@@ -60,13 +60,6 @@ jobs:
       with:
         targets: ${{ matrix.target }}
 
-    - name: Install cross tool (Linux ARM64)
-      if: matrix.target == 'aarch64-unknown-linux-gnu'
-      run: |
-        # Use pre-built binary for faster installation
-        curl -L https://github.com/cross-rs/cross/releases/latest/download/cross-x86_64-unknown-linux-gnu.tar.gz | tar xz
-        sudo mv cross /usr/local/bin/
-
     - name: Cache cargo registry
       uses: actions/cache@v4
       with:
@@ -78,25 +71,29 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-${{ matrix.target }}-cargo-
 
-    - name: Build release binary (ARM64 Linux)
-      if: matrix.target == 'aarch64-unknown-linux-gnu'
-      run: cross build --release --target ${{ matrix.target }} --bin ck
-
-    - name: Build release binary (x86_64 Linux)
-      if: matrix.target == 'x86_64-unknown-linux-gnu'
-      env:
-        PKG_CONFIG_PATH: "/usr/lib/x86_64-linux-gnu/pkgconfig"
-        PKG_CONFIG_ALLOW_CROSS: "0"
+    - name: Install build dependencies (Linux)
+      if: runner.os == 'Linux'
       run: |
-        # Install OpenSSL development packages for x86_64
         sudo apt-get update
+        if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+        fi
         sudo apt-get install -y libssl-dev pkg-config
-        # Clear any cross-compilation environment variables
-        unset CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER
-        cargo build --release --target ${{ matrix.target }} --bin ck
+
+    - name: Build release binary (Linux ARM64)
+      if: matrix.target == 'aarch64-unknown-linux-gnu'
+      env:
+        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: "aarch64-linux-gnu-gcc"
+        OPENSSL_DIR: "/usr"
+        OPENSSL_STATIC: "1"
+      run: cargo build --release --target ${{ matrix.target }} --bin ck
+
+    - name: Build release binary (Linux x86_64)
+      if: matrix.target == 'x86_64-unknown-linux-gnu'
+      run: cargo build --release --target ${{ matrix.target }} --bin ck
 
     - name: Build release binary (macOS and Windows)
-      if: matrix.target != 'aarch64-unknown-linux-gnu' && matrix.target != 'x86_64-unknown-linux-gnu'
+      if: runner.os != 'Linux'
       run: cargo build --release --target ${{ matrix.target }} --bin ck
 
     - name: Strip binary (Unix)
