@@ -429,13 +429,47 @@ pub async fn smart_update_index_with_progress(
     let current_files: Vec<PathBuf> = WalkDir::new(path)
         .into_iter()
         .filter_entry(|e| {
-            !e.path().starts_with(&index_dir) && !should_exclude_path(e.path(), &exclude_patterns)
+            let should_exclude = e.path().starts_with(&index_dir) || should_exclude_path(e.path(), &exclude_patterns);
+            eprintln!("DEBUG: filter_entry path={:?}, starts_with_index_dir={}, should_exclude_path={}, final_exclude={}", 
+                      e.path(), e.path().starts_with(&index_dir), should_exclude_path(e.path(), &exclude_patterns), should_exclude);
+            !should_exclude
         })
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
-        .filter(|e| is_text_file(e.path()))
-        .map(|e| e.path().to_path_buf())
+        .filter_map(|e| {
+            match e {
+                Ok(entry) => {
+                    eprintln!("DEBUG: WalkDir entry OK: {:?}, is_file={}", entry.path(), entry.file_type().is_file());
+                    Some(entry)
+                },
+                Err(err) => {
+                    eprintln!("DEBUG: WalkDir entry ERROR: {}", err);
+                    None
+                }
+            }
+        })
+        .filter(|e| {
+            let is_file = e.file_type().is_file();
+            eprintln!("DEBUG: file_type filter: {:?}, is_file={}", e.path(), is_file);
+            is_file
+        })
+        .filter(|e| {
+            let is_text = is_text_file(e.path());
+            eprintln!("DEBUG: is_text_file filter: {:?}, is_text={}", e.path(), is_text);
+            is_text
+        })
+        .map(|e| {
+            let path_buf = e.path().to_path_buf();
+            eprintln!("DEBUG: final mapped path: {:?}", path_buf);
+            path_buf
+        })
         .collect();
+
+    eprintln!(
+        "DEBUG: current_files collected: {} files",
+        current_files.len()
+    );
+    for (i, file) in current_files.iter().enumerate() {
+        eprintln!("DEBUG: current_files[{}] = {:?}", i, file);
+    }
 
     // First pass: determine which files need updating and collect stats
     let mut files_to_update = Vec::new();
