@@ -84,10 +84,15 @@ jobs:
 
     - name: Build release binary (x86_64 Linux)
       if: matrix.target == 'x86_64-unknown-linux-gnu'
+      env:
+        PKG_CONFIG_PATH: "/usr/lib/x86_64-linux-gnu/pkgconfig"
+        PKG_CONFIG_ALLOW_CROSS: "0"
       run: |
         # Install OpenSSL development packages for x86_64
         sudo apt-get update
         sudo apt-get install -y libssl-dev pkg-config
+        # Clear any cross-compilation environment variables
+        unset CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER
         cargo build --release --target ${{ matrix.target }} --bin ck
 
     - name: Build release binary (macOS and Windows)
