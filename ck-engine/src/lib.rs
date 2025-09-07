@@ -887,8 +887,7 @@ fn collect_files(
         for entry in WalkDir::new(path).into_iter().filter_entry(|e| {
             // Skip excluded directories entirely for efficiency
             let name = e.file_name();
-            let should_include = !globset.is_match(e.path()) && !globset.is_match(name);
-            should_include
+            !globset.is_match(e.path()) && !globset.is_match(name)
         }) {
             match entry {
                 Ok(entry) => {
