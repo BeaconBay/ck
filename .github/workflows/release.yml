@@ -78,14 +78,16 @@ jobs:
         if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
           sudo apt-get install -y gcc-aarch64-linux-gnu
         fi
-        sudo apt-get install -y libssl-dev pkg-config
+        # Install build tools needed for vendored OpenSSL
+        sudo apt-get install -y build-essential pkg-config
 
     - name: Build release binary (Linux ARM64)
       if: matrix.target == 'aarch64-unknown-linux-gnu'
       env:
         CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: "aarch64-linux-gnu-gcc"
-        OPENSSL_DIR: "/usr"
-        OPENSSL_STATIC: "1"
+        CC_aarch64_unknown_linux_gnu: "aarch64-linux-gnu-gcc"
+        CXX_aarch64_unknown_linux_gnu: "aarch64-linux-gnu-g++"
+        AR_aarch64_unknown_linux_gnu: "aarch64-linux-gnu-ar"
       run: cargo build --release --target ${{ matrix.target }} --bin ck
 
     - name: Build release binary (Linux x86_64)
