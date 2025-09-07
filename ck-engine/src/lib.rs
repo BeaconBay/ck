@@ -1159,7 +1159,7 @@ mod tests {
         // Debug: check what files were collected
         let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
         eprintln!("DEBUG: Found {} files: {:?}", files.len(), files);
-        
+
         // Debug: check file contents
         for file in &files {
             if let Ok(content) = std::fs::read_to_string(file) {
@@ -1173,7 +1173,8 @@ mod tests {
         assert!(
             !results.is_empty(),
             "Should find matches for 'rust' in test files. Created files: {:?}, Found files: {:?}",
-            created_files, files
+            created_files,
+            files
         );
 
         // Should find matches in files containing "rust"
@@ -1206,10 +1207,17 @@ mod tests {
         let results = regex_search(&options).unwrap();
         if results.is_empty() {
             let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
-            eprintln!("DEBUG case_insensitive: Found {} files: {:?}", files.len(), files);
+            eprintln!(
+                "DEBUG case_insensitive: Found {} files: {:?}",
+                files.len(),
+                files
+            );
             for file in &files {
                 if let Ok(content) = std::fs::read_to_string(file) {
-                    eprintln!("DEBUG case_insensitive: File {:?} content: {:?}", file, content);
+                    eprintln!(
+                        "DEBUG case_insensitive: File {:?} content: {:?}",
+                        file, content
+                    );
                 }
             }
         }
@@ -1241,7 +1249,11 @@ mod tests {
         let results = regex_search(&options).unwrap();
         if results.is_empty() {
             let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
-            eprintln!("DEBUG fixed_string: Found {} files: {:?}", files.len(), files);
+            eprintln!(
+                "DEBUG fixed_string: Found {} files: {:?}",
+                files.len(),
+                files
+            );
             for file in &files {
                 if let Ok(content) = std::fs::read_to_string(file) {
                     eprintln!("DEBUG fixed_string: File {:?} content: {:?}", file, content);
@@ -1417,7 +1429,11 @@ mod tests {
         let results = search(&options).await.unwrap();
         if results.is_empty() {
             let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
-            eprintln!("DEBUG search_main: Found {} files: {:?}", files.len(), files);
+            eprintln!(
+                "DEBUG search_main: Found {} files: {:?}",
+                files.len(),
+                files
+            );
             for file in &files {
                 if let Ok(content) = std::fs::read_to_string(file) {
                     eprintln!("DEBUG search_main: File {:?} content: {:?}", file, content);
