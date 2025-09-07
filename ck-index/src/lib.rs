@@ -362,7 +362,8 @@ pub fn get_index_stats(path: &Path) -> Result<IndexStats> {
     for file_path in manifest.files.keys() {
         let sidecar_path = get_sidecar_path(path, file_path);
         if sidecar_path.exists()
-            && let Ok(entry) = load_index_entry(&sidecar_path) {
+            && let Ok(entry) = load_index_entry(&sidecar_path)
+        {
             stats.total_chunks += entry.chunks.len();
             stats.total_size_bytes += entry.metadata.size;
 
@@ -383,7 +384,8 @@ pub fn get_index_stats(path: &Path) -> Result<IndexStats> {
     {
         for entry in entries {
             if entry.file_type().is_file()
-                && let Ok(metadata) = entry.metadata() {
+                && let Ok(metadata) = entry.metadata()
+            {
                 stats.index_size_bytes += metadata.len();
             }
         }
@@ -474,7 +476,8 @@ pub async fn smart_update_index_with_progress(
             .iter()
             .filter_map(|file_path| {
                 if let Some(ref callback) = progress_callback
-                    && let Some(file_name) = file_path.file_name() {
+                    && let Some(file_name) = file_path.file_name()
+                {
                     callback(&file_name.to_string_lossy());
                 }
                 match index_single_file(file_path, path, Some(&mut embedder)) {
@@ -492,7 +495,8 @@ pub async fn smart_update_index_with_progress(
             .par_iter()
             .filter_map(|file_path| {
                 if let Some(ref callback) = progress_callback
-                    && let Some(file_name) = file_path.file_name() {
+                    && let Some(file_name) = file_path.file_name()
+                {
                     callback(&file_name.to_string_lossy());
                 }
                 match index_single_file(file_path, path, None) {
