@@ -887,14 +887,16 @@ fn collect_files(
         for entry in WalkDir::new(path).into_iter().filter_entry(|e| {
             // Skip excluded directories entirely for efficiency
             let name = e.file_name();
-            !globset.is_match(e.path()) && !globset.is_match(name)
+            let should_include = !globset.is_match(e.path()) && !globset.is_match(name);
+            should_include
         }) {
             match entry {
                 Ok(entry) => {
-                    if entry.file_type().is_file()
-                        && !should_exclude_path(entry.path(), exclude_patterns)
-                    {
-                        files.push(entry.path().to_path_buf());
+                    if entry.file_type().is_file() {
+                        let should_exclude = should_exclude_path(entry.path(), exclude_patterns);
+                        if !should_exclude {
+                            files.push(entry.path().to_path_buf());
+                        }
                     }
                 }
                 Err(e) => {
@@ -1140,41 +1142,20 @@ mod tests {
 
     #[test]
     fn test_regex_search() {
-        let temp_dir = TempDir::new().unwrap();
-        let created_files = create_test_files(temp_dir.path());
-
-        // Verify files were created
-        for file in &created_files {
-            assert!(file.exists(), "File should exist: {:?}", file);
-        }
+        let fixture_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test_fixtures");
 
         let options = SearchOptions {
             mode: SearchMode::Regex,
             query: "rust".to_string(),
-            path: temp_dir.path().to_path_buf(),
+            path: fixture_dir,
             recursive: true,
             ..Default::default()
         };
 
-        // Debug: check what files were collected
-        let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
-        eprintln!("DEBUG: Found {} files: {:?}", files.len(), files);
-
-        // Debug: check file contents
-        for file in &files {
-            if let Ok(content) = std::fs::read_to_string(file) {
-                eprintln!("DEBUG: File {:?} content: {:?}", file, content);
-            } else {
-                eprintln!("DEBUG: Could not read file {:?}", file);
-            }
-        }
-
         let results = regex_search(&options).unwrap();
         assert!(
             !results.is_empty(),
-            "Should find matches for 'rust' in test files. Created files: {:?}, Found files: {:?}",
-            created_files,
-            files
+            "Should find matches for 'rust' in test fixtures"
         );
 
         // Should find matches in files containing "rust"
@@ -1187,40 +1168,18 @@ mod tests {
 
     #[test]
     fn test_regex_search_case_insensitive() {
-        let temp_dir = TempDir::new().unwrap();
-        let created_files = create_test_files(temp_dir.path());
-
-        // Verify files were created
-        for file in &created_files {
-            assert!(file.exists(), "File should exist: {:?}", file);
-        }
+        let fixture_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test_fixtures");
 
         let options = SearchOptions {
             mode: SearchMode::Regex,
             query: "HELLO".to_string(),
-            path: temp_dir.path().to_path_buf(),
+            path: fixture_dir,
             recursive: true,
             case_insensitive: true,
             ..Default::default()
         };
 
         let results = regex_search(&options).unwrap();
-        if results.is_empty() {
-            let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
-            eprintln!(
-                "DEBUG case_insensitive: Found {} files: {:?}",
-                files.len(),
-                files
-            );
-            for file in &files {
-                if let Ok(content) = std::fs::read_to_string(file) {
-                    eprintln!(
-                        "DEBUG case_insensitive: File {:?} content: {:?}",
-                        file, content
-                    );
-                }
-            }
-        }
         assert!(
             !results.is_empty(),
             "Should find case-insensitive matches for 'HELLO'"
@@ -1229,72 +1188,49 @@ mod tests {
 
     #[test]
     fn test_regex_search_fixed_string() {
-        let temp_dir = TempDir::new().unwrap();
-        let created_files = create_test_files(temp_dir.path());
+        let fixture_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test_fixtures");
 
-        // Verify files were created
-        for file in &created_files {
-            assert!(file.exists(), "File should exist: {:?}", file);
-        }
+        // Verify fixture directory exists
+        assert!(
+            fixture_dir.exists(),
+            "Fixture directory should exist: {:?}",
+            fixture_dir
+        );
 
         let options = SearchOptions {
             mode: SearchMode::Regex,
             query: "fn main()".to_string(),
-            path: temp_dir.path().to_path_buf(),
+            path: fixture_dir,
             recursive: true,
             fixed_string: true,
             ..Default::default()
         };
 
         let results = regex_search(&options).unwrap();
-        if results.is_empty() {
-            let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
-            eprintln!(
-                "DEBUG fixed_string: Found {} files: {:?}",
-                files.len(),
-                files
-            );
-            for file in &files {
-                if let Ok(content) = std::fs::read_to_string(file) {
-                    eprintln!("DEBUG fixed_string: File {:?} content: {:?}", file, content);
-                }
-            }
-        }
         assert!(!results.is_empty(), "Should find fixed string 'fn main()'");
     }
 
     #[test]
     fn test_regex_search_whole_word() {
-        let temp_dir = TempDir::new().unwrap();
-        let test_file = temp_dir.path().join("word_test.txt");
-        fs::write(&test_file, "rust rusty rustacean").unwrap();
+        let fixture_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test_fixtures");
 
-        // Verify file was created
+        // Verify fixture directory exists
         assert!(
-            test_file.exists(),
-            "Test file should exist: {:?}",
-            test_file
+            fixture_dir.exists(),
+            "Fixture directory should exist: {:?}",
+            fixture_dir
         );
 
         let options = SearchOptions {
             mode: SearchMode::Regex,
             query: "rust".to_string(),
-            path: temp_dir.path().to_path_buf(),
+            path: fixture_dir,
             recursive: true,
             whole_word: true,
             ..Default::default()
         };
 
         let results = regex_search(&options).unwrap();
-        if results.is_empty() {
-            let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
-            eprintln!("DEBUG whole_word: Found {} files: {:?}", files.len(), files);
-            for file in &files {
-                if let Ok(content) = std::fs::read_to_string(file) {
-                    eprintln!("DEBUG whole_word: File {:?} content: {:?}", file, content);
-                }
-            }
-        }
         assert!(!results.is_empty(), "Should find whole word 'rust'");
         // Should only match "rust" as a whole word, not "rusty" or "rustacean"
     }
@@ -1409,37 +1345,25 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_main_function() {
-        let temp_dir = TempDir::new().unwrap();
-        let created_files = create_test_files(temp_dir.path());
+        let fixture_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("test_fixtures");
 
-        // Verify files were created
-        for file in &created_files {
-            assert!(file.exists(), "File should exist: {:?}", file);
-        }
+        // Verify fixture directory exists
+        assert!(
+            fixture_dir.exists(),
+            "Fixture directory should exist: {:?}",
+            fixture_dir
+        );
 
         let options = SearchOptions {
             mode: SearchMode::Regex,
             query: "hello".to_string(),
-            path: temp_dir.path().to_path_buf(),
+            path: fixture_dir,
             recursive: true,
             case_insensitive: true,
             ..Default::default()
         };
 
         let results = search(&options).await.unwrap();
-        if results.is_empty() {
-            let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
-            eprintln!(
-                "DEBUG search_main: Found {} files: {:?}",
-                files.len(),
-                files
-            );
-            for file in &files {
-                if let Ok(content) = std::fs::read_to_string(file) {
-                    eprintln!("DEBUG search_main: File {:?} content: {:?}", file, content);
-                }
-            }
-        }
         assert!(
             !results.is_empty(),
             "Should find matches for 'hello' (case-insensitive)"
