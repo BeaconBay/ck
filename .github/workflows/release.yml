@@ -75,13 +75,13 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-${{ matrix.target }}-cargo-
 
-    - name: Build release binary
-      run: |
-        if [ "${{ matrix.target }}" = "aarch64-unknown-linux-gnu" ]; then
-          cross build --release --target ${{ matrix.target }} --bin ck
-        else
-          cargo build --release --target ${{ matrix.target }} --bin ck
-        fi
+    - name: Build release binary (ARM64 Linux)
+      if: matrix.target == 'aarch64-unknown-linux-gnu'
+      run: cross build --release --target ${{ matrix.target }} --bin ck
+
+    - name: Build release binary (Other targets)
+      if: matrix.target != 'aarch64-unknown-linux-gnu'
+      run: cargo build --release --target ${{ matrix.target }} --bin ck
 
     - name: Strip binary (Unix)
       if: matrix.os != 'windows-latest'
