@@ -2,6 +2,12 @@
 
 **ck (seek)** finds code by meaning, not just keywords. It's a drop-in replacement for `grep` that understands what you're looking for — search for "error handling" and find try/catch blocks, error returns, and exception handling code even when those exact words aren't present.
 
+## Quick start
+```bash
+cargo install ck-search
+```
+
+
 ```bash
 # Find error handling patterns (finds try/catch, Result types, etc.)
 ck --sem "error handling" src/
@@ -183,16 +189,6 @@ ck add new_file.rs
 | JavaScript | ✅ | ✅ | ✅ Functions, classes, methods |
 | TypeScript | ✅ | ✅ | ✅ Functions, classes, methods |
 | Haskell | ✅ | ✅ | ✅ Functions, types, instances |
-| Rust | ✅ | ❌ | ❌ Generic text chunks |
-| Go | ✅ | ❌ | ❌ Generic text chunks |
-| Java | ✅ | ❌ | ❌ Generic text chunks |
-| C/C++ | ✅ | ❌ | ❌ Generic text chunks |
-| C# | ✅ | ❌ | ❌ Generic text chunks |
-| Ruby | ✅ | ❌ | ❌ Generic text chunks |
-| PHP | ✅ | ❌ | ❌ Generic text chunks |
-| Swift | ✅ | ❌ | ❌ Generic text chunks |
-| Kotlin | ✅ | ❌ | ❌ Generic text chunks |
-| Scala | ✅ | ❌ | ❌ Generic text chunks |
 
 **Text Formats:** Markdown, JSON, YAML, TOML, XML, HTML, CSS, shell scripts, SQL, and plain text.
 
@@ -211,7 +207,6 @@ cargo install --path ck-cli
 ```bash
 # Coming soon:
 brew install ck-search
-cargo install ck-search  
 apt install ck-search
 ```
 
