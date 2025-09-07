@@ -1029,7 +1029,12 @@ mod tests {
     #[test]
     fn test_regex_search() {
         let temp_dir = TempDir::new().unwrap();
-        create_test_files(temp_dir.path());
+        let created_files = create_test_files(temp_dir.path());
+        
+        // Verify files were created
+        for file in &created_files {
+            assert!(file.exists(), "File should exist: {:?}", file);
+        }
 
         let options = SearchOptions {
             mode: SearchMode::Regex,
@@ -1040,7 +1045,7 @@ mod tests {
         };
 
         let results = regex_search(&options).unwrap();
-        assert!(!results.is_empty());
+        assert!(!results.is_empty(), "Should find matches for 'rust' in test files");
         
         // Should find matches in files containing "rust"
         let rust_matches: Vec<_> = results.iter()
@@ -1052,7 +1057,12 @@ mod tests {
     #[test]
     fn test_regex_search_case_insensitive() {
         let temp_dir = TempDir::new().unwrap();
-        create_test_files(temp_dir.path());
+        let created_files = create_test_files(temp_dir.path());
+        
+        // Verify files were created
+        for file in &created_files {
+            assert!(file.exists(), "File should exist: {:?}", file);
+        }
 
         let options = SearchOptions {
             mode: SearchMode::Regex,
@@ -1064,13 +1074,18 @@ mod tests {
         };
 
         let results = regex_search(&options).unwrap();
-        assert!(!results.is_empty());
+        assert!(!results.is_empty(), "Should find case-insensitive matches for 'HELLO'");
     }
 
     #[test]
     fn test_regex_search_fixed_string() {
         let temp_dir = TempDir::new().unwrap();
-        create_test_files(temp_dir.path());
+        let created_files = create_test_files(temp_dir.path());
+        
+        // Verify files were created
+        for file in &created_files {
+            assert!(file.exists(), "File should exist: {:?}", file);
+        }
 
         let options = SearchOptions {
             mode: SearchMode::Regex,
@@ -1082,13 +1097,17 @@ mod tests {
         };
 
         let results = regex_search(&options).unwrap();
-        assert!(!results.is_empty());
+        assert!(!results.is_empty(), "Should find fixed string 'fn main()'");
     }
 
     #[test]
     fn test_regex_search_whole_word() {
         let temp_dir = TempDir::new().unwrap();
-        fs::write(temp_dir.path().join("word_test.txt"), "rust rusty rustacean").unwrap();
+        let test_file = temp_dir.path().join("word_test.txt");
+        fs::write(&test_file, "rust rusty rustacean").unwrap();
+        
+        // Verify file was created
+        assert!(test_file.exists(), "Test file should exist: {:?}", test_file);
 
         let options = SearchOptions {
             mode: SearchMode::Regex,
@@ -1100,7 +1119,7 @@ mod tests {
         };
 
         let results = regex_search(&options).unwrap();
-        assert!(!results.is_empty());
+        assert!(!results.is_empty(), "Should find whole word 'rust'");
         // Should only match "rust" as a whole word, not "rusty" or "rustacean"
     }
 
@@ -1207,7 +1226,12 @@ mod tests {
     #[tokio::test]
     async fn test_search_main_function() {
         let temp_dir = TempDir::new().unwrap();
-        create_test_files(temp_dir.path());
+        let created_files = create_test_files(temp_dir.path());
+        
+        // Verify files were created
+        for file in &created_files {
+            assert!(file.exists(), "File should exist: {:?}", file);
+        }
 
         let options = SearchOptions {
             mode: SearchMode::Regex,
@@ -1219,6 +1243,6 @@ mod tests {
         };
 
         let results = search(&options).await.unwrap();
-        assert!(!results.is_empty());
+        assert!(!results.is_empty(), "Should find matches for 'hello' (case-insensitive)");
     }
 }
