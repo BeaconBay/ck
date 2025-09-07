@@ -812,8 +812,33 @@ mod tests {
         // Create initial file
         fs::write(test_path.join("file1.txt"), "initial content").unwrap();
 
+        // Ensure file is flushed to disk
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+
+        // Debug: Check if file exists and its properties
+        let file1_path = test_path.join("file1.txt");
+        eprintln!(
+            "DEBUG: file1_path={:?}, exists={}, is_text_file={}",
+            file1_path,
+            file1_path.exists(),
+            is_text_file(&file1_path)
+        );
+        if file1_path.exists() {
+            if let Ok(content) = fs::read_to_string(&file1_path) {
+                eprintln!("DEBUG: file1 content: '{}'", content);
+            }
+        }
+
         // First index
         let stats1 = smart_update_index(test_path, false).await.unwrap();
+        eprintln!(
+            "DEBUG: stats1 = files_added={}, files_indexed={}, files_up_to_date={}, files_modified={}, files_errored={}",
+            stats1.files_added,
+            stats1.files_indexed,
+            stats1.files_up_to_date,
+            stats1.files_modified,
+            stats1.files_errored
+        );
         assert_eq!(stats1.files_added, 1);
         assert_eq!(stats1.files_indexed, 1);
 
