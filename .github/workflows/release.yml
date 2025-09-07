@@ -9,7 +9,7 @@ on:
       tag:
         description: 'Tag to release'
         required: true
-        default: 'v0.3.3'
+        default: 'v0.3.4'
 
 env:
   CARGO_TERM_COLOR: always
