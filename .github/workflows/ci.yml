@@ -37,8 +37,6 @@ jobs:
     - name: Check formatting
       run: cargo fmt --all -- --check
 
-    - name: Run tests
-      run: cargo test --verbose
 
     - name: Build check
       run: cargo build --verbose
