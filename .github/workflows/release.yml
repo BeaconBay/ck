@@ -64,13 +64,25 @@ jobs:
       if: matrix.target == 'aarch64-unknown-linux-gnu'
       run: |
         sudo apt-get update
-        sudo apt-get install -y gcc-aarch64-linux-gnu
+        sudo apt-get install -y gcc-aarch64-linux-gnu pkg-config
+        # Enable multiarch for ARM64 packages
+        sudo dpkg --add-architecture arm64
+        sudo apt-get update
+        sudo apt-get install -y libssl-dev:arm64
 
     - name: Configure cross-compilation (Linux ARM64)
       if: matrix.target == 'aarch64-unknown-linux-gnu'
       run: |
         echo '[target.aarch64-unknown-linux-gnu]' >> ~/.cargo/config.toml
         echo 'linker = "aarch64-linux-gnu-gcc"' >> ~/.cargo/config.toml
+
+    - name: Set OpenSSL environment for ARM64 (Linux ARM64)
+      if: matrix.target == 'aarch64-unknown-linux-gnu'
+      run: |
+        echo "PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig" >> $GITHUB_ENV
+        echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
+        echo "OPENSSL_LIB_DIR=/usr/lib/aarch64-linux-gnu" >> $GITHUB_ENV
+        echo "OPENSSL_INCLUDE_DIR=/usr/include/openssl" >> $GITHUB_ENV
 
     - name: Cache cargo registry
       uses: actions/cache@v4
