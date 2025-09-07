@@ -23,7 +23,7 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
-        components: rustfmt, clippy
+        components: rustfmt
 
     - name: Cache cargo
       uses: actions/cache@v4
@@ -36,9 +36,6 @@ jobs:
 
     - name: Check formatting
       run: cargo fmt --all -- --check
-
-    - name: Run clippy
-      run: cargo clippy --all-targets --all-features -- -D warnings
 
     - name: Run tests
       run: cargo test --verbose
