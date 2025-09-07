@@ -207,18 +207,39 @@ ck add new_file.rs
 
 ## Installation
 
-### From Source
+### 📦 Pre-built Binaries (Recommended)
+
+**Download for your platform:**
+- **Linux (x86_64):** `ck-linux-x86_64.tar.gz`
+- **Linux (ARM64):** `ck-linux-aarch64.tar.gz` 
+- **macOS (Intel):** `ck-macos-x86_64.tar.gz`
+- **macOS (Apple Silicon):** `ck-macos-aarch64.tar.gz`
+- **Windows (x64):** `ck-windows-x86_64.zip`
+
+**Get the latest release:** https://github.com/BeaconBay/ck/releases/latest
+
+```bash
+# Example: Linux x86_64
+curl -L https://github.com/BeaconBay/ck/releases/latest/download/ck-linux-x86_64.tar.gz | tar xz
+sudo mv ck /usr/local/bin/
+```
+
+### 🦀 Via Cargo
+```bash
+cargo install ck-search
+```
+
+### 🔨 From Source
 ```bash
 git clone https://github.com/BeaconBay/ck
 cd ck
 cargo install --path ck-cli
 ```
 
-### Package Managers (Planned)
+### 🍺 Package Managers (Planned)
 ```bash
 # Coming soon:
 brew install ck-search
-cargo install ck-search  
 apt install ck-search
 ```
 
