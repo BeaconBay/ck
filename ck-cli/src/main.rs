@@ -576,29 +576,25 @@ async fn run_main() -> Result<()> {
                 status.info(&format!("  Index size: {:.1} MB", index_size_mb));
 
                 use std::time::UNIX_EPOCH;
-                if stats.index_created > 0 {
-                    if let Some(created) =
+                if stats.index_created > 0
+                    && let Some(created) =
                         UNIX_EPOCH.checked_add(std::time::Duration::from_secs(stats.index_created))
-                    {
-                        if let Ok(datetime) = created.elapsed() {
-                            status.info(&format!(
-                                "  Created: {:.1} hours ago",
-                                datetime.as_secs() as f64 / 3600.0
-                            ));
-                        }
-                    }
+                    && let Ok(datetime) = created.elapsed()
+                {
+                    status.info(&format!(
+                        "  Created: {:.1} hours ago",
+                        datetime.as_secs() as f64 / 3600.0
+                    ));
                 }
-                if stats.index_updated > 0 {
-                    if let Some(updated) =
+                if stats.index_updated > 0
+                    && let Some(updated) =
                         UNIX_EPOCH.checked_add(std::time::Duration::from_secs(stats.index_updated))
-                    {
-                        if let Ok(datetime) = updated.elapsed() {
-                            status.info(&format!(
-                                "  Updated: {:.1} hours ago",
-                                datetime.as_secs() as f64 / 3600.0
-                            ));
-                        }
-                    }
+                    && let Ok(datetime) = updated.elapsed()
+                {
+                    status.info(&format!(
+                        "  Updated: {:.1} hours ago",
+                        datetime.as_secs() as f64 / 3600.0
+                    ));
                 }
 
                 // Show compression ratio

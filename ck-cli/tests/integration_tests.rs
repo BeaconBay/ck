@@ -13,7 +13,7 @@ fn get_ck_binary() -> PathBuf {
 
     // Ensure binary exists by building it
     let output = Command::new("cargo")
-        .args(&["build", "--bin", "ck"])
+        .args(["build", "--bin", "ck"])
         .output()
         .expect("Failed to build ck binary");
 
@@ -50,7 +50,7 @@ fn test_basic_grep_functionality() {
 
     // Test basic regex search
     let output = Command::new(get_ck_binary())
-        .args(&["rust", temp_dir.path().to_str().unwrap()])
+        .args(["rust", temp_dir.path().to_str().unwrap()])
         .output()
         .expect("Failed to run ck");
 
@@ -70,7 +70,7 @@ fn test_case_insensitive_search() {
     .unwrap();
 
     let output = Command::new(get_ck_binary())
-        .args(&["-i", "HELLO", temp_dir.path().to_str().unwrap()])
+        .args(["-i", "HELLO", temp_dir.path().to_str().unwrap()])
         .output()
         .expect("Failed to run ck");
 
@@ -92,7 +92,7 @@ fn test_recursive_search() {
     .unwrap();
 
     let output = Command::new(get_ck_binary())
-        .args(&["-r", "target", temp_dir.path().to_str().unwrap()])
+        .args(["-r", "target", temp_dir.path().to_str().unwrap()])
         .output()
         .expect("Failed to run ck");
 
@@ -108,7 +108,7 @@ fn test_json_output() {
     fs::write(temp_dir.path().join("test.txt"), "json test line").unwrap();
 
     let output = Command::new(get_ck_binary())
-        .args(&["--json", "json", temp_dir.path().to_str().unwrap()])
+        .args(["--json", "json", temp_dir.path().to_str().unwrap()])
         .output()
         .expect("Failed to run ck");
 
@@ -129,7 +129,7 @@ fn test_index_command() {
 
     // Test index creation
     let output = Command::new(get_ck_binary())
-        .args(&["--index", "."])
+        .args(["--index", "."])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to run ck index");
@@ -171,7 +171,7 @@ fn test_semantic_search() {
 
     // First create an index
     let output = Command::new(get_ck_binary())
-        .args(&["--index", "."])
+        .args(["--index", "."])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to run ck index");
@@ -180,7 +180,7 @@ fn test_semantic_search() {
 
     // Test semantic search - should rank AI content higher for "neural networks"
     let output = Command::new(get_ck_binary())
-        .args(&["--sem", "neural networks", "."])
+        .args(["--sem", "neural networks", "."])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to run ck semantic search");
@@ -217,7 +217,7 @@ fn test_lexical_search() {
 
     // Create index
     let output = Command::new(get_ck_binary())
-        .args(&["--index", "."])
+        .args(["--index", "."])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to run ck index");
@@ -226,7 +226,7 @@ fn test_lexical_search() {
 
     // Test lexical search
     let output = Command::new(get_ck_binary())
-        .args(&["--lex", "machine learning", "."])
+        .args(["--lex", "machine learning", "."])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to run ck lexical search");
@@ -248,7 +248,7 @@ fn test_hybrid_search() {
 
     // Create index
     let output = Command::new(get_ck_binary())
-        .args(&["--index", "."])
+        .args(["--index", "."])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to run ck index");
@@ -257,7 +257,7 @@ fn test_hybrid_search() {
 
     // Test hybrid search
     let output = Command::new(get_ck_binary())
-        .args(&["--hybrid", "Python", "."])
+        .args(["--hybrid", "Python", "."])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to run ck hybrid search");
@@ -278,7 +278,7 @@ fn test_context_lines() {
     .unwrap();
 
     let output = Command::new(get_ck_binary())
-        .args(&["-C", "1", "target", temp_dir.path().to_str().unwrap()])
+        .args(["-C", "1", "target", temp_dir.path().to_str().unwrap()])
         .output()
         .expect("Failed to run ck with context");
 
@@ -305,7 +305,7 @@ fn test_topk_limit() {
     }
 
     let output = Command::new(get_ck_binary())
-        .args(&["--topk", "5", "match", temp_dir.path().to_str().unwrap()])
+        .args(["--topk", "5", "match", temp_dir.path().to_str().unwrap()])
         .output()
         .expect("Failed to run ck with topk");
 
@@ -325,7 +325,7 @@ fn test_line_numbers() {
     .unwrap();
 
     let output = Command::new(get_ck_binary())
-        .args(&["-n", "matched", temp_dir.path().to_str().unwrap()])
+        .args(["-n", "matched", temp_dir.path().to_str().unwrap()])
         .output()
         .expect("Failed to run ck with line numbers");
 
@@ -343,7 +343,7 @@ fn test_clean_command() {
 
     // Create index first
     let output = Command::new(get_ck_binary())
-        .args(&["--index", "."])
+        .args(["--index", "."])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to run ck index");
@@ -360,7 +360,7 @@ fn test_clean_command() {
 
     // Clean index
     let output = Command::new(get_ck_binary())
-        .args(&["--clean", "."])
+        .args(["--clean", "."])
         .current_dir(temp_dir.path())
         .output()
         .expect("Failed to run ck clean");
@@ -383,7 +383,7 @@ fn test_no_matches_stderr_message() {
 
     // Search for pattern that won't match
     let output = Command::new(get_ck_binary())
-        .args(&["nonexistent_pattern", temp_dir.path().to_str().unwrap()])
+        .args(["nonexistent_pattern", temp_dir.path().to_str().unwrap()])
         .output()
         .expect("Failed to run ck");
 
@@ -403,7 +403,7 @@ fn test_no_matches_stderr_message() {
 #[test]
 fn test_nonexistent_directory_error() {
     let output = Command::new(get_ck_binary())
-        .args(&["--sem", "test", "/nonexistent/directory"])
+        .args(["--sem", "test", "/nonexistent/directory"])
         .output()
         .expect("Failed to run ck");
 
@@ -418,7 +418,7 @@ fn test_nonexistent_directory_error() {
 fn test_error_handling() {
     // Test with nonexistent directory
     let _output = Command::new(get_ck_binary())
-        .args(&["test", "/nonexistent/directory"])
+        .args(["test", "/nonexistent/directory"])
         .output()
         .expect("Failed to run ck");
 
@@ -430,7 +430,7 @@ fn test_error_handling() {
     fs::write(temp_dir.path().join("test.txt"), "test content").unwrap();
 
     let output = Command::new(get_ck_binary())
-        .args(&["[invalid", temp_dir.path().to_str().unwrap()])
+        .args(["[invalid", temp_dir.path().to_str().unwrap()])
         .output()
         .expect("Failed to run ck");
 
