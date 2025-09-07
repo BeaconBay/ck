@@ -53,7 +53,7 @@ impl AnnIndex for SimpleIndex {
         Self: Sized,
     {
         if vectors.is_empty() {
-            return Ok(Self::new()?);
+            return Self::new();
         }
 
         let dim = vectors[0].len();
@@ -236,13 +236,13 @@ mod tests {
     fn test_add() {
         let mut index = SimpleIndex::new().unwrap();
 
-        index.add(100, &vec![1.0, 2.0, 3.0]);
+        index.add(100, &[1.0, 2.0, 3.0]);
         assert_eq!(index.vectors.len(), 1);
         assert_eq!(index.ids.len(), 1);
         assert_eq!(index.ids[0], 100);
         assert_eq!(index.dim, 3);
 
-        index.add(200, &vec![4.0, 5.0, 6.0]);
+        index.add(200, &[4.0, 5.0, 6.0]);
         assert_eq!(index.vectors.len(), 2);
         assert_eq!(index.ids.len(), 2);
         assert_eq!(index.ids[1], 200);
@@ -310,8 +310,8 @@ mod tests {
         assert_eq!(results[0].0, 0);
 
         // Test add through trait
-        index.add(99, &vec![0.0, 0.0, 1.0]);
-        let results = index.search(&vec![0.0, 0.0, 1.0], 1);
+        index.add(99, &[0.0, 0.0, 1.0]);
+        let results = index.search(&[0.0, 0.0, 1.0], 1);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].0, 99);
     }

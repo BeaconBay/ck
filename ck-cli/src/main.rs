@@ -3,7 +3,7 @@ use ck_core::{SearchMode, SearchOptions};
 use clap::Parser;
 use console::style;
 use owo_colors::{OwoColorize, Rgb};
-use regex::{Regex, RegexBuilder};
+use regex::RegexBuilder;
 use std::path::{Path, PathBuf};
 
 mod progress;
