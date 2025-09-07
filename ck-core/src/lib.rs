@@ -1,30 +1,30 @@
-use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum CkError {
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
-    
+
     #[error("Regex error: {0}")]
     Regex(#[from] regex::Error),
-    
+
     #[error("Serialization error: {0}")]
     Serialization(#[from] bincode::Error),
-    
+
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
-    
+
     #[error("Index error: {0}")]
     Index(String),
-    
+
     #[error("Search error: {0}")]
     Search(String),
-    
+
     #[error("Embedding error: {0}")]
     Embedding(String),
-    
+
     #[error("Other error: {0}")]
     Other(String),
 }
@@ -145,39 +145,33 @@ pub fn get_default_exclude_patterns() -> Vec<String> {
     vec![
         // ck's own index directory
         ".ck".to_string(),
-        
         // AI/ML model cache directories
         ".fastembed_cache".to_string(),
         ".cache".to_string(),
         "__pycache__".to_string(),
-        
         // Version control
         ".git".to_string(),
         ".svn".to_string(),
         ".hg".to_string(),
-        
         // Build directories
-        "target".to_string(),        // Rust
-        "build".to_string(),         // Various
-        "dist".to_string(),          // JavaScript/Python
-        "node_modules".to_string(),  // JavaScript
-        ".gradle".to_string(),       // Java
-        ".mvn".to_string(),          // Maven
-        "bin".to_string(),           // Various
-        "obj".to_string(),           // .NET
-        
+        "target".to_string(),       // Rust
+        "build".to_string(),        // Various
+        "dist".to_string(),         // JavaScript/Python
+        "node_modules".to_string(), // JavaScript
+        ".gradle".to_string(),      // Java
+        ".mvn".to_string(),         // Maven
+        "bin".to_string(),          // Various
+        "obj".to_string(),          // .NET
         // Python virtual environments
         "venv".to_string(),
         ".venv".to_string(),
         "env".to_string(),
         ".env".to_string(),
         "virtualenv".to_string(),
-        
         // IDE/Editor directories
         ".vscode".to_string(),
         ".idea".to_string(),
         ".eclipse".to_string(),
-        
         // Temporary directories
         "tmp".to_string(),
         "temp".to_string(),
@@ -217,7 +211,7 @@ mod tests {
             line_start: 1,
             line_end: 2,
         };
-        
+
         assert_eq!(span.byte_start, 0);
         assert_eq!(span.byte_end, 10);
         assert_eq!(span.line_start, 1);
@@ -292,10 +286,10 @@ mod tests {
     fn test_get_sidecar_path() {
         let repo_root = PathBuf::from("/home/user/project");
         let file_path = PathBuf::from("/home/user/project/src/main.rs");
-        
+
         let sidecar = get_sidecar_path(&repo_root, &file_path);
         let expected = PathBuf::from("/home/user/project/.ck/src/main.rs.ck");
-        
+
         assert_eq!(sidecar, expected);
     }
 
@@ -303,10 +297,10 @@ mod tests {
     fn test_get_sidecar_path_no_extension() {
         let repo_root = PathBuf::from("/project");
         let file_path = PathBuf::from("/project/README");
-        
+
         let sidecar = get_sidecar_path(&repo_root, &file_path);
         let expected = PathBuf::from("/project/.ck/README.ck");
-        
+
         assert_eq!(sidecar, expected);
     }
 
@@ -314,16 +308,16 @@ mod tests {
     fn test_compute_file_hash() {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.txt");
-        
+
         fs::write(&file_path, "hello world").unwrap();
-        
+
         let hash1 = compute_file_hash(&file_path).unwrap();
         let hash2 = compute_file_hash(&file_path).unwrap();
-        
+
         // Same content should produce same hash
         assert_eq!(hash1, hash2);
         assert!(!hash1.is_empty());
-        
+
         // Different content should produce different hash
         fs::write(&file_path, "hello rust").unwrap();
         let hash3 = compute_file_hash(&file_path).unwrap();

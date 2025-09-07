@@ -21,7 +21,7 @@ pub struct ModelRegistry {
 impl Default for ModelRegistry {
     fn default() -> Self {
         let mut models = HashMap::new();
-        
+
         models.insert(
             "bge-small".to_string(),
             ModelConfig {
@@ -32,7 +32,7 @@ impl Default for ModelRegistry {
                 description: "Small, fast English embedding model".to_string(),
             },
         );
-        
+
         models.insert(
             "minilm".to_string(),
             ModelConfig {
@@ -43,7 +43,7 @@ impl Default for ModelRegistry {
                 description: "Lightweight English embedding model".to_string(),
             },
         );
-        
+
         Self {
             models,
             default_model: "bge-small".to_string(),
@@ -60,17 +60,17 @@ impl ModelRegistry {
             Ok(Self::default())
         }
     }
-    
+
     pub fn save(&self, path: &Path) -> Result<()> {
         let data = serde_json::to_string_pretty(self)?;
         std::fs::write(path, data)?;
         Ok(())
     }
-    
+
     pub fn get_model(&self, name: &str) -> Option<&ModelConfig> {
         self.models.get(name)
     }
-    
+
     pub fn get_default_model(&self) -> Option<&ModelConfig> {
         self.models.get(&self.default_model)
     }
@@ -104,7 +104,7 @@ impl ProjectConfig {
             Ok(Self::default())
         }
     }
-    
+
     pub fn save(&self, path: &Path) -> Result<()> {
         let data = serde_json::to_string_pretty(self)?;
         std::fs::write(path, data)?;
