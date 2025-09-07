@@ -15,6 +15,7 @@ ck-core = { version = "0.3.2", path = "../ck-core" }
 anyhow = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
+openssl-sys = { workspace = true }
 
 fastembed = { workspace = true, optional = true }
 
