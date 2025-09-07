@@ -77,13 +77,18 @@ jobs:
 
     - name: Build release binary (ARM64 Linux)
       if: matrix.target == 'aarch64-unknown-linux-gnu'
-      env:
-        OPENSSL_STATIC: "1"
-        OPENSSL_VENDOR: "1"
       run: cross build --release --target ${{ matrix.target }} --bin ck
 
-    - name: Build release binary (Other targets)
-      if: matrix.target != 'aarch64-unknown-linux-gnu'
+    - name: Build release binary (x86_64 Linux)
+      if: matrix.target == 'x86_64-unknown-linux-gnu'
+      run: |
+        # Install OpenSSL development packages for x86_64
+        sudo apt-get update
+        sudo apt-get install -y libssl-dev pkg-config
+        cargo build --release --target ${{ matrix.target }} --bin ck
+
+    - name: Build release binary (macOS and Windows)
+      if: matrix.target != 'aarch64-unknown-linux-gnu' && matrix.target != 'x86_64-unknown-linux-gnu'
       run: cargo build --release --target ${{ matrix.target }} --bin ck
 
     - name: Strip binary (Unix)
