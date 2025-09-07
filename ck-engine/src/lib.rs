@@ -1156,10 +1156,24 @@ mod tests {
             ..Default::default()
         };
 
+        // Debug: check what files were collected
+        let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
+        eprintln!("DEBUG: Found {} files: {:?}", files.len(), files);
+        
+        // Debug: check file contents
+        for file in &files {
+            if let Ok(content) = std::fs::read_to_string(file) {
+                eprintln!("DEBUG: File {:?} content: {:?}", file, content);
+            } else {
+                eprintln!("DEBUG: Could not read file {:?}", file);
+            }
+        }
+
         let results = regex_search(&options).unwrap();
         assert!(
             !results.is_empty(),
-            "Should find matches for 'rust' in test files"
+            "Should find matches for 'rust' in test files. Created files: {:?}, Found files: {:?}",
+            created_files, files
         );
 
         // Should find matches in files containing "rust"
@@ -1190,6 +1204,15 @@ mod tests {
         };
 
         let results = regex_search(&options).unwrap();
+        if results.is_empty() {
+            let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
+            eprintln!("DEBUG case_insensitive: Found {} files: {:?}", files.len(), files);
+            for file in &files {
+                if let Ok(content) = std::fs::read_to_string(file) {
+                    eprintln!("DEBUG case_insensitive: File {:?} content: {:?}", file, content);
+                }
+            }
+        }
         assert!(
             !results.is_empty(),
             "Should find case-insensitive matches for 'HELLO'"
@@ -1216,6 +1239,15 @@ mod tests {
         };
 
         let results = regex_search(&options).unwrap();
+        if results.is_empty() {
+            let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
+            eprintln!("DEBUG fixed_string: Found {} files: {:?}", files.len(), files);
+            for file in &files {
+                if let Ok(content) = std::fs::read_to_string(file) {
+                    eprintln!("DEBUG fixed_string: File {:?} content: {:?}", file, content);
+                }
+            }
+        }
         assert!(!results.is_empty(), "Should find fixed string 'fn main()'");
     }
 
@@ -1242,6 +1274,15 @@ mod tests {
         };
 
         let results = regex_search(&options).unwrap();
+        if results.is_empty() {
+            let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
+            eprintln!("DEBUG whole_word: Found {} files: {:?}", files.len(), files);
+            for file in &files {
+                if let Ok(content) = std::fs::read_to_string(file) {
+                    eprintln!("DEBUG whole_word: File {:?} content: {:?}", file, content);
+                }
+            }
+        }
         assert!(!results.is_empty(), "Should find whole word 'rust'");
         // Should only match "rust" as a whole word, not "rusty" or "rustacean"
     }
@@ -1374,6 +1415,15 @@ mod tests {
         };
 
         let results = search(&options).await.unwrap();
+        if results.is_empty() {
+            let files = collect_files(&options.path, true, &options.exclude_patterns).unwrap();
+            eprintln!("DEBUG search_main: Found {} files: {:?}", files.len(), files);
+            for file in &files {
+                if let Ok(content) = std::fs::read_to_string(file) {
+                    eprintln!("DEBUG search_main: File {:?} content: {:?}", file, content);
+                }
+            }
+        }
         assert!(
             !results.is_empty(),
             "Should find matches for 'hello' (case-insensitive)"
