@@ -3,14 +3,19 @@ use ck_core::{CkError, SearchOptions, SearchResult};
 use std::path::Path;
 use walkdir::WalkDir;
 
-use super::{SearchProgressCallback, extract_content_from_span, find_nearest_index_root, detect_language};
+use super::{
+    SearchProgressCallback, detect_language, extract_content_from_span, find_nearest_index_root,
+};
 
 /// New semantic search implementation using span-based storage
 pub async fn semantic_search_v3(options: &SearchOptions) -> Result<Vec<SearchResult>> {
     semantic_search_v3_with_progress(options, None).await
 }
 
-pub async fn semantic_search_v3_with_progress(options: &SearchOptions, progress_callback: Option<SearchProgressCallback>) -> Result<Vec<SearchResult>> {
+pub async fn semantic_search_v3_with_progress(
+    options: &SearchOptions,
+    progress_callback: Option<SearchProgressCallback>,
+) -> Result<Vec<SearchResult>> {
     // Find the index root
     let index_root = find_nearest_index_root(&options.path).unwrap_or_else(|| {
         if options.path.is_file() {
@@ -19,10 +24,13 @@ pub async fn semantic_search_v3_with_progress(options: &SearchOptions, progress_
             options.path.clone()
         }
     });
-    
+
     let index_dir = index_root.join(".ck");
     if !index_dir.exists() {
-        return Err(CkError::Index("No index found. Run 'ck --index' first with embeddings.".to_string()).into());
+        return Err(CkError::Index(
+            "No index found. Run 'ck --index' first with embeddings.".to_string(),
+        )
+        .into());
     }
 
     if let Some(ref callback) = progress_callback {
@@ -31,7 +39,7 @@ pub async fn semantic_search_v3_with_progress(options: &SearchOptions, progress_
 
     // Collect all sidecar files and their embeddings
     let mut file_chunks: Vec<(std::path::PathBuf, ck_index::ChunkEntry)> = Vec::new();
-    
+
     for entry in WalkDir::new(&index_dir) {
         let entry = entry?;
         if entry.file_type().is_file() {
@@ -53,25 +61,31 @@ pub async fn semantic_search_v3_with_progress(options: &SearchOptions, progress_
     }
 
     if file_chunks.is_empty() {
-        return Err(CkError::Index("No embeddings found. Run 'ck --index' first with embeddings.".to_string()).into());
+        return Err(CkError::Index(
+            "No embeddings found. Run 'ck --index' first with embeddings.".to_string(),
+        )
+        .into());
     }
 
     if let Some(ref callback) = progress_callback {
-        callback(&format!("Found {} chunks with embeddings", file_chunks.len()));
+        callback(&format!(
+            "Found {} chunks with embeddings",
+            file_chunks.len()
+        ));
     }
 
     // Create embedder and embed the query
     if let Some(ref callback) = progress_callback {
         callback("Loading embedding model...");
     }
-    
+
     let mut embedder = ck_embed::create_embedder(None)?;
     let query_embeddings = embedder.embed(&[options.query.clone()])?;
-    
+
     if query_embeddings.is_empty() {
         return Ok(Vec::new());
     }
-    
+
     let query_embedding = &query_embeddings[0];
 
     if let Some(ref callback) = progress_callback {
@@ -80,7 +94,7 @@ pub async fn semantic_search_v3_with_progress(options: &SearchOptions, progress_
 
     // Compute similarities
     let mut similarities: Vec<(f32, &std::path::PathBuf, &ck_index::ChunkEntry)> = Vec::new();
-    
+
     for (file_path, chunk) in &file_chunks {
         if let Some(ref embedding) = chunk.embedding {
             let similarity = cosine_similarity(query_embedding, embedding);
@@ -94,7 +108,7 @@ pub async fn semantic_search_v3_with_progress(options: &SearchOptions, progress_
     // Apply threshold and top_k filtering
     let mut results = Vec::new();
     let limit = options.top_k.unwrap_or(similarities.len());
-    
+
     for (similarity, file_path, chunk) in similarities.into_iter().take(limit) {
         // Apply threshold filtering
         if let Some(threshold) = options.threshold {
@@ -105,15 +119,25 @@ pub async fn semantic_search_v3_with_progress(options: &SearchOptions, progress_
 
         // Check if we're filtering by a specific file or directory
         if options.path.is_file() {
-            let target_file = options.path.canonicalize().unwrap_or_else(|_| options.path.clone());
-            let result_file = file_path.canonicalize().unwrap_or_else(|_| file_path.clone());
+            let target_file = options
+                .path
+                .canonicalize()
+                .unwrap_or_else(|_| options.path.clone());
+            let result_file = file_path
+                .canonicalize()
+                .unwrap_or_else(|_| file_path.clone());
             if result_file != target_file {
                 continue;
             }
         } else if options.path != Path::new(".") {
             // Filter by directory path - only include files within the specified directory
-            let target_dir = options.path.canonicalize().unwrap_or_else(|_| options.path.clone());
-            let result_file = file_path.canonicalize().unwrap_or_else(|_| file_path.clone());
+            let target_dir = options
+                .path
+                .canonicalize()
+                .unwrap_or_else(|_| options.path.clone());
+            let result_file = file_path
+                .canonicalize()
+                .unwrap_or_else(|_| file_path.clone());
             if !result_file.starts_with(&target_dir) {
                 continue;
             }
@@ -141,11 +165,15 @@ pub async fn semantic_search_v3_with_progress(options: &SearchOptions, progress_
     Ok(results)
 }
 
-fn reconstruct_original_path(sidecar_path: &Path, index_dir: &Path, repo_root: &Path) -> Option<std::path::PathBuf> {
+fn reconstruct_original_path(
+    sidecar_path: &Path,
+    index_dir: &Path,
+    repo_root: &Path,
+) -> Option<std::path::PathBuf> {
     // Remove the index directory prefix and .ck extension
     let relative_path = sidecar_path.strip_prefix(index_dir).ok()?;
     let mut original_path = relative_path.with_extension("");
-    
+
     // Handle the .ck extension removal
     if let Some(name) = original_path.file_name() {
         let name_str = name.to_string_lossy();
@@ -155,7 +183,7 @@ fn reconstruct_original_path(sidecar_path: &Path, index_dir: &Path, repo_root: &
             original_path = new_path;
         }
     }
-    
+
     Some(repo_root.join(original_path))
 }
 
@@ -163,11 +191,11 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     if a.len() != b.len() {
         return 0.0;
     }
-    
+
     let dot_product: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
     let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
     let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    
+
     if norm_a == 0.0 || norm_b == 0.0 {
         0.0
     } else {
