@@ -197,7 +197,7 @@ fn search_file(
                 },
                 score: 1.0,
                 preview,
-                lang: detect_language(file_path),
+                lang: ck_core::Language::from_path(file_path),
                 symbol: None,
             });
         }
@@ -292,7 +292,7 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
                 },
                 score: _score,
                 preview,
-                lang: detect_language(&PathBuf::from(path_text)),
+                lang: ck_core::Language::from_path(&PathBuf::from(path_text)),
                 symbol: None,
             },
         ));
@@ -426,7 +426,7 @@ async fn build_tantivy_index(options: &SearchOptions) -> Result<Vec<SearchResult
                 },
                 score: _score,
                 preview,
-                lang: detect_language(&PathBuf::from(path_text)),
+                lang: ck_core::Language::from_path(&PathBuf::from(path_text)),
                 symbol: None,
             },
         ));
@@ -573,7 +573,7 @@ async fn semantic_search_with_progress(
                 },
                 score: similarity,
                 preview,
-                lang: detect_language(file_path),
+                lang: ck_core::Language::from_path(file_path),
                 symbol: None,
             });
         }
@@ -658,8 +658,13 @@ async fn build_semantic_index_with_progress(
             }
 
             // Chunk the content for better embeddings
+<<<<<<< HEAD
             let chunks = ck_chunk::chunk_text(&content, detect_language(file_path).as_deref())?;
 
+=======
+            let chunks = ck_chunk::chunk_text(&content, ck_core::Language::from_path(file_path))?;
+            
+>>>>>>> main
             for chunk in chunks {
                 let chunk_embeddings = embedder.embed(std::slice::from_ref(&chunk.text))?;
                 if !chunk_embeddings.is_empty() {
@@ -765,7 +770,7 @@ async fn build_semantic_index_with_progress(
                 },
                 score: similarity,
                 preview,
-                lang: detect_language(file_path),
+                lang: ck_core::Language::from_path(file_path),
                 symbol: None,
             });
         }
@@ -931,6 +936,7 @@ fn collect_files(
     Ok(files)
 }
 
+<<<<<<< HEAD
 fn detect_language(path: &Path) -> Option<String> {
     path.extension()
         .and_then(|ext| ext.to_str())
@@ -960,6 +966,10 @@ async fn ensure_index_updated(
     force_reindex: bool,
     need_embeddings: bool,
 ) -> Result<()> {
+=======
+async fn ensure_index_updated(path: &Path, force_reindex: bool, need_embeddings: bool) -> Result<()> {
+    
+>>>>>>> main
     // Handle both files and directories and reuse nearest existing .ck index up the tree
     let index_root_buf = find_nearest_index_root(path).unwrap_or_else(|| {
         if path.is_file() {
@@ -1020,6 +1030,7 @@ fn get_context_preview(lines: &[&str], line_idx: usize, options: &SearchOptions)
 
 fn extract_code_sections(file_path: &Path, content: &str) -> Option<Vec<(usize, usize, String)>> {
     // Detect language for tree-sitter parsing
+<<<<<<< HEAD
     let lang = match file_path.extension().and_then(|s| s.to_str()) {
         Some("py") => Some("python"),
         Some("js") => Some("javascript"),
@@ -1028,8 +1039,12 @@ fn extract_code_sections(file_path: &Path, content: &str) -> Option<Vec<(usize, 
         _ => return None,
     };
 
+=======
+    let lang = ck_core::Language::from_path(file_path)?;
+    
+>>>>>>> main
     // Parse the file with tree-sitter and extract function/class sections
-    if let Ok(chunks) = ck_chunk::chunk_text(content, lang) {
+    if let Ok(chunks) = ck_chunk::chunk_text(content, Some(lang)) {
         let sections: Vec<(usize, usize, String)> = chunks
             .into_iter()
             .filter(|chunk| {
@@ -1094,6 +1109,7 @@ mod tests {
         paths
     }
 
+<<<<<<< HEAD
     #[test]
     fn test_detect_language() {
         assert_eq!(
@@ -1122,6 +1138,8 @@ mod tests {
         );
         assert_eq!(detect_language(&PathBuf::from("noext")), None);
     }
+=======
+>>>>>>> main
 
     #[test]
     fn test_collect_files() {

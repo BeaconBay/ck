@@ -18,35 +18,62 @@ pub enum ChunkType {
     Module,
 }
 
-pub fn chunk_text(text: &str, language: Option<&str>) -> Result<Vec<Chunk>> {
-    tracing::debug!(
-        "Chunking text with language: {:?}, length: {} chars",
-        language,
-        text.len()
-    );
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParseableLanguage {
+    Python,
+    TypeScript,
+    JavaScript,
+    Haskell,
+    Rust,
+    Ruby,
+    Go,
+}
 
-    let result = match language {
-        Some("python") => {
-            tracing::debug!("Using Python tree-sitter parser");
-            chunk_python(text)
+impl std::fmt::Display for ParseableLanguage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            ParseableLanguage::Python => "python",
+            ParseableLanguage::TypeScript => "typescript",
+            ParseableLanguage::JavaScript => "javascript",
+            ParseableLanguage::Haskell => "haskell",
+            ParseableLanguage::Rust => "rust",
+            ParseableLanguage::Ruby => "ruby",
+            ParseableLanguage::Go => "go",
+        };
+        write!(f, "{}", name)
+    }
+}
+
+impl TryFrom<ck_core::Language> for ParseableLanguage {
+    type Error = anyhow::Error;
+
+    fn try_from(lang: ck_core::Language) -> Result<Self, Self::Error> {
+        match lang {
+            ck_core::Language::Python => Ok(ParseableLanguage::Python),
+            ck_core::Language::TypeScript => Ok(ParseableLanguage::TypeScript),
+            ck_core::Language::JavaScript => Ok(ParseableLanguage::JavaScript),
+            ck_core::Language::Haskell => Ok(ParseableLanguage::Haskell),
+            ck_core::Language::Rust => Ok(ParseableLanguage::Rust),
+            ck_core::Language::Ruby => Ok(ParseableLanguage::Ruby),
+            ck_core::Language::Go => Ok(ParseableLanguage::Go),
+            _ => Err(anyhow::anyhow!("Language {:?} is not supported for parsing", lang)),
         }
-        Some("typescript") | Some("javascript") => {
-            tracing::debug!("Using TypeScript/JavaScript tree-sitter parser");
-            chunk_typescript(text)
-        }
-        Some("haskell") => {
-            tracing::debug!("Using Haskell tree-sitter parser");
-            chunk_haskell(text)
-        }
-        Some("rust") => {
-            tracing::debug!("Using Rust tree-sitter parser");
-            chunk_rust(text)
-        }
-        Some("ruby") => {
-            tracing::debug!("Using Ruby tree-sitter parser");
-            chunk_ruby(text)
-        }
-        _ => {
+    }
+}
+
+pub fn chunk_text(text: &str, language: Option<ck_core::Language>) -> Result<Vec<Chunk>> {
+    tracing::debug!("Chunking text with language: {:?}, length: {} chars", language, text.len());
+    
+    let result = match language.map(ParseableLanguage::try_from) {
+        Some(Ok(lang)) => {
+            tracing::debug!("Using {} tree-sitter parser", lang);
+            chunk_language(text, lang)
+        },
+        Some(Err(_)) => {
+            tracing::debug!("Language not supported for parsing, using generic chunking strategy");
+            chunk_generic(text)
+        },
+        None => {
             tracing::debug!("Using generic chunking strategy");
             chunk_generic(text)
         }
@@ -104,99 +131,27 @@ fn chunk_generic(text: &str) -> Result<Vec<Chunk>> {
     Ok(chunks)
 }
 
-fn chunk_python(text: &str) -> Result<Vec<Chunk>> {
+fn chunk_language(text: &str, language: ParseableLanguage) -> Result<Vec<Chunk>> {
     let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&tree_sitter_python::language())?;
-
-    let tree = parser
-        .parse(text, None)
-        .ok_or_else(|| anyhow::anyhow!("Failed to parse Python code"))?;
-
-    let mut chunks = Vec::new();
-    let mut cursor = tree.root_node().walk();
-
-    extract_code_chunks(&mut cursor, text, &mut chunks, "python");
-
-    if chunks.is_empty() {
-        return chunk_generic(text);
+    
+    match language {
+        ParseableLanguage::Python => parser.set_language(&tree_sitter_python::language())?,
+        ParseableLanguage::TypeScript | ParseableLanguage::JavaScript => parser.set_language(&tree_sitter_typescript::language_typescript())?,
+        ParseableLanguage::Haskell => parser.set_language(&tree_sitter_haskell::language())?,
+        ParseableLanguage::Rust => parser.set_language(&tree_sitter_rust::language())?,
+        ParseableLanguage::Ruby => parser.set_language(&tree_sitter_ruby::language())?,
+        ParseableLanguage::Go => parser.set_language(&tree_sitter_go::language())?,
     }
-
-    Ok(chunks)
-}
-
-fn chunk_typescript(text: &str) -> Result<Vec<Chunk>> {
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&tree_sitter_typescript::language_typescript())?;
-
-    let tree = parser
-        .parse(text, None)
-        .ok_or_else(|| anyhow::anyhow!("Failed to parse TypeScript code"))?;
-
+    
+    let tree = parser.parse(text, None).ok_or_else(|| {
+        anyhow::anyhow!("Failed to parse {} code", language)
+    })?;
+    
     let mut chunks = Vec::new();
     let mut cursor = tree.root_node().walk();
-
-    extract_code_chunks(&mut cursor, text, &mut chunks, "typescript");
-
-    if chunks.is_empty() {
-        return chunk_generic(text);
-    }
-
-    Ok(chunks)
-}
-
-fn chunk_haskell(text: &str) -> Result<Vec<Chunk>> {
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&tree_sitter_haskell::language())?;
-
-    let tree = parser
-        .parse(text, None)
-        .ok_or_else(|| anyhow::anyhow!("Failed to parse Haskell code"))?;
-
-    let mut chunks = Vec::new();
-    let mut cursor = tree.root_node().walk();
-
-    extract_code_chunks(&mut cursor, text, &mut chunks, "haskell");
-
-    if chunks.is_empty() {
-        return chunk_generic(text);
-    }
-
-    Ok(chunks)
-}
-
-fn chunk_rust(text: &str) -> Result<Vec<Chunk>> {
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&tree_sitter_rust::language())?;
-
-    let tree = parser
-        .parse(text, None)
-        .ok_or_else(|| anyhow::anyhow!("Failed to parse Rust code"))?;
-
-    let mut chunks = Vec::new();
-    let mut cursor = tree.root_node().walk();
-
-    extract_code_chunks(&mut cursor, text, &mut chunks, "rust");
-
-    if chunks.is_empty() {
-        return chunk_generic(text);
-    }
-
-    Ok(chunks)
-}
-
-fn chunk_ruby(text: &str) -> Result<Vec<Chunk>> {
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&tree_sitter_ruby::language())?;
-
-    let tree = parser
-        .parse(text, None)
-        .ok_or_else(|| anyhow::anyhow!("Failed to parse Ruby code"))?;
-
-    let mut chunks = Vec::new();
-    let mut cursor = tree.root_node().walk();
-
-    extract_code_chunks(&mut cursor, text, &mut chunks, "ruby");
-
+    
+    extract_code_chunks(&mut cursor, text, &mut chunks, language);
+    
     if chunks.is_empty() {
         return chunk_generic(text);
     }
@@ -208,18 +163,18 @@ fn extract_code_chunks(
     cursor: &mut tree_sitter::TreeCursor,
     source: &str,
     chunks: &mut Vec<Chunk>,
-    language: &str,
+    language: ParseableLanguage,
 ) {
     let node = cursor.node();
     let node_kind = node.kind();
 
     let is_chunk = match language {
-        "python" => matches!(node_kind, "function_definition" | "class_definition"),
-        "typescript" | "javascript" => matches!(
+        ParseableLanguage::Python => matches!(node_kind, "function_definition" | "class_definition"),
+        ParseableLanguage::TypeScript | ParseableLanguage::JavaScript => matches!(
             node_kind,
             "function_declaration" | "class_declaration" | "method_definition" | "arrow_function"
         ),
-        "haskell" => matches!(
+        ParseableLanguage::Haskell => matches!(
             node_kind,
             "signature"
                 | "data_type"
@@ -229,15 +184,18 @@ fn extract_code_chunks(
                 | "class"
                 | "instance"
         ),
-        "rust" => matches!(
+        ParseableLanguage::Rust => matches!(
             node_kind,
             "function_item" | "impl_item" | "struct_item" | "enum_item" | "trait_item" | "mod_item"
         ),
-        "ruby" => matches!(
+        ParseableLanguage::Ruby => matches!(
             node_kind,
             "method" | "class" | "module" | "singleton_method"
         ),
-        _ => false,
+        ParseableLanguage::Go => matches!(
+            node_kind,
+            "function_declaration" | "method_declaration" | "type_declaration" | "var_declaration" | "const_declaration"
+        ),
     };
 
     if is_chunk {
@@ -249,33 +207,10 @@ fn extract_code_chunks(
         let text = &source[start_byte..end_byte];
 
         let chunk_type = match node_kind {
-            "function_definition"
-            | "function_declaration"
-            | "arrow_function"
-            | "function"
-            | "signature"
-            | "function_item"
-            | "def"
-            | "defp"
-            | "method"
-            | "singleton_method"
-            | "defn"
-            | "defn-" => ChunkType::Function,
-            "class_definition"
-            | "class_declaration"
-            | "instance_declaration"
-            | "class"
-            | "instance"
-            | "struct_item"
-            | "enum_item"
-            | "defstruct"
-            | "defrecord"
-            | "deftype" => ChunkType::Class,
-            "method_definition" | "defmacro" => ChunkType::Method,
-            "data_type" | "newtype" | "type_synomym" | "type_family" | "impl_item"
-            | "trait_item" | "mod_item" | "defmodule" | "module" | "defprotocol" | "ns" => {
-                ChunkType::Module
-            }
+            "function_definition" | "function_declaration" | "arrow_function" | "function" | "signature" | "function_item" | "def" | "defp" | "method" | "singleton_method" | "defn" | "defn-" => ChunkType::Function,
+            "class_definition" | "class_declaration" | "instance_declaration" | "class" | "instance" | "struct_item" | "enum_item" | "defstruct" | "defrecord" | "deftype" | "type_declaration" => ChunkType::Class,
+            "method_definition" | "method_declaration" | "defmacro" => ChunkType::Method,
+            "data_type" | "newtype" | "type_synomym" | "type_family" | "impl_item" | "trait_item" | "mod_item" | "defmodule" | "module" | "defprotocol" | "ns" | "var_declaration" | "const_declaration" => ChunkType::Module,
             _ => ChunkType::Text,
         };
 
@@ -377,8 +312,8 @@ pub mod utils {
     pub fn helper() {}
 }
 "#;
-
-        let chunks = chunk_rust(rust_code).unwrap();
+        
+        let chunks = chunk_language(rust_code, ParseableLanguage::Rust).unwrap();
         assert!(!chunks.is_empty());
 
         // Should find struct, impl, functions, and module
@@ -421,8 +356,8 @@ def main
   calc = Calculator.new
 end
 "#;
-
-        let chunks = chunk_ruby(ruby_code).unwrap();
+        
+        let chunks = chunk_language(ruby_code, ParseableLanguage::Ruby).unwrap();
         assert!(!chunks.is_empty());
 
         // Should find class, module, and methods
@@ -436,12 +371,55 @@ end
     fn test_language_detection_fallback() {
         // Test that unknown languages fall back to generic chunking
         let generic_text = "Some text\nwith multiple lines\nto chunk generically";
-
-        let chunks_unknown = chunk_text(generic_text, Some("unknown_language")).unwrap();
+        
+        let chunks_unknown = chunk_text(generic_text, None).unwrap();
         let chunks_generic = chunk_generic(generic_text).unwrap();
 
         // Should produce the same result
         assert_eq!(chunks_unknown.len(), chunks_generic.len());
         assert_eq!(chunks_unknown[0].text, chunks_generic[0].text);
+    }
+
+    #[test]
+    fn test_chunk_go() {
+        let go_code = r#"
+package main
+
+import "fmt"
+
+const Pi = 3.14159
+
+var memory float64
+
+type Calculator struct {
+    memory float64
+}
+
+type Operation interface {
+    Calculate(a, b float64) float64
+}
+
+func NewCalculator() *Calculator {
+    return &Calculator{memory: 0.0}
+}
+
+func (c *Calculator) Add(a, b float64) float64 {
+    return a + b
+}
+
+func main() {
+    calc := NewCalculator()
+}
+"#;
+        
+        let chunks = chunk_language(go_code, ParseableLanguage::Go).unwrap();
+        assert!(!chunks.is_empty());
+        
+        // Should find const, var, type declarations, functions, and methods
+        let chunk_types: Vec<&ChunkType> = chunks.iter().map(|c| &c.chunk_type).collect();
+        assert!(chunk_types.contains(&&ChunkType::Module)); // const and var
+        assert!(chunk_types.contains(&&ChunkType::Class));  // struct and interface
+        assert!(chunk_types.contains(&&ChunkType::Function)); // functions
+        assert!(chunk_types.contains(&&ChunkType::Method));   // methods
     }
 }

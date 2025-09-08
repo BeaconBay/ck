@@ -20,4 +20,5 @@ tree-sitter-typescript = { workspace = true }
 tree-sitter-haskell = { workspace = true }
 tree-sitter-rust = { workspace = true }
 tree-sitter-ruby = { workspace = true }
+tree-sitter-go = { workspace = true }
 tracing = { workspace = true }

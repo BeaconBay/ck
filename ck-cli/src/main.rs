@@ -333,29 +333,11 @@ async fn inspect_file_metadata(file_path: &PathBuf, status: &StatusReporter) -> 
     status.info(&format!("📏 Size: {} bytes", metadata.len()));
 
     // Detect language
-    let detected_lang = if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-        match ext {
-            "rs" => Some("rust"),
-            "py" => Some("python"),
-            "js" => Some("javascript"),
-            "ts" => Some("typescript"),
-            "hs" | "lhs" => Some("haskell"),
-            "rb" => Some("ruby"),
-            "go" => Some("go"),
-            "java" => Some("java"),
-            "c" => Some("c"),
-            "cpp" | "cc" | "cxx" => Some("cpp"),
-            _ => Some(ext),
-        }
-    } else {
-        None
-    };
-
-    status.info(&format!(
-        "🔍 Language: {}",
-        detected_lang.unwrap_or("unknown")
-    ));
-
+    let detected_lang = ck_core::Language::from_path(path);
+    
+    status.info(&format!("🔍 Language: {}", 
+        detected_lang.map(|l| l.to_string()).unwrap_or_else(|| "unknown".to_string())));
+    
     // Read file content
     let content = fs::read_to_string(path)?;
     status.info(&format!("📄 Lines: {}", content.lines().count()));

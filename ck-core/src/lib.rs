@@ -31,6 +31,75 @@ pub enum CkError {
 
 pub type Result<T> = std::result::Result<T, CkError>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Language {
+    Rust,
+    Python,
+    JavaScript,
+    TypeScript,
+    Haskell,
+    Go,
+    Java,
+    C,
+    Cpp,
+    CSharp,
+    Ruby,
+    Php,
+    Swift,
+    Kotlin,
+}
+
+impl Language {
+    pub fn from_extension(ext: &str) -> Option<Self> {
+        match ext {
+            "rs" => Some(Language::Rust),
+            "py" => Some(Language::Python),
+            "js" => Some(Language::JavaScript),
+            "ts" | "tsx" => Some(Language::TypeScript),
+            "hs" | "lhs" => Some(Language::Haskell),
+            "go" => Some(Language::Go),
+            "java" => Some(Language::Java),
+            "c" => Some(Language::C),
+            "cpp" | "cc" | "cxx" | "c++" => Some(Language::Cpp),
+            "h" | "hpp" => Some(Language::Cpp), // Assume C++ for headers
+            "cs" => Some(Language::CSharp),
+            "rb" => Some(Language::Ruby),
+            "php" => Some(Language::Php),
+            "swift" => Some(Language::Swift),
+            "kt" | "kts" => Some(Language::Kotlin),
+            _ => None,
+        }
+    }
+
+    pub fn from_path(path: &Path) -> Option<Self> {
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .and_then(Self::from_extension)
+    }
+}
+
+impl std::fmt::Display for Language {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            Language::Rust => "rust",
+            Language::Python => "python",
+            Language::JavaScript => "javascript",
+            Language::TypeScript => "typescript",
+            Language::Haskell => "haskell",
+            Language::Go => "go",
+            Language::Java => "java",
+            Language::C => "c",
+            Language::Cpp => "cpp",
+            Language::CSharp => "csharp",
+            Language::Ruby => "ruby",
+            Language::Php => "php",
+            Language::Swift => "swift",
+            Language::Kotlin => "kotlin",
+        };
+        write!(f, "{}", name)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Span {
     pub byte_start: usize,
@@ -54,7 +123,7 @@ pub struct SearchResult {
     pub score: f32,
     pub preview: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub lang: Option<String>,
+    pub lang: Option<Language>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub symbol: Option<String>,
 }
@@ -63,7 +132,7 @@ pub struct SearchResult {
 pub struct JsonSearchResult {
     pub file: String,
     pub span: Span,
-    pub lang: Option<String>,
+    pub lang: Option<Language>,
     pub symbol: Option<String>,
     pub score: f32,
     pub signals: SearchSignals,
@@ -270,7 +339,7 @@ mod tests {
             },
             score: 0.95,
             preview: "hello world".to_string(),
-            lang: Some("rust".to_string()),
+            lang: Some(Language::Rust),
             symbol: Some("main".to_string()),
         };
 
@@ -348,7 +417,7 @@ mod tests {
                 line_start: 1,
                 line_end: 1,
             },
-            lang: Some("txt".to_string()),
+            lang: None, // txt is not a supported language
             symbol: None,
             score: 0.95,
             signals,
@@ -363,5 +432,49 @@ mod tests {
         assert_eq!(result.score, deserialized.score);
         assert_eq!(result.signals.rrf_score, deserialized.signals.rrf_score);
         assert_eq!(result.model, deserialized.model);
+    }
+
+    #[test]
+    fn test_language_from_extension() {
+        assert_eq!(Language::from_extension("rs"), Some(Language::Rust));
+        assert_eq!(Language::from_extension("py"), Some(Language::Python));
+        assert_eq!(Language::from_extension("js"), Some(Language::JavaScript));
+        assert_eq!(Language::from_extension("ts"), Some(Language::TypeScript));
+        assert_eq!(Language::from_extension("tsx"), Some(Language::TypeScript));
+        assert_eq!(Language::from_extension("hs"), Some(Language::Haskell));
+        assert_eq!(Language::from_extension("lhs"), Some(Language::Haskell));
+        assert_eq!(Language::from_extension("go"), Some(Language::Go));
+        assert_eq!(Language::from_extension("java"), Some(Language::Java));
+        assert_eq!(Language::from_extension("c"), Some(Language::C));
+        assert_eq!(Language::from_extension("cpp"), Some(Language::Cpp));
+        assert_eq!(Language::from_extension("cs"), Some(Language::CSharp));
+        assert_eq!(Language::from_extension("rb"), Some(Language::Ruby));
+        assert_eq!(Language::from_extension("php"), Some(Language::Php));
+        assert_eq!(Language::from_extension("swift"), Some(Language::Swift));
+        assert_eq!(Language::from_extension("kt"), Some(Language::Kotlin));
+        assert_eq!(Language::from_extension("kts"), Some(Language::Kotlin));
+        assert_eq!(Language::from_extension("unknown"), None);
+    }
+
+    #[test]
+    fn test_language_from_path() {
+        assert_eq!(Language::from_path(&PathBuf::from("test.rs")), Some(Language::Rust));
+        assert_eq!(Language::from_path(&PathBuf::from("test.py")), Some(Language::Python));
+        assert_eq!(Language::from_path(&PathBuf::from("test.js")), Some(Language::JavaScript));
+        assert_eq!(Language::from_path(&PathBuf::from("test.hs")), Some(Language::Haskell));
+        assert_eq!(Language::from_path(&PathBuf::from("test.lhs")), Some(Language::Haskell));
+        assert_eq!(Language::from_path(&PathBuf::from("test.go")), Some(Language::Go));
+        assert_eq!(Language::from_path(&PathBuf::from("test.unknown")), None); // unknown extensions return None
+        assert_eq!(Language::from_path(&PathBuf::from("noext")), None); // no extension
+    }
+
+    #[test]
+    fn test_language_display() {
+        assert_eq!(Language::Rust.to_string(), "rust");
+        assert_eq!(Language::Python.to_string(), "python");
+        assert_eq!(Language::JavaScript.to_string(), "javascript");
+        assert_eq!(Language::TypeScript.to_string(), "typescript");
+        assert_eq!(Language::Go.to_string(), "go");
+        assert_eq!(Language::Java.to_string(), "java");
     }
 }

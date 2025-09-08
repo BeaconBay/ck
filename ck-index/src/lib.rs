@@ -587,15 +587,7 @@ fn index_single_file(
     };
 
     // Detect language for tree-sitter parsing
-    let lang = match file_path.extension().and_then(|s| s.to_str()) {
-        Some("py") => Some("python"),
-        Some("js") => Some("javascript"),
-        Some("ts") | Some("tsx") => Some("typescript"),
-        Some("hs") | Some("lhs") => Some("haskell"),
-        Some("rs") => Some("rust"),
-        Some("rb") => Some("ruby"),
-        _ => None,
-    };
+    let lang = ck_core::Language::from_path(file_path);
 
     let chunks = ck_chunk::chunk_text(&content, lang)?;
 
