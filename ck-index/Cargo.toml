@@ -2,6 +2,7 @@
 name = "ck-index"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 description = "Indexing and storage for ck semantic search"

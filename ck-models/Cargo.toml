@@ -2,6 +2,7 @@
 name = "ck-models"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 description = "Model registry and configuration for ck semantic search"

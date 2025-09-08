@@ -2,6 +2,7 @@
 name = "ck-search"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 authors.workspace = true
 license.workspace = true
 description = "Semantic grep by embedding - find code by meaning, not just keywords"

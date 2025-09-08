@@ -658,13 +658,7 @@ async fn build_semantic_index_with_progress(
             }
 
             // Chunk the content for better embeddings
-<<<<<<< HEAD
-            let chunks = ck_chunk::chunk_text(&content, detect_language(file_path).as_deref())?;
-
-=======
             let chunks = ck_chunk::chunk_text(&content, ck_core::Language::from_path(file_path))?;
-            
->>>>>>> main
             for chunk in chunks {
                 let chunk_embeddings = embedder.embed(std::slice::from_ref(&chunk.text))?;
                 if !chunk_embeddings.is_empty() {
@@ -936,40 +930,7 @@ fn collect_files(
     Ok(files)
 }
 
-<<<<<<< HEAD
-fn detect_language(path: &Path) -> Option<String> {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .map(|ext| match ext {
-            "rs" => "rust",
-            "py" => "python",
-            "js" => "javascript",
-            "ts" => "typescript",
-            "hs" | "lhs" => "haskell",
-            "go" => "go",
-            "java" => "java",
-            "c" => "c",
-            "cpp" | "cc" | "cxx" => "cpp",
-            "h" | "hpp" => "cpp",
-            "cs" => "csharp",
-            "rb" => "ruby",
-            "php" => "php",
-            "swift" => "swift",
-            "kt" => "kotlin",
-            _ => ext,
-        })
-        .map(String::from)
-}
-
-async fn ensure_index_updated(
-    path: &Path,
-    force_reindex: bool,
-    need_embeddings: bool,
-) -> Result<()> {
-=======
 async fn ensure_index_updated(path: &Path, force_reindex: bool, need_embeddings: bool) -> Result<()> {
-    
->>>>>>> main
     // Handle both files and directories and reuse nearest existing .ck index up the tree
     let index_root_buf = find_nearest_index_root(path).unwrap_or_else(|| {
         if path.is_file() {
@@ -1030,19 +991,7 @@ fn get_context_preview(lines: &[&str], line_idx: usize, options: &SearchOptions)
 
 fn extract_code_sections(file_path: &Path, content: &str) -> Option<Vec<(usize, usize, String)>> {
     // Detect language for tree-sitter parsing
-<<<<<<< HEAD
-    let lang = match file_path.extension().and_then(|s| s.to_str()) {
-        Some("py") => Some("python"),
-        Some("js") => Some("javascript"),
-        Some("ts") | Some("tsx") => Some("typescript"),
-        Some("hs") | Some("lhs") => Some("haskell"),
-        _ => return None,
-    };
-
-=======
     let lang = ck_core::Language::from_path(file_path)?;
-    
->>>>>>> main
     // Parse the file with tree-sitter and extract function/class sections
     if let Ok(chunks) = ck_chunk::chunk_text(content, Some(lang)) {
         let sections: Vec<(usize, usize, String)> = chunks
@@ -1109,37 +1058,6 @@ mod tests {
         paths
     }
 
-<<<<<<< HEAD
-    #[test]
-    fn test_detect_language() {
-        assert_eq!(
-            detect_language(&PathBuf::from("test.rs")),
-            Some("rust".to_string())
-        );
-        assert_eq!(
-            detect_language(&PathBuf::from("test.py")),
-            Some("python".to_string())
-        );
-        assert_eq!(
-            detect_language(&PathBuf::from("test.js")),
-            Some("javascript".to_string())
-        );
-        assert_eq!(
-            detect_language(&PathBuf::from("test.hs")),
-            Some("haskell".to_string())
-        );
-        assert_eq!(
-            detect_language(&PathBuf::from("test.lhs")),
-            Some("haskell".to_string())
-        );
-        assert_eq!(
-            detect_language(&PathBuf::from("test.unknown")),
-            Some("unknown".to_string())
-        );
-        assert_eq!(detect_language(&PathBuf::from("noext")), None);
-    }
-=======
->>>>>>> main
 
     #[test]
     fn test_collect_files() {
