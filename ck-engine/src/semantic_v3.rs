@@ -80,7 +80,7 @@ pub async fn semantic_search_v3_with_progress(
     }
 
     let mut embedder = ck_embed::create_embedder(None)?;
-    let query_embeddings = embedder.embed(&[options.query.clone()])?;
+    let query_embeddings = embedder.embed(std::slice::from_ref(&options.query))?;
 
     if query_embeddings.is_empty() {
         return Ok(Vec::new());
@@ -111,11 +111,10 @@ pub async fn semantic_search_v3_with_progress(
 
     for (similarity, file_path, chunk) in similarities.into_iter().take(limit) {
         // Apply threshold filtering
-        if let Some(threshold) = options.threshold {
-            if similarity < threshold {
+        if let Some(threshold) = options.threshold
+            && similarity < threshold {
                 continue;
             }
-        }
 
         // Check if we're filtering by a specific file or directory
         if options.path.is_file() {

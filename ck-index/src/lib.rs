@@ -61,7 +61,7 @@ pub fn collect_files(path: &Path, respect_gitignore: bool) -> Vec<PathBuf> {
             .filter_map(|entry| entry.ok())
             .filter(|entry| {
                 let path = entry.path();
-                entry.file_type().map_or(false, |ft| ft.is_file())
+                entry.file_type().is_some_and(|ft| ft.is_file())
                     && is_text_file(path)
                     && !path.starts_with(&index_dir)
             })
@@ -334,14 +334,13 @@ pub fn cleanup_index(path: &Path, respect_gitignore: bool) -> Result<CleanupStat
                 let path = entry.path();
                 if path.extension().and_then(|s| s.to_str()) == Some("ck") {
                     // Try to reconstruct the original file path
-                    if let Some(original_path) = sidecar_to_original_path(path, &index_dir, path) {
-                        if !current_files.contains(&original_path)
+                    if let Some(original_path) = sidecar_to_original_path(path, &index_dir, path)
+                        && !current_files.contains(&original_path)
                             && !manifest.files.contains_key(&original_path)
                         {
                             fs::remove_file(path)?;
                             stats.orphaned_sidecars_removed += 1;
                         }
-                    }
                 }
             }
         }
@@ -381,8 +380,8 @@ pub fn get_index_stats(path: &Path) -> Result<IndexStats> {
     // Calculate total chunks and size
     for file_path in manifest.files.keys() {
         let sidecar_path = get_sidecar_path(path, file_path);
-        if sidecar_path.exists() {
-            if let Ok(entry) = load_index_entry(&sidecar_path) {
+        if sidecar_path.exists()
+            && let Ok(entry) = load_index_entry(&sidecar_path) {
                 stats.total_chunks += entry.chunks.len();
                 stats.total_size_bytes += entry.metadata.size;
 
@@ -394,7 +393,6 @@ pub fn get_index_stats(path: &Path) -> Result<IndexStats> {
                     .count();
                 stats.embedded_chunks += embedded;
             }
-        }
     }
 
     // Calculate index size on disk
@@ -403,11 +401,10 @@ pub fn get_index_stats(path: &Path) -> Result<IndexStats> {
         .collect::<Result<Vec<_>, _>>()
     {
         for entry in entries {
-            if entry.file_type().is_file() {
-                if let Ok(metadata) = entry.metadata() {
+            if entry.file_type().is_file()
+                && let Ok(metadata) = entry.metadata() {
                     stats.index_size_bytes += metadata.len();
                 }
-            }
         }
     }
 
@@ -468,7 +465,7 @@ pub async fn smart_update_index_with_progress(
 
             let fs_last_modified = match fs_meta.modified().and_then(|m| {
                 m.duration_since(SystemTime::UNIX_EPOCH)
-                    .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "Time error"))
+                    .map_err(|_| std::io::Error::other("Time error"))
             }) {
                 Ok(dur) => dur.as_secs(),
                 Err(_) => {
@@ -518,11 +515,10 @@ pub async fn smart_update_index_with_progress(
         files_to_update
             .iter()
             .filter_map(|file_path| {
-                if let Some(ref callback) = progress_callback {
-                    if let Some(file_name) = file_path.file_name() {
+                if let Some(ref callback) = progress_callback
+                    && let Some(file_name) = file_path.file_name() {
                         callback(&file_name.to_string_lossy());
                     }
-                }
                 match index_single_file(file_path, path, Some(&mut embedder)) {
                     Ok(entry) => Some((file_path.clone(), entry)),
                     Err(e) => {
@@ -537,11 +533,10 @@ pub async fn smart_update_index_with_progress(
         files_to_update
             .par_iter()
             .filter_map(|file_path| {
-                if let Some(ref callback) = progress_callback {
-                    if let Some(file_name) = file_path.file_name() {
+                if let Some(ref callback) = progress_callback
+                    && let Some(file_name) = file_path.file_name() {
                         callback(&file_name.to_string_lossy());
                     }
-                }
                 match index_single_file(file_path, path, None) {
                     Ok(entry) => Some((file_path.clone(), entry)),
                     Err(e) => {
@@ -616,7 +611,7 @@ fn index_single_file(
 
         chunks
             .into_iter()
-            .zip(embeddings.into_iter())
+            .zip(embeddings)
             .map(|(chunk, embedding)| {
                 let chunk_type_str = match chunk.chunk_type {
                     ck_chunk::ChunkType::Function => Some("function".to_string()),

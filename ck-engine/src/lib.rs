@@ -101,7 +101,7 @@ fn regex_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
     let regex = RegexBuilder::new(&pattern)
         .case_insensitive(options.case_insensitive)
         .build()
-        .map_err(|e| CkError::Regex(e))?;
+        .map_err(CkError::Regex)?;
 
     // Default to recursive for directories (like grep) to maintain compatibility
     let should_recurse = options.path.is_dir() || options.recursive;
@@ -310,11 +310,10 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
                 let normalized_score = raw_score / max_score;
 
                 // Apply threshold filtering with normalized score
-                if let Some(threshold) = options.threshold {
-                    if normalized_score < threshold {
+                if let Some(threshold) = options.threshold
+                    && normalized_score < threshold {
                         continue;
                     }
-                }
 
                 result.score = normalized_score;
                 results.push(result);
@@ -350,7 +349,7 @@ async fn build_tantivy_index(options: &SearchOptions) -> Result<Vec<SearchResult
         .writer(50_000_000)
         .map_err(|e| CkError::Index(format!("Failed to create index writer: {}", e)))?;
 
-    let files = collect_files(&index_root, true, &options.exclude_patterns)?;
+    let files = collect_files(index_root, true, &options.exclude_patterns)?;
 
     for file_path in &files {
         if let Ok(content) = fs::read_to_string(file_path) {
@@ -445,11 +444,10 @@ async fn build_tantivy_index(options: &SearchOptions) -> Result<Vec<SearchResult
                 let normalized_score = raw_score / max_score;
 
                 // Apply threshold filtering with normalized score
-                if let Some(threshold) = options.threshold {
-                    if normalized_score < threshold {
+                if let Some(threshold) = options.threshold
+                    && normalized_score < threshold {
                         continue;
                     }
-                }
 
                 result.score = normalized_score;
                 results.push(result);
@@ -513,7 +511,7 @@ async fn semantic_search_with_progress(
     } else {
         ck_embed::create_embedder(Some("BAAI/bge-small-en-v1.5"))?
     };
-    let query_embeddings = embedder.embed(&[options.query.clone()])?;
+    let query_embeddings = embedder.embed(std::slice::from_ref(&options.query))?;
 
     if query_embeddings.is_empty() {
         return Ok(Vec::new());
@@ -542,11 +540,10 @@ async fn semantic_search_with_progress(
 
     for (doc_id, similarity) in similar_docs {
         // Apply threshold filtering
-        if let Some(threshold) = options.threshold {
-            if similarity < threshold {
+        if let Some(threshold) = options.threshold
+            && similarity < threshold {
                 continue;
             }
-        }
 
         if let Some((file_path, content)) = file_embeddings.get(doc_id as usize) {
             // Filter by target file if specified
@@ -615,7 +612,7 @@ async fn build_semantic_index_with_progress(
     eprintln!("Building semantic index (no existing index found)...");
 
     // Collect files and their content
-    let files = collect_files(&index_root, true, &options.exclude_patterns)?;
+    let files = collect_files(index_root, true, &options.exclude_patterns)?;
 
     if let Some(ref callback) = progress_callback {
         callback(&format!("Found {} files to index", files.len()));
@@ -664,7 +661,7 @@ async fn build_semantic_index_with_progress(
             let chunks = ck_chunk::chunk_text(&content, detect_language(file_path).as_deref())?;
 
             for chunk in chunks {
-                let chunk_embeddings = embedder.embed(&[chunk.text.clone()])?;
+                let chunk_embeddings = embedder.embed(std::slice::from_ref(&chunk.text))?;
                 if !chunk_embeddings.is_empty() {
                     embeddings.push(chunk_embeddings[0].clone());
                     file_embeddings.push((file_path.clone(), chunk.text));
@@ -706,7 +703,7 @@ async fn build_semantic_index_with_progress(
 
     // Create embedder and embed the query
     let mut embedder = ck_embed::create_embedder(Some("BAAI/bge-small-en-v1.5"))?;
-    let query_embeddings = embedder.embed(&[options.query.clone()])?;
+    let query_embeddings = embedder.embed(std::slice::from_ref(&options.query))?;
 
     if query_embeddings.is_empty() {
         return Ok(Vec::new());
@@ -735,11 +732,10 @@ async fn build_semantic_index_with_progress(
 
     for (doc_id, similarity) in similar_docs {
         // Apply threshold filtering
-        if let Some(threshold) = options.threshold {
-            if similarity < threshold {
+        if let Some(threshold) = options.threshold
+            && similarity < threshold {
                 continue;
             }
-        }
 
         if let Some((file_path, content)) = file_embeddings.get(doc_id as usize) {
             // Filter by target file if specified
@@ -816,9 +812,7 @@ async fn hybrid_search_with_progress(
     }
 
     // Calculate RRF scores according to original paper: RRFscore(d) = Σ(r∈R) 1/(k + r(d))
-    let mut rrf_results: Vec<SearchResult> = combined
-        .into_iter()
-        .map(|(_, ranks)| {
+    let mut rrf_results: Vec<SearchResult> = combined.into_values().map(|ranks| {
             let mut result = ranks[0].1.clone();
             let rrf_score = ranks
                 .iter()
@@ -869,11 +863,10 @@ fn should_exclude_path(path: &Path, exclude_patterns: &[String]) -> bool {
         return true;
     }
     for component in path.components() {
-        if let std::path::Component::Normal(name) = component {
-            if globset.is_match(name) {
+        if let std::path::Component::Normal(name) = component
+            && globset.is_match(name) {
                 return true;
             }
-        }
     }
     false
 }
