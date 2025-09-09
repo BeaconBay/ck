@@ -1,9 +1,12 @@
-# Use sccache's proven Docker images
+# Use sccache's proven Docker images with pkg-config pre-build
 [target.x86_64-unknown-linux-musl]
 image = "messense/rust-musl-cross:x86_64-musl"
+pre-build = ["apt-get update && apt-get install -y pkg-config"]
 
 [target.aarch64-unknown-linux-musl]
 image = "messense/rust-musl-cross:aarch64-musl"
+pre-build = ["apt-get update && apt-get install -y pkg-config"]
 
 [target.armv7-unknown-linux-musleabihf]
 image = "messense/rust-musl-cross:armv7-musleabihf"
+pre-build = ["apt-get update && apt-get install -y pkg-config"]
