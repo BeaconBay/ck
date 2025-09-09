@@ -136,15 +136,15 @@ jobs:
       
       - name: Build release binary
         env:
-          # Force static OpenSSL linking for all targets
-          OPENSSL_STATIC: 1
-          # Set musl-specific OpenSSL vars (will be ignored on non-musl targets)
-          X86_64_UNKNOWN_LINUX_MUSL_OPENSSL_STATIC: 1
-          AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_STATIC: 1
-          ARMV7_UNKNOWN_LINUX_GNUEABIHF_OPENSSL_STATIC: 1
+          # For cross-compilation targets, force static OpenSSL linking
+          OPENSSL_STATIC: ${{ matrix.use-cross && 1 || '' }}
+          # Set target-specific OpenSSL vars for cross-compilation
+          X86_64_UNKNOWN_LINUX_MUSL_OPENSSL_STATIC: ${{ matrix.use-cross && 1 || '' }}
+          AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_STATIC: ${{ matrix.use-cross && 1 || '' }}
+          ARMV7_UNKNOWN_LINUX_GNUEABIHF_OPENSSL_STATIC: ${{ matrix.use-cross && 1 || '' }}
+          # For non-cross builds, disable vendored OpenSSL to use system libraries
+          OPENSSL_NO_VENDOR: ${{ !matrix.use-cross && 1 || '' }}
         run: |
-          # Ensure OPENSSL_NO_VENDOR is not set (would disable vendored OpenSSL)
-          unset OPENSSL_NO_VENDOR 2>/dev/null || true
           ${{ env.CARGO_CMD }} build --release --target ${{ matrix.target }} --package ck-search
         shell: bash
       
