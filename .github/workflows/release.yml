@@ -33,10 +33,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ github.ref_name }}" \
-            --title "Release ${{ github.ref_name }}" \
-            --draft \
-            --generate-notes
+          # Check if release already exists
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            echo "Release ${{ github.ref_name }} already exists, skipping creation"
+          else
+            gh release create "${{ github.ref_name }}" \
+              --title "Release ${{ github.ref_name }}" \
+              --draft \
+              --generate-notes
+          fi
 
   build-release:
     name: Build release binary
@@ -173,9 +178,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            gh release upload "${{ github.ref_name }}" ${{ env.ARCHIVE_NAME }}.zip ${{ env.ARCHIVE_NAME }}.zip.sha256
+            gh release upload "${{ github.ref_name }}" ${{ env.ARCHIVE_NAME }}.zip ${{ env.ARCHIVE_NAME }}.zip.sha256 --clobber
           else
-            gh release upload "${{ github.ref_name }}" ${{ env.ARCHIVE_NAME }}.tar.gz ${{ env.ARCHIVE_NAME }}.tar.gz.sha256
+            gh release upload "${{ github.ref_name }}" ${{ env.ARCHIVE_NAME }}.tar.gz ${{ env.ARCHIVE_NAME }}.tar.gz.sha256 --clobber
           fi
         shell: bash
 
