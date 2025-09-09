@@ -19,6 +19,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/BeaconBay/ck"
 rust-version = "1.88.0"
 
+
 [workspace.dependencies]
 anyhow = "1.0"
 thiserror = "1.0"
@@ -42,7 +43,7 @@ tree-sitter-haskell = "0.21"
 tree-sitter-rust = "0.21"
 tree-sitter-ruby = "0.21"
 tree-sitter-go = "0.21"
-fastembed = { version = "5.1", default-features = false, features = ["hf-hub-rustls-tls", "ort-download-binaries", "ort-load-dynamic"] }
+fastembed = { version = "5.1", default-features = false, features = ["hf-hub-rustls-tls"] }
 openssl = { version = "0.10" }
 tempfile = "3.8"
 glob = "0.3"
