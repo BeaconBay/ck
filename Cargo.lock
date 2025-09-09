@@ -527,7 +527,6 @@ dependencies = [
  "globset",
  "indicatif",
  "openssl",
- "openssl-sys",
  "owo-colors",
  "regex",
  "serde_json",

@@ -136,8 +136,8 @@ jobs:
       
       - name: Build release binary
         run: |
-          # Vendored OpenSSL is now enabled by default in workspace
-          ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
+          # Use sccache's exact approach: enable openssl/vendored feature
+          ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=openssl/vendored
         shell: bash
       
       - name: Strip binary (Linux and macOS)

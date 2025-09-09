@@ -37,9 +37,10 @@ regex = { workspace = true }
 indicatif = "0.17"
 console = "0.15"
 owo-colors = "4.0"
-openssl = { workspace = true, features = ["vendored"] }
-openssl-sys = { workspace = true, features = ["vendored"] }
+openssl = { workspace = true, optional = true }
 
+[features]
+vendored-openssl = ["openssl?/vendored"]
 
 [dev-dependencies]
 tempfile = { workspace = true }
