@@ -1,5 +1,1 @@
-# Use sccache's proven Docker images with pkg-config pre-build
-[target.x86_64-unknown-linux-musl]
-image = "messense/rust-musl-cross:x86_64-musl"
-pre-build = ["apt-get update && apt-get install -y pkg-config libssl-dev"]
-
+# Cross-compilation configuration (currently empty - no cross targets)
