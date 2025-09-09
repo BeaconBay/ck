@@ -2,8 +2,8 @@
 [target.x86_64-unknown-linux-musl]
 image = "messense/rust-musl-cross:x86_64-musl"
 
-[target.aarch64-unknown-linux-gnu]
+[target.aarch64-unknown-linux-musl]
 image = "messense/rust-musl-cross:aarch64-musl"
 
-[target.armv7-unknown-linux-gnueabihf]
-image = "messense/rust-musl-cross:armv7-musleabi"
+[target.armv7-unknown-linux-musleabihf]
+image = "messense/rust-musl-cross:armv7-musleabihf"
