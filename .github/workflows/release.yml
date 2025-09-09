@@ -142,6 +142,8 @@ jobs:
           X86_64_UNKNOWN_LINUX_MUSL_OPENSSL_STATIC: ${{ matrix.use-cross && 1 || '' }}
           AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_STATIC: ${{ matrix.use-cross && 1 || '' }}
           ARMV7_UNKNOWN_LINUX_GNUEABIHF_OPENSSL_STATIC: ${{ matrix.use-cross && 1 || '' }}
+          # Allow pkg-config to work with cross-compilation
+          PKG_CONFIG_ALLOW_CROSS: ${{ matrix.use-cross && 1 || '' }}
           # For non-cross builds, disable vendored OpenSSL to use system libraries
           OPENSSL_NO_VENDOR: ${{ !matrix.use-cross && 1 || '' }}
         run: |
