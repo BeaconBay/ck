@@ -98,8 +98,11 @@ jobs:
       - name: Install build dependencies (Windows)
         if: matrix.os == 'windows-latest'
         run: |
+          # Install Strawberry Perl for OpenSSL compilation
           choco install strawberryperl -y
-        shell: bash
+          # Refresh environment variables
+          refreshenv
+        shell: cmd
       
       - name: Install cross
         if: matrix.use-cross
@@ -116,17 +119,13 @@ jobs:
         shell: bash
       
       - name: Build release binary
-        env:
-          # Explicit OPENSSL_DIR paths for ARM cross-compilation (from PR #32)
-          OPENSSL_DIR: ${{ matrix.target == 'aarch64-pc-windows-msvc' && 'C:/Program Files/OpenSSL-Win64' || '' }}
         run: |
-          # Use different OpenSSL strategies per platform
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            # Use vendored OpenSSL on Windows with explicit paths for ARM (PR #32 approach)
-            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=vendored-openssl
+          # Use sccache's exact approach: enable openssl/vendored feature
+          # Skip vendored OpenSSL for Windows GNU due to potential compatibility issues
+          if [ "${{ matrix.target }}" = "x86_64-pc-windows-gnu" ]; then
+            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
           else
-            # Use vendored OpenSSL on Unix platforms (PR #52 approach)
-            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=vendored-openssl
+            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=openssl/vendored
           fi
         shell: bash
       
