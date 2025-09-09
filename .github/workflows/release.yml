@@ -75,6 +75,15 @@ jobs:
             target: x86_64-pc-windows-msvc
             use-cross: false
           
+          - build: windows-x86_64-gnu
+            os: windows-latest
+            target: x86_64-pc-windows-gnu
+            use-cross: false
+          
+          - build: windows-aarch64
+            os: windows-latest
+            target: aarch64-pc-windows-msvc
+            use-cross: false
 
     steps:
       - name: Checkout repository
@@ -91,6 +100,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev perl make
       
+      - name: Install build dependencies (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          # Install Strawberry Perl for OpenSSL compilation
+          choco install strawberryperl -y
+          # Refresh environment variables
+          refreshenv
+        shell: cmd
       
       - name: Install cross
         if: matrix.use-cross
@@ -109,7 +126,12 @@ jobs:
       - name: Build release binary
         run: |
           # Use sccache's exact approach: enable openssl/vendored feature
-          ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=openssl/vendored
+          # Skip vendored OpenSSL for Windows GNU due to potential compatibility issues
+          if [ "${{ matrix.target }}" = "x86_64-pc-windows-gnu" ]; then
+            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
+          else
+            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=openssl/vendored
+          fi
         shell: bash
       
       - name: Strip binary (Linux and macOS)
