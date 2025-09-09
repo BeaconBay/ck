@@ -136,21 +136,15 @@ jobs:
       
       - name: Build release binary
         env:
-          # For cross-compilation targets, force static OpenSSL linking
-          OPENSSL_STATIC: ${{ matrix.use-cross && 1 || '' }}
-          # Set target-specific OpenSSL vars for cross-compilation
-          X86_64_UNKNOWN_LINUX_MUSL_OPENSSL_STATIC: ${{ matrix.use-cross && 1 || '' }}
-          AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_STATIC: ${{ matrix.use-cross && 1 || '' }}
-          AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_DIR: ${{ matrix.use-cross && '/usr/lib/aarch64-linux-gnu' || '' }}
-          ARMV7_UNKNOWN_LINUX_GNUEABIHF_OPENSSL_STATIC: ${{ matrix.use-cross && 1 || '' }}
-          ARMV7_UNKNOWN_LINUX_GNUEABIHF_OPENSSL_DIR: ${{ matrix.use-cross && '/usr/lib/arm-linux-gnueabihf' || '' }}
-          # Allow pkg-config to work with cross-compilation
-          PKG_CONFIG_ALLOW_CROSS: ${{ matrix.use-cross && 1 || '' }}
-          PKG_CONFIG_PATH: ${{ matrix.use-cross && '/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/lib/arm-linux-gnueabihf/pkgconfig' || '' }}
           # For non-cross builds, disable vendored OpenSSL to use system libraries
           OPENSSL_NO_VENDOR: ${{ !matrix.use-cross && 1 || '' }}
         run: |
-          ${{ env.CARGO_CMD }} build --release --target ${{ matrix.target }} --package ck-search
+          # Use sccache's proven approach: --features=openssl/vendored for cross-compilation
+          if [ "${{ matrix.use-cross }}" = "true" ]; then
+            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=openssl/vendored
+          else
+            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
+          fi
         shell: bash
       
       - name: Strip binary (Linux and macOS)

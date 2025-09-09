@@ -1,48 +1,9 @@
-# Configuration for musl target
+# Use sccache's proven Docker images
 [target.x86_64-unknown-linux-musl]
-# Use emk/rust-musl-builder which has OpenSSL pre-configured
-image = "ekidd/rust-musl-builder"
+image = "messense/rust-musl-cross:x86_64-musl"
 
-[target.x86_64-unknown-linux-musl.env]
-passthrough = [
-    "OPENSSL_STATIC",
-    "X86_64_UNKNOWN_LINUX_MUSL_OPENSSL_STATIC",
-]
-
-# Configuration for ARM64 Linux
 [target.aarch64-unknown-linux-gnu]
-# Install required packages for OpenSSL compilation
-pre-build = [
-    "dpkg --add-architecture arm64",
-    "apt-get update", 
-    "apt-get install -y pkg-config libssl-dev:arm64",
-    "ln -sf /usr/lib/aarch64-linux-gnu/pkgconfig/openssl.pc /usr/lib/pkgconfig/ || true"
-]
+image = "messense/rust-musl-cross:aarch64-musl"
 
-[target.aarch64-unknown-linux-gnu.env]
-passthrough = [
-    "OPENSSL_STATIC",
-    "AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_STATIC",
-    "AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_DIR",
-    "PKG_CONFIG_PATH",
-    "PKG_CONFIG_ALLOW_CROSS",
-]
-
-# Configuration for ARMv7
 [target.armv7-unknown-linux-gnueabihf]
-# Install required packages for OpenSSL compilation  
-pre-build = [
-    "dpkg --add-architecture armhf",
-    "apt-get update",
-    "apt-get install -y pkg-config libssl-dev:armhf",
-    "ln -sf /usr/lib/arm-linux-gnueabihf/pkgconfig/openssl.pc /usr/lib/pkgconfig/ || true"
-]
-
-[target.armv7-unknown-linux-gnueabihf.env]
-passthrough = [
-    "OPENSSL_STATIC", 
-    "ARMV7_UNKNOWN_LINUX_GNUEABIHF_OPENSSL_STATIC",
-    "ARMV7_UNKNOWN_LINUX_GNUEABIHF_OPENSSL_DIR",
-    "PKG_CONFIG_PATH",
-    "PKG_CONFIG_ALLOW_CROSS",
-]
+image = "messense/rust-musl-cross:armv7-musleabi"
