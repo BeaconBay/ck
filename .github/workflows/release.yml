@@ -124,6 +124,7 @@ jobs:
         if: matrix.use-cross
         run: |
           cargo install cross --git https://github.com/cross-rs/cross
+          rustup target add ${{ matrix.target }}
       
       - name: Set up cargo command
         run: |
