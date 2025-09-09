@@ -119,13 +119,21 @@ jobs:
         shell: bash
       
       - name: Build release binary
+        env:
+          # For Windows builds, disable vendored OpenSSL to use system libraries (from c0a84af)
+          OPENSSL_NO_VENDOR: ${{ matrix.os == 'windows-latest' && 1 || '' }}
         run: |
-          # Use sccache's exact approach: enable openssl/vendored feature
-          # Skip vendored OpenSSL for Windows GNU due to potential compatibility issues
-          if [ "${{ matrix.target }}" = "x86_64-pc-windows-gnu" ]; then
-            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
+          # Different approaches for different platforms
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            # Windows approach from c0a84af - no --locked, no vendored features, use system OpenSSL
+            ${{ env.CARGO_CMD }} build --release --target ${{ matrix.target }} --package ck-search
           else
-            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=openssl/vendored
+            # Linux/macOS approach from 4cf1a9b - keep working approach unchanged
+            if [ "${{ matrix.target }}" = "x86_64-pc-windows-gnu" ]; then
+              ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
+            else
+              ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=openssl/vendored
+            fi
           fi
         shell: bash
       
