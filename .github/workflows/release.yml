@@ -137,7 +137,11 @@ jobs:
       - name: Build release binary
         run: |
           # Use sccache's proven approach: vendored OpenSSL for cross-compilation
-          ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
+          if [ "${{ matrix.use-cross }}" = "true" ]; then
+            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features vendored
+          else
+            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
+          fi
         shell: bash
       
       - name: Strip binary (Linux and macOS)
