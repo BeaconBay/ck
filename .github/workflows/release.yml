@@ -75,11 +75,6 @@ jobs:
             target: x86_64-pc-windows-msvc
             use-cross: false
           
-          - build: windows-x86_64-gnu
-            os: windows-latest
-            target: x86_64-pc-windows-gnu
-            use-cross: false
-          
           - build: windows-aarch64
             os: windows-latest
             target: aarch64-pc-windows-msvc
@@ -103,14 +98,17 @@ jobs:
       - name: Install build dependencies (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          # Install Strawberry Perl for OpenSSL compilation
-          choco install strawberryperl -y
-          # Add Strawberry Perl to PATH at the beginning
-          echo "C:\strawberry\perl\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          echo "C:\strawberry\c\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          # Verify Perl installation
-          C:\strawberry\perl\bin\perl.exe -v
-        shell: pwsh
+          # Install vcpkg and OpenSSL instead of building from source
+          git clone https://github.com/Microsoft/vcpkg.git C:\vcpkg
+          cd C:\vcpkg
+          .\bootstrap-vcpkg.bat
+          if [ "${{ matrix.target }}" = "aarch64-pc-windows-msvc" ]; then
+            .\vcpkg install openssl:arm64-windows-static
+          else
+            .\vcpkg install openssl:x64-windows-static
+          fi
+          echo "VCPKG_ROOT=C:\vcpkg" >> $GITHUB_ENV
+        shell: bash
       
       - name: Install cross
         if: matrix.use-cross
@@ -127,12 +125,16 @@ jobs:
         shell: bash
       
       - name: Build release binary
+        env:
+          # Use vcpkg OpenSSL on Windows instead of vendored
+          OPENSSL_DIR: ${{ matrix.os == 'windows-latest' && env.VCPKG_ROOT && format('{0}/installed/{1}', env.VCPKG_ROOT, matrix.target == 'aarch64-pc-windows-msvc' && 'arm64-windows-static' || 'x64-windows-static') || '' }}
         run: |
-          # Use sccache's exact approach: enable openssl/vendored feature
-          # Skip vendored OpenSSL for Windows GNU due to potential compatibility issues
-          if [ "${{ matrix.target }}" = "x86_64-pc-windows-gnu" ]; then
+          # Use different OpenSSL strategies per platform
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            # Use vcpkg OpenSSL on Windows (no vendored feature needed)
             ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
           else
+            # Use vendored OpenSSL on Unix platforms
             ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=openssl/vendored
           fi
         shell: bash
