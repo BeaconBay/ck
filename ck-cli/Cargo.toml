@@ -1,10 +1,10 @@
 [package]
 name = "ck-search"
-version.workspace = true
-edition.workspace = true
+version = "0.3.8"
+edition = "2021"
 authors = ["Mike Renwick"]
-license.workspace = true
-rust-version.workspace = true
+license = "MIT OR Apache-2.0"
+rust-version = "1.70"
 description = "Semantic grep by embedding - find code by meaning, not just keywords"
 repository = "https://github.com/BeaconBay/ck"
 homepage = "https://github.com/BeaconBay/ck"
