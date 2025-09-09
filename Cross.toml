@@ -1,11 +1,3 @@
-# Build configuration
-[build]
-# Add pre-build hook to install deps
-pre-build = [
-    "apt-get update && apt-get install -y perl make || true",
-    "apk add --no-cache perl make || true",
-]
-
 # Configuration for musl target
 [target.x86_64-unknown-linux-musl]
 # Use Alpine-based image for musl
@@ -14,19 +6,16 @@ image = "messense/rust-musl-cross:x86_64-musl"
 [target.x86_64-unknown-linux-musl.env]
 passthrough = [
     "OPENSSL_STATIC",
-    "OPENSSL_VENDOR",
 ]
 
 # Configuration for ARM64 Linux
 [target.aarch64-unknown-linux-gnu.env]
 passthrough = [
     "OPENSSL_STATIC",
-    "OPENSSL_VENDOR",
 ]
 
 # Configuration for ARMv7
 [target.armv7-unknown-linux-gnueabihf.env]
 passthrough = [
     "OPENSSL_STATIC",
-    "OPENSSL_VENDOR",
 ]

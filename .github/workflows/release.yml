@@ -138,8 +138,9 @@ jobs:
         env:
           # Force vendored OpenSSL for cross-compilation
           OPENSSL_STATIC: 1
-          OPENSSL_VENDOR: 1
         run: |
+          # Ensure OPENSSL_NO_VENDOR is not set (would disable vendored OpenSSL)
+          unset OPENSSL_NO_VENDOR 2>/dev/null || true
           ${{ env.CARGO_CMD }} build --release --target ${{ matrix.target }} --package ck-search
         shell: bash
       
