@@ -75,11 +75,6 @@ jobs:
             target: x86_64-pc-windows-msvc
             use-cross: false
           
-          - build: windows-x86_64-gnu
-            os: windows-latest
-            target: x86_64-pc-windows-gnu
-            use-cross: false
-          
           - build: windows-aarch64
             os: windows-latest
             target: aarch64-pc-windows-msvc
@@ -100,11 +95,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev perl make
       
-      - name: Install build dependencies (Windows GNU)
-        if: matrix.os == 'windows-latest' && contains(matrix.target, 'gnu')
-        run: |
-          choco install strawberryperl -y
-        shell: bash
       
       - name: Install cross
         if: matrix.use-cross
