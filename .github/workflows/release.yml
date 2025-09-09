@@ -69,7 +69,7 @@ jobs:
           
           - build: linux-armv7
             os: ubuntu-latest
-            target: armv7-unknown-linux-musleabihf
+            target: armv7-unknown-linux-gnueabihf
             use-cross: true
           
           # macOS builds

@@ -7,6 +7,6 @@ pre-build = ["apt-get update && apt-get install -y pkg-config libssl-dev"]
 image = "messense/rust-musl-cross:aarch64-musl"
 pre-build = ["apt-get update && apt-get install -y pkg-config libssl-dev"]
 
-[target.armv7-unknown-linux-musleabihf]
-image = "messense/rust-musl-cross:armv7-musleabihf"
+[target.armv7-unknown-linux-gnueabihf]
+image = "ghcr.io/cross-rs/armv7-unknown-linux-gnueabihf:edge"
 pre-build = ["apt-get update && apt-get install -y pkg-config libssl-dev"]
