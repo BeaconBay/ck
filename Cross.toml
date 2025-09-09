@@ -1,7 +1,7 @@
 # Configuration for musl target
 [target.x86_64-unknown-linux-musl]
-# Use established musl builder with OpenSSL pre-compiled
-image = "ghcr.io/rust-cross/rust-musl-cross:x86_64-musl"
+# Use emk/rust-musl-builder which has OpenSSL pre-configured
+image = "ekidd/rust-musl-builder"
 
 [target.x86_64-unknown-linux-musl.env]
 passthrough = [
