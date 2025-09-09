@@ -43,8 +43,8 @@ tree-sitter-rust = "0.21"
 tree-sitter-ruby = "0.21"
 tree-sitter-go = "0.21"
 fastembed = { version = "5.1", default-features = false, features = ["hf-hub-rustls-tls", "ort-download-binaries", "ort-load-dynamic"] }
-openssl = { version = "0.10", features = ["vendored"] }
-openssl-sys = { version = "0.9", features = ["vendored"] }
+openssl = { version = "0.10", default-features = false, features = ["vendored"] }
+openssl-sys = { version = "0.9", default-features = false, features = ["vendored"] }
 tempfile = "3.8"
 glob = "0.3"
 globset = "0.4"
