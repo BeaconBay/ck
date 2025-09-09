@@ -135,16 +135,9 @@ jobs:
         shell: bash
       
       - name: Build release binary
-        env:
-          # For non-cross builds, disable vendored OpenSSL to use system libraries
-          OPENSSL_NO_VENDOR: ${{ !matrix.use-cross && 1 || '' }}
         run: |
-          # Use sccache's proven approach: --features=openssl/vendored for cross-compilation
-          if [ "${{ matrix.use-cross }}" = "true" ]; then
-            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=openssl/vendored
-          else
-            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
-          fi
+          # Use sccache's proven approach: vendored OpenSSL for cross-compilation
+          ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
         shell: bash
       
       - name: Strip binary (Linux and macOS)
