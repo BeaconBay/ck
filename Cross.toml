@@ -1,0 +1,13 @@
+[target.aarch64-unknown-linux-gnu]
+image = "ghcr.io/cross-rs/cross:aarch64-unknown-linux-gnu-0.2.5"
+
+[target.aarch64-unknown-linux-gnu.env]
+passthrough = [
+    "OPENSSL_DIR",
+    "OPENSSL_LIB_DIR", 
+    "OPENSSL_INCLUDE_DIR",
+]
+
+[target.aarch64-unknown-linux-gnu.packages]
+# Install OpenSSL development packages
+apt = ["libssl-dev", "pkg-config"]
