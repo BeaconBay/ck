@@ -105,9 +105,12 @@ jobs:
         run: |
           # Install Strawberry Perl for OpenSSL compilation
           choco install strawberryperl -y
-          # Refresh environment variables
-          refreshenv
-        shell: cmd
+          # Add Strawberry Perl to PATH at the beginning
+          echo "C:\strawberry\perl\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          echo "C:\strawberry\c\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # Verify Perl installation
+          C:\strawberry\perl\bin\perl.exe -v
+        shell: pwsh
       
       - name: Install cross
         if: matrix.use-cross
