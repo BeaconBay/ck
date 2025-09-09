@@ -135,7 +135,7 @@ jobs:
             ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
           else
             # Use vendored OpenSSL on Unix platforms
-            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=openssl/vendored
+            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=vendored-openssl
           fi
         shell: bash
       
