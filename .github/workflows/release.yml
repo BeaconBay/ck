@@ -123,6 +123,10 @@ jobs:
         shell: bash
       
       - name: Build release binary
+        env:
+          # Force vendored OpenSSL for cross-compilation
+          OPENSSL_STATIC: 1
+          OPENSSL_VENDOR: 1
         run: |
           ${{ env.CARGO_CMD }} build --release --target ${{ matrix.target }} --package ck-search
         shell: bash
