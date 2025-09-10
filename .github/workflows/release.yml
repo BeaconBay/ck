@@ -219,15 +219,15 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           # Publish workspace crates in dependency order
-          cargo publish -p ck-models --token $CARGO_REGISTRY_TOKEN || true
+          cargo publish -p ck-core --token $CARGO_REGISTRY_TOKEN || true
           sleep 10
-          cargo publish -p ck-embed --token $CARGO_REGISTRY_TOKEN || true
+          cargo publish -p ck-models --token $CARGO_REGISTRY_TOKEN || true
           sleep 10
           cargo publish -p ck-chunk --token $CARGO_REGISTRY_TOKEN || true
           sleep 10
-          cargo publish -p ck-ann --token $CARGO_REGISTRY_TOKEN || true
+          cargo publish -p ck-embed --token $CARGO_REGISTRY_TOKEN || true
           sleep 10
-          cargo publish -p ck-core --token $CARGO_REGISTRY_TOKEN || true
+          cargo publish -p ck-ann --token $CARGO_REGISTRY_TOKEN || true
           sleep 10
           cargo publish -p ck-index --token $CARGO_REGISTRY_TOKEN || true
           sleep 10
