@@ -40,15 +40,6 @@ jobs:
             gh release create "${{ github.ref_name }}" \
               --title "Release ${{ github.ref_name }}" \
               --draft \
-              --notes "🚀 **Release ${{ github.ref_name }}**
-
-## 📦 Installation
-Download the binary for your platform from the assets below.
-
-## 🛠️ Changes
-See the full changelog below for all changes in this release.
-
----" \
               --generate-notes
           fi
 
