@@ -10,7 +10,7 @@ This file contains project-specific instructions for Claude and other AI agents 
 
 ```bash
 # Correct format (current standard since 0.3.8+)
-git tag 0.4.0
+git tag 0.4.1
 git tag 0.3.9
 
 # Old format (deprecated, do not use)

@@ -2,24 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.4.0] - 2025-09-10
+## [0.4.1] - 2025-09-10
 
 ### Added
-- **Ctrl+C interrupt handling**: Comprehensive SIGINT support for safely stopping long-running indexing operations
-- **Cross-platform signal handling**: Uses `ctrlc` crate for Windows, macOS, and Linux compatibility
-- **Thread-safe interrupts**: Atomic bool operations ensure safe concurrent interrupt handling
-- **Progress preservation**: Shows count of processed files when indexing is interrupted
-- **Clean user messaging**: User-friendly interrupt notifications and graceful cleanup
+- **JSONL output format**: Stream-friendly `--jsonl` flag for AI agent workflows with structured output
+- **No-snippet mode**: `--no-snippet` flag for metadata-only output to reduce bandwidth for agents
+- **Agent documentation**: Comprehensive README section explaining JSONL benefits over traditional JSON
+- **Agent examples**: Python code demonstrating stream processing patterns for AI workflows
+- **UTF-8 warning suppression**: Eliminated noisy warnings for binary files in .git directories
 
 ### Technical
-- **Global interrupt flag**: `AtomicBool` with `std::sync::Once` pattern for one-time signal handler registration
-- **Strategic interrupt checks**: Placed throughout sequential and parallel indexing loops for responsive interruption
-- **Non-blocking design**: Interrupt checks don't impact indexing performance
-- **Dependencies**: Added `ctrlc = "3.4"` to workspace and `ck-index` crate
+- **JsonlSearchResult struct**: New agent-friendly output format with conversion methods
+- **Extended SearchResult**: Added chunk_hash and index_epoch fields for future agent features
+- **Comprehensive test coverage**: 4 new integration tests validating JSONL functionality
+- **Updated help text**: Dedicated JSONL section explaining streaming benefits for agents
+- **Phase 1 PRD**: Complete specification for agent-ready code navigation features
 
-### Fixed
-- **ONNX runtime test failures**: Resolved conflicting system-level ONNX runtime from brew-installed pytorch package
-- **Test stability**: All 65+ tests now pass cleanly without schema registration errors or mutex lock failures
+### Why JSONL for AI Agents?
+- **Streaming friendly**: Process results as they arrive, no waiting for complete response
+- **Memory efficient**: Parse one result at a time, not entire array into memory
+- **Error resilient**: Malformed lines don't break entire response
+- **Standard format**: Used by OpenAI, Anthropic, and modern ML pipelines
 
 ## [0.3.9] - 2025-09-10
 

@@ -1,6 +1,6 @@
 [package]
 name = "ck-search"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 authors = ["Mike Renwick"]
 license = "MIT OR Apache-2.0"
@@ -17,13 +17,13 @@ name = "ck"
 path = "src/main.rs"
 
 [dependencies]
-ck-core = { version = "0.4.0", path = "../ck-core" }
-ck-index = { version = "0.4.0", path = "../ck-index" }
-ck-engine = { version = "0.4.0", path = "../ck-engine" }
-ck-chunk = { version = "0.4.0", path = "../ck-chunk" }
-ck-embed = { version = "0.4.0", path = "../ck-embed" }
-ck-ann = { version = "0.4.0", path = "../ck-ann" }
-ck-models = { version = "0.4.0", path = "../ck-models" }
+ck-core = { version = "0.4.1", path = "../ck-core" }
+ck-index = { version = "0.4.1", path = "../ck-index" }
+ck-engine = { version = "0.4.1", path = "../ck-engine" }
+ck-chunk = { version = "0.4.1", path = "../ck-chunk" }
+ck-embed = { version = "0.4.1", path = "../ck-embed" }
+ck-ann = { version = "0.4.1", path = "../ck-ann" }
+ck-models = { version = "0.4.1", path = "../ck-models" }
 
 anyhow = { workspace = true }
 clap = { workspace = true }

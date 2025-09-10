@@ -405,7 +405,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "ck-ann"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "bincode",
@@ -416,7 +416,7 @@ dependencies = [
 
 [[package]]
 name = "ck-chunk"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "ck-core",
@@ -433,7 +433,7 @@ dependencies = [
 
 [[package]]
 name = "ck-core"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "bincode",
@@ -447,7 +447,7 @@ dependencies = [
 
 [[package]]
 name = "ck-embed"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "ck-core",
@@ -458,7 +458,7 @@ dependencies = [
 
 [[package]]
 name = "ck-engine"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "ck-ann",
@@ -480,7 +480,7 @@ dependencies = [
 
 [[package]]
 name = "ck-index"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "bincode",
@@ -502,7 +502,7 @@ dependencies = [
 
 [[package]]
 name = "ck-models"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "ck-core",
@@ -512,7 +512,7 @@ dependencies = [
 
 [[package]]
 name = "ck-search"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "ck-ann",
