@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2025-09-10
+
+### Added
+- **Ctrl+C interrupt handling**: Comprehensive SIGINT support for safely stopping long-running indexing operations
+- **Cross-platform signal handling**: Uses `ctrlc` crate for Windows, macOS, and Linux compatibility
+- **Thread-safe interrupts**: Atomic bool operations ensure safe concurrent interrupt handling
+- **Progress preservation**: Shows count of processed files when indexing is interrupted
+- **Clean user messaging**: User-friendly interrupt notifications and graceful cleanup
+
+### Technical
+- **Global interrupt flag**: `AtomicBool` with `std::sync::Once` pattern for one-time signal handler registration
+- **Strategic interrupt checks**: Placed throughout sequential and parallel indexing loops for responsive interruption
+- **Non-blocking design**: Interrupt checks don't impact indexing performance
+- **Dependencies**: Added `ctrlc = "3.4"` to workspace and `ck-index` crate
+
+### Fixed
+- **ONNX runtime test failures**: Resolved conflicting system-level ONNX runtime from brew-installed pytorch package
+- **Test stability**: All 65+ tests now pass cleanly without schema registration errors or mutex lock failures
+
+## [0.3.9] - 2025-09-10
+
+### Added
+- **Streaming producer-consumer indexing**: Implemented efficient streaming architecture for large-scale indexing operations
+- **Memory-efficient processing**: Reduces memory footprint during indexing of large codebases
+- **Performance optimization**: Better resource utilization through streaming data flow
+
+### Technical
+- **Producer-consumer pattern**: Separates file discovery from processing for better parallelization
+- **Streaming integration**: Compatible with existing smart update and exclude pattern functionality
+
+## [0.3.8] - 2025-09-09
+
+### Added
+- **Enhanced model caching documentation**: Updated README with comprehensive information about embedding model cache locations
+- **Platform-specific cache paths**: Documented cache directories for Linux/macOS (`~/.cache/ck/models/`), Windows (`%LOCALAPPDATA%\ck\cache\models\`), and fallback locations
+- **Model download transparency**: Clear documentation of where fastembed stores ONNX models when downloaded during indexing
+
+### Fixed
+- **Documentation accuracy**: Removed outdated `.fastembed_cache` references and provided correct cache path information
+- **FAQ section**: Added frequently asked questions about embedding model storage and management
+
 ## [0.3.7] - 2025-09-08
 
 ### Improved

@@ -11,7 +11,7 @@ keywords = ["parsing", "chunking", "tree-sitter"]
 categories = ["parsing"]
 
 [dependencies]
-ck-core = { version = "0.3.9", path = "../ck-core" }
+ck-core = { version = "0.4.0", path = "../ck-core" }
 
 anyhow = { workspace = true }
 serde = { workspace = true }
