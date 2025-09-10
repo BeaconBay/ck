@@ -149,6 +149,12 @@ jobs:
             strip target/${{ matrix.target }}/release/ck
           fi
       
+      - name: Sign macOS binary (ad-hoc)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # Ad-hoc code signing to avoid Gatekeeper warnings
+          codesign --force --sign - target/${{ matrix.target }}/release/ck
+      
       - name: Determine archive name
         run: |
           version="${{ github.ref_name }}"
