@@ -98,7 +98,7 @@ ck "pattern" .                           # Follows .gitignore rules
 ck --no-ignore "pattern" .               # Search all files including ignored ones
 
 # These are also excluded by default:
-# .git, node_modules, target/, .fastembed_cache, __pycache__
+# .git, node_modules, target/, __pycache__
 
 # Override defaults:
 ck --no-default-excludes "pattern" .     # Search everything
@@ -197,7 +197,7 @@ ck --add new_file.rs
 
 **Smart Binary Detection:** Uses ripgrep-style content analysis (NUL byte detection) instead of extension-based filtering, automatically indexing any text file regardless of extension while correctly excluding binary files.
 
-**Smart Exclusions:** Automatically skips `.git`, `node_modules`, `target/`, `build/`, `dist/`, `__pycache__/`, `.fastembed_cache`, `.venv`, `venv`, and other common build/cache/virtual environment directories.
+**Smart Exclusions:** Automatically skips `.git`, `node_modules`, `target/`, `build/`, `dist/`, `__pycache__/`, `.venv`, `venv`, and other common build/cache/virtual environment directories.
 
 ## Installation
 
@@ -306,7 +306,7 @@ ck --help | grep -A 20 exclude
 # These directories are excluded by default:
 # .git, .svn, .hg                    # Version control
 # node_modules, target, build        # Build artifacts  
-# .cache, __pycache__, .fastembed_cache  # Caches
+# .cache, __pycache__  # Caches
 # .vscode, .idea                     # IDE files
 ```
 
@@ -403,6 +403,12 @@ A: Absolutely. The `--json` flag provides structured output perfect for automate
 
 **Q: What about privacy/security?**  
 A: Everything runs locally. No code or queries are sent to external services. The embedding model is downloaded once and cached locally.
+
+**Q: Where are the models cached?**  
+A: Models are cached in platform-appropriate directories:
+- Linux/macOS: `~/.cache/ck/models/` (or `$XDG_CACHE_HOME/ck/models/`)
+- Windows: `%LOCALAPPDATA%\ck\cache\models\`
+- Fallback: `.ck_models/` in the current directory if no home directory is found
 
 ## License
 
