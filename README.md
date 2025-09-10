@@ -404,11 +404,13 @@ A: Absolutely. The `--json` flag provides structured output perfect for automate
 **Q: What about privacy/security?**  
 A: Everything runs locally. No code or queries are sent to external services. The embedding model is downloaded once and cached locally.
 
-**Q: Where are the models cached?**  
-A: Models are cached in platform-appropriate directories:
-- Linux/macOS: `~/.cache/ck/models/` (or `$XDG_CACHE_HOME/ck/models/`)
+**Q: Where are the embedding models cached?**  
+A: The embedding models (ONNX format) are downloaded and cached in platform-specific directories:
+- Linux/macOS: `~/.cache/ck/models/` (or `$XDG_CACHE_HOME/ck/models/` if set)
 - Windows: `%LOCALAPPDATA%\ck\cache\models\`
-- Fallback: `.ck_models/` in the current directory if no home directory is found
+- Fallback: `.ck_models/models/` in the current directory (only if no home directory is found)
+
+The models are downloaded automatically on first use and reused for subsequent runs.
 
 ## License
 
