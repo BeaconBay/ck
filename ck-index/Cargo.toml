@@ -26,6 +26,7 @@ rayon = { workspace = true }
 walkdir = { workspace = true }
 tracing = { workspace = true }
 ignore = { workspace = true }
+ctrlc = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

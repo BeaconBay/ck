@@ -7,10 +7,16 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Once;
 use std::time::SystemTime;
 use walkdir::WalkDir;
 
 pub type ProgressCallback = Box<dyn Fn(&str) + Send + Sync>;
+
+// Global interrupt flag
+static INTERRUPTED: AtomicBool = AtomicBool::new(false);
+static HANDLER_INIT: Once = Once::new();
 
 /// Build override patterns for excluding files during directory traversal
 fn build_overrides(
@@ -519,6 +525,17 @@ pub async fn smart_update_index_with_progress(
 ) -> Result<UpdateStats> {
     let index_dir = path.join(".ck");
     let mut stats = UpdateStats::default();
+    
+    // Set up interrupt handler (only once per process)
+    HANDLER_INIT.call_once(|| {
+        let _ = ctrlc::set_handler(move || {
+            INTERRUPTED.store(true, Ordering::SeqCst);
+            eprintln!("\nIndexing interrupted by user. Cleaning up...");
+        });
+    });
+    
+    // Reset interrupt flag for this indexing operation
+    INTERRUPTED.store(false, Ordering::SeqCst);
 
     if force_rebuild {
         clean_index(path)?;
@@ -551,6 +568,12 @@ pub async fn smart_update_index_with_progress(
     let mut manifest_changed = false;
 
     for file_path in current_files {
+        // Check for interrupt
+        if INTERRUPTED.load(Ordering::SeqCst) {
+            eprintln!("Indexing interrupted during file scanning.");
+            return Ok(stats);
+        }
+        
         if let Some(metadata) = manifest.files.get(&file_path) {
             let fs_meta = match fs::metadata(&file_path) {
                 Ok(m) => m,
@@ -612,6 +635,12 @@ pub async fn smart_update_index_with_progress(
         let mut _processed_count = 0;
 
         for file_path in files_to_update.iter() {
+            // Check for interrupt
+            if INTERRUPTED.load(Ordering::SeqCst) {
+                eprintln!("Indexing interrupted. {} files processed.", _processed_count);
+                break;
+            }
+            
             if let Some(ref callback) = progress_callback
                 && let Some(file_name) = file_path.file_name()
             {
@@ -653,6 +682,11 @@ pub async fn smart_update_index_with_progress(
         // Spawn worker thread for parallel processing
         let worker_handle = thread::spawn(move || {
             files_clone.par_iter().for_each(|file_path| {
+                // Check for interrupt
+                if INTERRUPTED.load(Ordering::SeqCst) {
+                    return;
+                }
+                
                 match index_single_file(file_path, &path_clone, None) {
                     Ok(entry) => {
                         if tx.send((file_path.clone(), entry)).is_err() {
@@ -669,6 +703,13 @@ pub async fn smart_update_index_with_progress(
         // Main thread: stream results as they arrive
         let mut _processed_count = 0;
         while let Ok((file_path, entry)) = rx.recv() {
+            // Check for interrupt
+            if INTERRUPTED.load(Ordering::SeqCst) {
+                eprintln!("Indexing interrupted. {} files processed.", _processed_count);
+                drop(rx); // Drop receiver to signal worker to stop
+                break;
+            }
+            
             if let Some(ref callback) = progress_callback
                 && let Some(file_name) = file_path.file_name()
             {
