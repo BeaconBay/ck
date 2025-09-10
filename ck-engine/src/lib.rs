@@ -203,6 +203,8 @@ fn search_file(
                 preview,
                 lang: ck_core::Language::from_path(file_path),
                 symbol: None,
+                chunk_hash: None,
+                index_epoch: None,
             });
         }
 
@@ -298,6 +300,8 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
                 preview,
                 lang: ck_core::Language::from_path(&PathBuf::from(path_text)),
                 symbol: None,
+                chunk_hash: None,
+                index_epoch: None,
             },
         ));
     }
@@ -433,6 +437,8 @@ async fn build_tantivy_index(options: &SearchOptions) -> Result<Vec<SearchResult
                 preview,
                 lang: ck_core::Language::from_path(&PathBuf::from(path_text)),
                 symbol: None,
+                chunk_hash: None,
+                index_epoch: None,
             },
         ));
     }
@@ -582,6 +588,8 @@ async fn semantic_search_with_progress(
                 preview,
                 lang: ck_core::Language::from_path(file_path),
                 symbol: None,
+                chunk_hash: None,
+                index_epoch: None,
             });
         }
     }
@@ -775,6 +783,8 @@ async fn build_semantic_index_with_progress(
                 preview,
                 lang: ck_core::Language::from_path(file_path),
                 symbol: None,
+                chunk_hash: None,
+                index_epoch: None,
             });
         }
     }

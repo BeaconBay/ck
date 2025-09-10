@@ -81,3 +81,5 @@ Always update CHANGELOG.md with new releases. Follow this structure:
 - All tests must pass
 - New features require comprehensive test coverage
 - Breaking changes require major version bump
+- --help reflects any new features
+- README incorporates any new user features (e.g. flags etc)

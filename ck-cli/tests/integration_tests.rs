@@ -437,3 +437,183 @@ fn test_error_handling() {
     // Should fail gracefully with invalid regex
     assert!(!output.status.success());
 }
+
+#[test]
+fn test_jsonl_basic_output() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create test files
+    fs::write(
+        temp_dir.path().join("test.rs"),
+        "fn main() {\n    println!(\"Hello Rust\");\n}",
+    )
+    .unwrap();
+    fs::write(
+        temp_dir.path().join("test.py"),
+        "print('Hello Python')\ndef main():\n    pass",
+    )
+    .unwrap();
+
+    let output = Command::new(get_ck_binary())
+        .args(["fn main", "--jsonl", temp_dir.path().to_str().unwrap()])
+        .output()
+        .expect("Failed to run ck");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Should output JSONL format
+    assert!(!stdout.trim().is_empty());
+
+    // Each line should be valid JSON
+    for line in stdout.lines() {
+        if !line.trim().is_empty() {
+            let json: serde_json::Value = serde_json::from_str(line).expect("Invalid JSON line");
+
+            // Verify required JSONL fields exist
+            assert!(json.get("path").is_some());
+            assert!(json.get("span").is_some());
+            assert!(json.get("language").is_some());
+            assert!(json.get("snippet").is_some());
+            assert!(json.get("score").is_some());
+
+            // Verify span structure
+            let span = json.get("span").unwrap().as_object().unwrap();
+            assert!(span.get("byte_start").is_some());
+            assert!(span.get("byte_end").is_some());
+            assert!(span.get("line_start").is_some());
+            assert!(span.get("line_end").is_some());
+        }
+    }
+}
+
+#[test]
+fn test_jsonl_no_snippet_flag() {
+    let temp_dir = TempDir::new().unwrap();
+
+    fs::write(
+        temp_dir.path().join("test.rs"),
+        "fn main() {\n    println!(\"Hello Rust\");\n}",
+    )
+    .unwrap();
+
+    let output = Command::new(get_ck_binary())
+        .args([
+            "fn main",
+            "--jsonl",
+            "--no-snippet",
+            temp_dir.path().to_str().unwrap(),
+        ])
+        .output()
+        .expect("Failed to run ck");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Should output JSONL format without snippets
+    for line in stdout.lines() {
+        if !line.trim().is_empty() {
+            let json: serde_json::Value = serde_json::from_str(line).expect("Invalid JSON line");
+
+            // Should not have snippet field when --no-snippet is used
+            assert!(json.get("snippet").is_none());
+
+            // Should still have other required fields
+            assert!(json.get("path").is_some());
+            assert!(json.get("span").is_some());
+            assert!(json.get("language").is_some());
+            assert!(json.get("score").is_some());
+        }
+    }
+}
+
+#[test]
+fn test_jsonl_vs_regular_output() {
+    let temp_dir = TempDir::new().unwrap();
+
+    fs::write(
+        temp_dir.path().join("test.rs"),
+        "fn main() {\n    println!(\"Hello Rust\");\n}",
+    )
+    .unwrap();
+
+    // Regular output
+    let regular_output = Command::new(get_ck_binary())
+        .args(["fn main", temp_dir.path().to_str().unwrap()])
+        .output()
+        .expect("Failed to run ck");
+
+    // JSONL output
+    let jsonl_output = Command::new(get_ck_binary())
+        .args(["fn main", "--jsonl", temp_dir.path().to_str().unwrap()])
+        .output()
+        .expect("Failed to run ck");
+
+    assert!(regular_output.status.success());
+    assert!(jsonl_output.status.success());
+
+    let regular_stdout = String::from_utf8(regular_output.stdout).unwrap();
+    let jsonl_stdout = String::from_utf8(jsonl_output.stdout).unwrap();
+
+    // Regular output should NOT be JSON
+    assert!(!regular_stdout.contains("{\"path\":"));
+
+    // JSONL output should be JSON
+    assert!(jsonl_stdout.contains("{\"path\":"));
+    assert!(jsonl_stdout.contains("\"span\":"));
+    assert!(jsonl_stdout.contains("\"language\":"));
+}
+
+#[test]
+fn test_jsonl_with_different_languages() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create files in different languages
+    fs::write(
+        temp_dir.path().join("test.rs"),
+        "fn main() {\n    println!(\"Hello Rust\");\n}",
+    )
+    .unwrap();
+    fs::write(
+        temp_dir.path().join("test.py"),
+        "def main():\n    print('Hello Python')",
+    )
+    .unwrap();
+    fs::write(
+        temp_dir.path().join("test.js"),
+        "function main() {\n    console.log('Hello JS');\n}",
+    )
+    .unwrap();
+
+    let output = Command::new(get_ck_binary())
+        .args(["main", "--jsonl", temp_dir.path().to_str().unwrap()])
+        .output()
+        .expect("Failed to run ck");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    let mut rust_found = false;
+    let mut python_found = false;
+    let mut js_found = false;
+
+    // Check that different languages are correctly detected
+    for line in stdout.lines() {
+        if !line.trim().is_empty() {
+            let json: serde_json::Value = serde_json::from_str(line).expect("Invalid JSON line");
+
+            let language = json.get("language").unwrap().as_str().unwrap();
+            match language {
+                "rust" => rust_found = true,
+                "python" => python_found = true,
+                "javascript" => js_found = true,
+                _ => {}
+            }
+        }
+    }
+
+    // Should detect all three languages
+    assert!(rust_found);
+    assert!(python_found);
+    assert!(js_found);
+}

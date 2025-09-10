@@ -157,6 +157,8 @@ pub async fn semantic_search_v3_with_progress(
             preview: content,
             lang: ck_core::Language::from_path(file_path),
             symbol: None,
+            chunk_hash: None,
+            index_epoch: None,
         });
     }
 

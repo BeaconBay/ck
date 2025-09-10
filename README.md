@@ -35,7 +35,7 @@ ck --hybrid "connection timeout" src/
 
 **For Developers:** Stop hunting through thousands of regex false positives. Find the code you actually need by describing what it does.
 
-**For AI Agents:** Get structured, semantic search results in JSON format. Perfect for code analysis, documentation generation, and automated refactoring.
+**For AI Agents:** Get structured, semantic search results in JSONL format. Stream-friendly, error-resilient output perfect for LLM workflows, code analysis, documentation generation, and automated refactoring.
 
 
 
@@ -81,12 +81,46 @@ ck -l --hybrid "database" src/      # List files using hybrid search
 ```
 
 ### 🤖 **Agent-Friendly Output**
-Perfect JSON output for LLMs, scripts, and automation.
+Perfect structured output for LLMs, scripts, and automation. JSONL format provides superior parsing reliability for AI agents.
 
 ```bash
+# JSONL format - one JSON object per line (recommended for agents)
+ck --jsonl --sem "error handling" src/
+ck --jsonl --no-snippet "function" .        # Metadata only
+ck --jsonl --topk 5 --threshold 0.7 "auth"  # High-confidence results
+
+# Traditional JSON (single array)
 ck --json --sem "error handling" src/ | jq '.file'
 ck --json --topk 5 "TODO" . | jq -r '.preview'
 ck --json --full-section --sem "database" . | jq -r '.preview'  # Complete functions
+```
+
+**Why JSONL for AI agents?**
+- ✅ **Streaming friendly**: Process results as they arrive, no waiting for complete response
+- ✅ **Memory efficient**: Parse one result at a time, not entire array into memory
+- ✅ **Error resilient**: One malformed line doesn't break entire response
+- ✅ **Composable**: Works perfectly with Unix pipes and stream processing
+- ✅ **Standard format**: Used by OpenAI API, Anthropic API, and modern ML pipelines
+
+**JSONL Output Format:**
+```json
+{"path":"./src/auth.rs","span":{"byte_start":1203,"byte_end":1456,"line_start":42,"line_end":58},"language":"rust","snippet":"fn authenticate(user: User) -> Result<Token> { ... }","score":0.89}
+{"path":"./src/error.rs","span":{"byte_start":234,"byte_end":678,"line_start":15,"line_end":25},"language":"rust","snippet":"impl Error for AuthError { ... }","score":0.76}
+```
+
+**Agent Processing Example:**
+```python
+# Stream-process JSONL results (memory efficient)
+import json, subprocess
+
+proc = subprocess.Popen(['ck', '--jsonl', '--sem', 'error handling', 'src/'], 
+                       stdout=subprocess.PIPE, text=True)
+
+for line in proc.stdout:
+    result = json.loads(line)
+    if result['score'] > 0.8:  # High-confidence matches only
+        print(f"📍 {result['path']}:{result['span']['line_start']}")
+        print(f"🔍 {result['snippet'][:100]}...")
 ```
 
 ### 📁 **Smart File Filtering**

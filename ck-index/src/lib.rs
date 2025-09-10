@@ -178,7 +178,15 @@ pub async fn index_directory(
                     _processed_count += 1;
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to index {:?}: {}", file_path, e);
+                    // Suppress warnings for binary files and UTF-8 errors in .git directories
+                    let error_msg = e.to_string();
+                    let is_binary_skip = error_msg.contains("Binary file, skipping");
+                    let is_utf8_error = error_msg.contains("stream did not contain valid UTF-8");
+                    let is_git_file = file_path.components().any(|c| c.as_os_str() == ".git");
+
+                    if !(is_binary_skip || is_utf8_error && is_git_file) {
+                        tracing::warn!("Failed to index {:?}: {}", file_path, e);
+                    }
                 }
             }
         }
@@ -201,7 +209,16 @@ pub async fn index_directory(
                         }
                     }
                     Err(e) => {
-                        tracing::warn!("Failed to index {:?}: {}", file_path, e);
+                        // Suppress warnings for binary files and UTF-8 errors in .git directories
+                        let error_msg = e.to_string();
+                        let is_binary_skip = error_msg.contains("Binary file, skipping");
+                        let is_utf8_error =
+                            error_msg.contains("stream did not contain valid UTF-8");
+                        let is_git_file = file_path.components().any(|c| c.as_os_str() == ".git");
+
+                        if !(is_binary_skip || is_utf8_error && is_git_file) {
+                            tracing::warn!("Failed to index {:?}: {}", file_path, e);
+                        }
                     }
                 }
             });
@@ -310,7 +327,17 @@ pub async fn update_index(
                     match index_single_file(file_path, path, Some(&mut embedder)) {
                         Ok(entry) => Some((file_path.clone(), entry)),
                         Err(e) => {
-                            tracing::warn!("Failed to index {:?}: {}", file_path, e);
+                            // Suppress warnings for binary files and UTF-8 errors in .git directories
+                            let error_msg = e.to_string();
+                            let is_binary_skip = error_msg.contains("Binary file, skipping");
+                            let is_utf8_error =
+                                error_msg.contains("stream did not contain valid UTF-8");
+                            let is_git_file =
+                                file_path.components().any(|c| c.as_os_str() == ".git");
+
+                            if !(is_binary_skip || is_utf8_error && is_git_file) {
+                                tracing::warn!("Failed to index {:?}: {}", file_path, e);
+                            }
                             None
                         }
                     }
@@ -336,7 +363,17 @@ pub async fn update_index(
                     match index_single_file(file_path, path, None) {
                         Ok(entry) => Some((file_path.clone(), entry)),
                         Err(e) => {
-                            tracing::warn!("Failed to index {:?}: {}", file_path, e);
+                            // Suppress warnings for binary files and UTF-8 errors in .git directories
+                            let error_msg = e.to_string();
+                            let is_binary_skip = error_msg.contains("Binary file, skipping");
+                            let is_utf8_error =
+                                error_msg.contains("stream did not contain valid UTF-8");
+                            let is_git_file =
+                                file_path.components().any(|c| c.as_os_str() == ".git");
+
+                            if !(is_binary_skip || is_utf8_error && is_git_file) {
+                                tracing::warn!("Failed to index {:?}: {}", file_path, e);
+                            }
                             None
                         }
                     }
@@ -666,7 +703,15 @@ pub async fn smart_update_index_with_progress(
                     _processed_count += 1;
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to index {:?}: {}", file_path, e);
+                    // Suppress warnings for binary files and UTF-8 errors in .git directories
+                    let error_msg = e.to_string();
+                    let is_binary_skip = error_msg.contains("Binary file, skipping");
+                    let is_utf8_error = error_msg.contains("stream did not contain valid UTF-8");
+                    let is_git_file = file_path.components().any(|c| c.as_os_str() == ".git");
+
+                    if !(is_binary_skip || is_utf8_error && is_git_file) {
+                        tracing::warn!("Failed to index {:?}: {}", file_path, e);
+                    }
                     stats.files_errored += 1;
                 }
             }
@@ -697,7 +742,16 @@ pub async fn smart_update_index_with_progress(
                         }
                     }
                     Err(e) => {
-                        tracing::warn!("Failed to index {:?}: {}", file_path, e);
+                        // Suppress warnings for binary files and UTF-8 errors in .git directories
+                        let error_msg = e.to_string();
+                        let is_binary_skip = error_msg.contains("Binary file, skipping");
+                        let is_utf8_error =
+                            error_msg.contains("stream did not contain valid UTF-8");
+                        let is_git_file = file_path.components().any(|c| c.as_os_str() == ".git");
+
+                        if !(is_binary_skip || is_utf8_error && is_git_file) {
+                            tracing::warn!("Failed to index {:?}: {}", file_path, e);
+                        }
                     }
                 }
             });
@@ -764,6 +818,11 @@ fn index_single_file(
     _repo_root: &Path,
     embedder: Option<&mut Box<dyn ck_embed::Embedder>>,
 ) -> Result<IndexEntry> {
+    // Skip binary files to avoid UTF-8 warnings
+    if !is_text_file(file_path) {
+        return Err(anyhow::anyhow!("Binary file, skipping"));
+    }
+
     let content = fs::read_to_string(file_path)?;
     let hash = compute_file_hash(file_path)?;
     let metadata = fs::metadata(file_path)?;

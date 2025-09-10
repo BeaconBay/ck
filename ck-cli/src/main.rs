@@ -48,8 +48,14 @@ QUICK START EXAMPLES:
     ck --add file.rs                   # Add single file to index
 
   JSON output for tools/scripts:
-    ck --json --sem "bug fix" src/    # Machine-readable output
+    ck --json --sem "bug fix" src/    # Traditional JSON (single array)
     ck --json --limit 5 "TODO"       # Limit results (--limit alias for --topk)
+    
+  JSONL output for AI agents (recommended):
+    ck --jsonl "auth" --no-snippet    # Streaming, memory-efficient format
+    ck --jsonl --sem "error" src/     # Perfect for LLM/agent consumption
+    ck --jsonl --topk 5 --threshold 0.8 "func"  # High-confidence agent results
+    # Why JSONL? Streaming, error-resilient, standard in AI pipelines
 
   Advanced grep features:
     ck -C 2 "error" src/              # Show 2 lines of context  
@@ -191,6 +197,12 @@ struct Cli {
 
     #[arg(long = "json-v1", help = "Output results as JSON v1 schema")]
     json_v1: bool,
+
+    #[arg(long = "jsonl", help = "Output results as JSONL for agent workflows")]
+    jsonl: bool,
+
+    #[arg(long = "no-snippet", help = "Exclude code snippets from JSONL output")]
+    no_snippet: bool,
 
     #[arg(long = "reindex", help = "Force index update before searching")]
     reindex: bool,
@@ -743,6 +755,8 @@ fn build_options(cli: &Cli, reindex: bool) -> SearchOptions {
         after_context_lines: after_context,
         recursive: cli.recursive,
         json_output: cli.json || cli.json_v1,
+        jsonl_output: cli.jsonl,
+        no_snippet: cli.no_snippet,
         reindex,
         show_scores: cli.show_scores,
         show_filenames: false, // Will be set by caller
@@ -755,8 +769,8 @@ fn build_options(cli: &Cli, reindex: bool) -> SearchOptions {
 }
 
 fn highlight_matches(text: &str, pattern: &str, options: &SearchOptions) -> String {
-    // Don't highlight if this is JSON output
-    if options.json_output {
+    // Don't highlight if this is JSON/JSONL output
+    if options.json_output || options.jsonl_output {
         return text.to_string();
     }
 
@@ -1005,7 +1019,14 @@ async fn run_search(
     }
 
     let mut has_matches = false;
-    if options.json_output {
+    if options.jsonl_output {
+        for result in results {
+            has_matches = true;
+            let jsonl_result =
+                ck_core::JsonlSearchResult::from_search_result(&result, !options.no_snippet);
+            println!("{}", serde_json::to_string(&jsonl_result)?);
+        }
+    } else if options.json_output {
         for result in results {
             has_matches = true;
             let json_result = ck_core::JsonSearchResult {
