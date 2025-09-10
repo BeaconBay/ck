@@ -511,7 +511,7 @@ dependencies = [
 
 [[package]]
 name = "ck-search"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "anyhow",
  "ck-ann",
