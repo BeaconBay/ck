@@ -7,8 +7,8 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::SystemTime;
 use walkdir::WalkDir;
 
@@ -525,7 +525,7 @@ pub async fn smart_update_index_with_progress(
 ) -> Result<UpdateStats> {
     let index_dir = path.join(".ck");
     let mut stats = UpdateStats::default();
-    
+
     // Set up interrupt handler (only once per process)
     HANDLER_INIT.call_once(|| {
         let _ = ctrlc::set_handler(move || {
@@ -533,7 +533,7 @@ pub async fn smart_update_index_with_progress(
             eprintln!("\nIndexing interrupted by user. Cleaning up...");
         });
     });
-    
+
     // Reset interrupt flag for this indexing operation
     INTERRUPTED.store(false, Ordering::SeqCst);
 
@@ -573,7 +573,7 @@ pub async fn smart_update_index_with_progress(
             eprintln!("Indexing interrupted during file scanning.");
             return Ok(stats);
         }
-        
+
         if let Some(metadata) = manifest.files.get(&file_path) {
             let fs_meta = match fs::metadata(&file_path) {
                 Ok(m) => m,
@@ -637,10 +637,13 @@ pub async fn smart_update_index_with_progress(
         for file_path in files_to_update.iter() {
             // Check for interrupt
             if INTERRUPTED.load(Ordering::SeqCst) {
-                eprintln!("Indexing interrupted. {} files processed.", _processed_count);
+                eprintln!(
+                    "Indexing interrupted. {} files processed.",
+                    _processed_count
+                );
                 break;
             }
-            
+
             if let Some(ref callback) = progress_callback
                 && let Some(file_name) = file_path.file_name()
             {
@@ -686,7 +689,7 @@ pub async fn smart_update_index_with_progress(
                 if INTERRUPTED.load(Ordering::SeqCst) {
                     return;
                 }
-                
+
                 match index_single_file(file_path, &path_clone, None) {
                     Ok(entry) => {
                         if tx.send((file_path.clone(), entry)).is_err() {
@@ -705,11 +708,14 @@ pub async fn smart_update_index_with_progress(
         while let Ok((file_path, entry)) = rx.recv() {
             // Check for interrupt
             if INTERRUPTED.load(Ordering::SeqCst) {
-                eprintln!("Indexing interrupted. {} files processed.", _processed_count);
+                eprintln!(
+                    "Indexing interrupted. {} files processed.",
+                    _processed_count
+                );
                 drop(rx); // Drop receiver to signal worker to stop
                 break;
             }
-            
+
             if let Some(ref callback) = progress_callback
                 && let Some(file_name) = file_path.file_name()
             {
