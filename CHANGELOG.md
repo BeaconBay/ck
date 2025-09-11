@@ -22,6 +22,11 @@ All notable changes to this project will be documented in this file.
 - **Agent documentation**: Comprehensive README section explaining JSONL benefits over traditional JSON
 - **Agent examples**: Python code demonstrating stream processing patterns for AI workflows
 - **UTF-8 warning suppression**: Eliminated noisy warnings for binary files in .git directories
+- **JSONL output format**: Stream-friendly `--jsonl` flag for AI agent workflows with structured output
+- **No-snippet mode**: `--no-snippet` flag for metadata-only output to reduce bandwidth for agents
+- **Agent documentation**: Comprehensive README section explaining JSONL benefits over traditional JSON
+- **Agent examples**: Python code demonstrating stream processing patterns for AI workflows
+- **UTF-8 warning suppression**: Eliminated noisy warnings for binary files in .git directories
 
 ### Technical
 - **JsonlSearchResult struct**: New agent-friendly output format with conversion methods
