@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.2] - 2025-09-11
+
+### Fixed
+- **Hidden file indexing bug**: Fixed critical bug where hidden directories (especially `.git`) were being indexed despite exclusion patterns
+- **Semantic search pollution**: Eliminated `.git` files appearing in semantic search results for unrelated queries
+- **Index size reduction**: Significantly reduced index size by properly excluding hidden files and directories
+
+### Technical
+- **WalkBuilder configuration**: Changed `.hidden(false)` to `.hidden(true)` to respect hidden file conventions
+- **Exclusion pattern enforcement**: Hidden file exclusion now takes precedence, preventing override patterns from being ignored
+- **Performance improvement**: Reduced indexing time and storage by not processing `.git` and other hidden directories
+
 ## [0.4.1] - 2025-09-10
 
 ### Added

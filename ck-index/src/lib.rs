@@ -88,7 +88,7 @@ pub fn collect_files(
             .git_ignore(true)
             .git_global(true)
             .git_exclude(true)
-            .hidden(false)
+            .hidden(true)
             .overrides(overrides)
             .build()
             .filter_map(|entry| entry.ok())
@@ -112,7 +112,7 @@ pub fn collect_files(
 
         Ok(WalkBuilder::new(path)
             .git_ignore(false)
-            .hidden(false)
+            .hidden(true)
             .overrides(combined_overrides)
             .build()
             .filter_map(|entry| entry.ok())
