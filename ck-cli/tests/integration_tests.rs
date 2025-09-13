@@ -617,3 +617,104 @@ fn test_jsonl_with_different_languages() {
     assert!(python_found);
     assert!(js_found);
 }
+
+#[test]
+fn test_add_single_file_to_index() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a test file to add
+    let test_file = temp_dir.path().join("test_file.txt");
+    fs::write(&test_file, "This is test content for indexing").unwrap();
+
+    // First create an index in the directory
+    let output = Command::new(get_ck_binary())
+        .args(["--index", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to create index");
+
+    assert!(output.status.success(), "Failed to create initial index");
+
+    // Create another file after index creation
+    let new_file = temp_dir.path().join("new_file.txt");
+    fs::write(&new_file, "New file content to be added").unwrap();
+
+    // Test adding the new file with absolute path
+    let output = Command::new(get_ck_binary())
+        .args(["--add", new_file.to_str().unwrap()])
+        .output()
+        .expect("Failed to run ck --add");
+
+    assert!(
+        output.status.success(),
+        "Failed to add file: stderr: {}, stdout: {}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let stderr = String::from_utf8(output.stderr).unwrap();
+
+    // Check for success message in either stdout or stderr
+    assert!(
+        stdout.contains("Added") || stderr.contains("Added"),
+        "Expected 'Added' in output, got stdout: {}, stderr: {}",
+        stdout,
+        stderr
+    );
+
+    // Verify the file was actually added by searching for it
+    let output = Command::new(get_ck_binary())
+        .args(["New file", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to search for added file");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        stdout.contains("New file content"),
+        "Added file content not found in search"
+    );
+}
+
+#[test]
+fn test_add_file_with_relative_path() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create index first
+    let output = Command::new(get_ck_binary())
+        .args(["--index", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to create index");
+
+    assert!(output.status.success());
+
+    // Create a new file to add
+    fs::write(temp_dir.path().join("relative_file.txt"), "Relative path content").unwrap();
+
+    // Test adding with relative path from the temp directory
+    let output = Command::new(get_ck_binary())
+        .args(["--add", "relative_file.txt"])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck --add with relative path");
+
+    assert!(
+        output.status.success(),
+        "Failed to add file with relative path: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Verify file was added
+    let output = Command::new(get_ck_binary())
+        .args(["Relative path", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to search");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("Relative path content"));
+}

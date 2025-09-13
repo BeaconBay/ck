@@ -582,11 +582,25 @@ async fn run_main() -> Result<()> {
 
     if cli.add {
         // Handle --add flag
-        let file = cli
-            .files
-            .first()
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!("No file specified. Usage: ck --add <file>"))?;
+        // When using --add, the file path might be in pattern or files
+        let file = if let Some(ref pattern) = cli.pattern {
+            // If pattern is provided and no files, use pattern as the file path
+            if cli.files.is_empty() {
+                PathBuf::from(pattern)
+            } else {
+                // Otherwise use the first file
+                cli.files
+                    .first()
+                    .cloned()
+                    .ok_or_else(|| anyhow::anyhow!("No file specified. Usage: ck --add <file>"))?
+            }
+        } else {
+            // No pattern, must be in files
+            cli.files
+                .first()
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("No file specified. Usage: ck --add <file>"))?
+        };
         status.section_header("Adding File to Index");
         status.info(&format!("Processing {}", file.display()));
 
