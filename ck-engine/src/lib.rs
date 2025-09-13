@@ -173,8 +173,10 @@ fn search_file(
     for (line_idx, line) in lines.iter().enumerate() {
         let line_number = line_idx + 1;
 
-        // Find all matches in the line with their positions
-        for mat in regex.find_iter(line) {
+        // Special handling for empty pattern - match the entire line once
+        // An empty regex pattern will match at every position, so we need to handle it specially
+        if regex.as_str().is_empty() {
+            // Empty pattern matches the whole line once (grep compatibility)
             let preview = if options.full_section {
                 // Try to find the containing code section
                 if let Some(ref sections) = code_sections {
@@ -194,8 +196,8 @@ fn search_file(
             results.push(SearchResult {
                 file: file_path.to_path_buf(),
                 span: Span {
-                    byte_start: byte_offset + mat.start(),
-                    byte_end: byte_offset + mat.end(),
+                    byte_start: byte_offset,
+                    byte_end: byte_offset + line.len(),
                     line_start: line_number,
                     line_end: line_number,
                 },
@@ -206,6 +208,41 @@ fn search_file(
                 chunk_hash: None,
                 index_epoch: None,
             });
+        } else {
+            // Find all matches in the line with their positions
+            for mat in regex.find_iter(line) {
+                let preview = if options.full_section {
+                    // Try to find the containing code section
+                    if let Some(ref sections) = code_sections {
+                        if let Some(section) = find_containing_section(sections, line_idx) {
+                            section.clone()
+                        } else {
+                            // Fall back to context lines if no section found
+                            get_context_preview(&lines, line_idx, options)
+                        }
+                    } else {
+                        get_context_preview(&lines, line_idx, options)
+                    }
+                } else {
+                    get_context_preview(&lines, line_idx, options)
+                };
+
+                results.push(SearchResult {
+                    file: file_path.to_path_buf(),
+                    span: Span {
+                        byte_start: byte_offset + mat.start(),
+                        byte_end: byte_offset + mat.end(),
+                        line_start: line_number,
+                        line_end: line_number,
+                    },
+                    score: 1.0,
+                    preview,
+                    lang: ck_core::Language::from_path(file_path),
+                    symbol: None,
+                    chunk_hash: None,
+                    index_epoch: None,
+                });
+            }
         }
 
         // Update byte offset for next line (add line length + newline character)
