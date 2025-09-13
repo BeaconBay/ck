@@ -692,7 +692,11 @@ fn test_add_file_with_relative_path() {
     assert!(output.status.success());
 
     // Create a new file to add
-    fs::write(temp_dir.path().join("relative_file.txt"), "Relative path content").unwrap();
+    fs::write(
+        temp_dir.path().join("relative_file.txt"),
+        "Relative path content",
+    )
+    .unwrap();
 
     // Test adding with relative path from the temp directory
     let output = Command::new(get_ck_binary())

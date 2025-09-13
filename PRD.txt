@@ -289,7 +289,7 @@ ck/
 
 ---
 
-## Current Implementation Status (v0.4.1)
+## Current Implementation Status (v0.4.4)
 
 ### ✅ **Production Ready Features**
 - **Complete grep replacement**: All major flags supported with identical behavior

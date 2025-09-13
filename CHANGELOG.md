@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.4] - 2025-09-13
+
+### Fixed
+- **`--add` command argument parsing**: Fixed issue where file paths were incorrectly parsed as pattern arguments, preventing single file additions to the index
+- **Empty pattern behavior**: Empty regex patterns now match each line once (consistent with grep/ripgrep) instead of matching at every character position causing massive duplication
+
 ## [0.4.3] - 2025-09-13
 
 ### Added
