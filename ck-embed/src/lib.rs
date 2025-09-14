@@ -93,7 +93,17 @@ impl FastEmbedder {
         model_name: &str,
         progress_callback: Option<ModelDownloadCallback>,
     ) -> Result<Self> {
+        Self::new_with_retry(model_name, progress_callback, 3)
+    }
+
+    pub fn new_with_retry(
+        model_name: &str,
+        progress_callback: Option<ModelDownloadCallback>,
+        max_retries: u32,
+    ) -> Result<Self> {
         use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
+        use std::thread;
+        use std::time::Duration;
 
         let model = match model_name {
             // Current models
@@ -149,12 +159,45 @@ impl FastEmbedder {
             _ => 512, // Safe default
         };
 
-        let init_options = InitOptions::new(model.clone())
-            .with_show_download_progress(progress_callback.is_some())
-            .with_cache_dir(model_cache_dir)
-            .with_max_length(max_length);
+        // Try to create embedding with retry logic for network failures
+        let mut last_error = None;
+        let mut embedding = None;
 
-        let embedding = TextEmbedding::try_new(init_options)?;
+        for attempt in 0..max_retries {
+            if attempt > 0 {
+                if let Some(ref callback) = progress_callback {
+                    callback(&format!("Retrying download (attempt {}/{})", attempt + 1, max_retries));
+                }
+                thread::sleep(Duration::from_secs(2_u64.pow(attempt)));
+            }
+
+            let init_options = InitOptions::new(model.clone())
+                .with_show_download_progress(progress_callback.is_some())
+                .with_cache_dir(model_cache_dir.clone())
+                .with_max_length(max_length);
+
+            match TextEmbedding::try_new(init_options) {
+                Ok(emb) => {
+                    embedding = Some(emb);
+                    break;
+                }
+                Err(e) => {
+                    last_error = Some(e);
+                    if let Some(ref callback) = progress_callback {
+                        callback(&format!("Download attempt {} failed: {}", attempt + 1, last_error.as_ref().unwrap()));
+                    }
+                }
+            }
+        }
+
+        let embedding = match embedding {
+            Some(emb) => emb,
+            None => {
+                return Err(last_error.unwrap_or_else(|| {
+                    anyhow::anyhow!("Failed to download model after {} attempts", max_retries)
+                }));
+            }
+        };
 
         if let Some(ref callback) = progress_callback {
             callback("Model loaded successfully");

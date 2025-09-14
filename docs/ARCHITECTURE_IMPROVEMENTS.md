@@ -9,6 +9,8 @@ This document describes the architectural improvements made to address two criti
 
 ## Improvements Implemented
 
+**Note**: While a full modular refactor was designed and partially implemented (see `ck-cli/src/commands/` and `ck-cli/src/dispatcher.rs`), we prioritized backward compatibility and focused on integrating the most critical improvements directly into the existing codebase.
+
 ### 1. Enhanced Error Handling System
 
 #### Context-Aware Error Types (`ck-cli/src/error.rs`)
@@ -42,9 +44,15 @@ Benefits:
 
 ### 2. Robust Model Download System
 
-#### Retry Logic with Exponential Backoff (`ck-embed/src/download.rs`)
+#### Retry Logic with Exponential Backoff
 
-The new `ModelDownloader` provides:
+Integrated directly into `FastEmbedder::new_with_retry()` in `ck-embed/src/lib.rs`:
+- **Automatic retry** on download failures (default: 3 attempts)
+- **Exponential backoff** between retries (2^n seconds)
+- **Progress feedback** during retry attempts
+- **Better error reporting** with failure context
+
+The new `ModelDownloader` class (`ck-embed/src/download.rs`) provides additional capabilities:
 
 - **Automatic retry** with exponential backoff (default: 3 attempts)
 - **Timeout protection** to prevent hanging downloads
@@ -67,11 +75,11 @@ Features:
 - Cached models are validated before use
 - Offline mode with pre-download support: `ck --download-model <name>`
 
-### 3. Modular Command Architecture
+### 3. Modular Command Architecture (Foundation Laid)
 
 #### Command Pattern Implementation (`ck-cli/src/commands/`)
 
-The monolithic CLI has been refactored into modular commands:
+A modular command architecture has been designed and implemented as a foundation for future refactoring:
 
 ```
 ck-cli/src/commands/
@@ -122,9 +130,23 @@ Enhanced user feedback throughout operations:
 - **Spinner indicators** for long operations
 - **Verbose mode** for debugging
 
+## What's Actually Working Now
+
+### Automatic Retry on Model Downloads
+
+When you run any command that requires downloading models (indexing or semantic search), the system now:
+1. Automatically retries up to 3 times on network failures
+2. Uses exponential backoff between attempts
+3. Provides clear feedback about retry attempts
+4. Shows better error messages if all retries fail
+
+### Enhanced Error Context
+
+The error handling module provides structured errors that are ready to use when the full refactor is completed.
+
 ## Usage Examples
 
-### Reliable Indexing with Retry
+### Reliable Indexing with Built-in Retry
 
 ```bash
 # Index with automatic retry on failures
