@@ -1,8 +1,8 @@
 use super::{Command, CommandContext};
-use crate::error::{CkError, ErrorContext, Result};
+// use crate::error::CkError;
 use crate::progress::StatusReporter;
 use anyhow::Result as AnyhowResult;
-use console::style;
+// use console::style;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -28,7 +28,26 @@ impl IndexCommand {
         }
     }
 
-    async fn download_model_with_retry(&self, model_name: &str) -> Result<()> {
+    async fn download_model_with_retry(&self, model_name: &str) -> AnyhowResult<()> {
+        // In offline mode, skip download entirely and validate cached model exists
+        if self.max_retries == 0 {
+            let downloader = ck_embed::ModelDownloader::new(ck_embed::ModelDownloadConfig {
+                offline_mode: true,
+                verbose: self.context.verbose,
+                ..Default::default()
+            });
+
+            match downloader.check_model_cached(model_name).map_err(|e| anyhow::anyhow!(e))? {
+                Some(_) => return Ok(()), // Model exists in cache
+                None => {
+                    anyhow::bail!(
+                        "❌ Model '{}' not found in cache.\n💡 Download the model first: ck --download-model {}",
+                        model_name, model_name
+                    );
+                }
+            }
+        }
+
         let mut attempts = 0;
         let mut last_error = None;
 
@@ -51,16 +70,15 @@ impl IndexCommand {
             }
         }
 
-        Err(CkError::ModelDownloadFailed {
-            model: model_name.to_string(),
-            reason: last_error.map(|e| e.to_string()).unwrap_or_else(|| "Unknown error".to_string()),
-            offline_fallback: Some(format!(
-                "Pre-download the model manually or use --offline mode with cached models"
-            )),
-        })
+        Err(anyhow::anyhow!(
+            "❌ Failed to download model '{}' after {} attempts: {}\n💡 Pre-download the model manually or use --offline mode with cached models",
+            model_name,
+            self.max_retries,
+            last_error.map(|e| e.to_string()).unwrap_or_else(|| "Unknown error".to_string())
+        ))
     }
 
-    async fn try_download_model(&self, model_name: &str) -> Result<()> {
+    async fn try_download_model(&self, model_name: &str) -> AnyhowResult<()> {
         let status = StatusReporter::new(self.context.verbose);
 
         let progress_callback = if !self.context.no_progress {
@@ -71,27 +89,18 @@ impl IndexCommand {
             None
         };
 
-        ck_embed::create_embedder_with_progress(Some(model_name), progress_callback)
-            .context_model(model_name)?;
+        ck_embed::create_embedder_with_progress(Some(model_name), progress_callback)?;
 
         Ok(())
     }
 
-    async fn validate_prerequisites(&self) -> Result<()> {
+    async fn validate_prerequisites(&self) -> AnyhowResult<()> {
         if !self.path.exists() {
-            return Err(CkError::FileAccessError {
-                path: self.path.clone(),
-                operation: "index".to_string(),
-                reason: "Path does not exist".to_string(),
-            });
+            anyhow::bail!("❌ Path does not exist: {}", self.path.display());
         }
 
         if !self.path.is_dir() && !self.path.is_file() {
-            return Err(CkError::FileAccessError {
-                path: self.path.clone(),
-                operation: "index".to_string(),
-                reason: "Path is neither a file nor a directory".to_string(),
-            });
+            anyhow::bail!("❌ Path is neither a file nor directory: {}", self.path.display());
         }
 
         Ok(())
@@ -172,7 +181,7 @@ impl Command for IndexCommand {
             ));
         }) as ck_index::DetailedProgressCallback);
 
-        let stats = ck_index::smart_update_index_with_detailed_progress(
+        let stats = match ck_index::smart_update_index_with_detailed_progress(
             &self.path,
             self.force_rebuild,
             progress_callback,
@@ -180,28 +189,18 @@ impl Command for IndexCommand {
             true,
             &self.exclude_patterns,
             Some(model_name),
-        ).map_err(|e| CkError::IndexingFailed {
-            path: self.path.clone(),
-            reason: e.to_string(),
-            suggestion: Some("Try running with --force-rebuild or check file permissions".to_string()),
-        }).map_err(|e| anyhow::anyhow!(e))?;
+        ).await {
+            Ok(stats) => stats,
+            Err(e) => anyhow::bail!("Indexing failed: {}", e),
+        };
 
         overall_pb.finish_and_clear();
         file_pb.finish_and_clear();
 
         status.success(&format!(
-            "✅ Indexed {} files ({} chunks) in {:.2}s",
-            stats.files_indexed,
-            stats.chunks_created,
-            stats.duration.as_secs_f64()
+            "✅ Indexed {} files",
+            stats.files_indexed
         ));
-
-        if stats.files_skipped > 0 {
-            status.info(&format!(
-                "ℹ️  Skipped {} unchanged files",
-                stats.files_skipped
-            ));
-        }
 
         Ok(())
     }
@@ -209,10 +208,11 @@ impl Command for IndexCommand {
     fn validate(&self) -> AnyhowResult<()> {
         if let Some(ref model) = self.model {
             if !ck_models::is_valid_model(model) {
-                return Err(anyhow::anyhow!(CkError::ModelNotFound {
-                    model: model.clone(),
-                    available_models: ck_models::get_valid_models(),
-                }));
+                anyhow::bail!(
+                    "❌ Model '{}' not found\n📋 Available models: {}",
+                    model,
+                    ck_models::get_valid_models().join(", ")
+                );
             }
         }
         Ok(())

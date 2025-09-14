@@ -1,9 +1,10 @@
 use super::{Command, CommandContext};
 use anyhow::Result;
 use ck_core::{SearchMode, SearchOptions};
-use ck_search::{SearchResult, SearchSummary};
+use ck_core::SearchResult;
 use console::style;
-use owo_colors::{OwoColorize, Rgb};
+use owo_colors::OwoColorize;
+use regex::Regex;
 use std::path::PathBuf;
 
 pub struct SearchCommand {
@@ -12,16 +13,24 @@ pub struct SearchCommand {
     pub mode: SearchMode,
     pub options: SearchOptions,
     pub context: CommandContext,
+    compiled_regex: Option<Regex>,
 }
 
 impl SearchCommand {
     pub fn new(pattern: String, paths: Vec<PathBuf>) -> Self {
+        let compiled_regex = if let Ok(re) = Regex::new(&pattern) {
+            Some(re)
+        } else {
+            None
+        };
+
         Self {
             pattern,
             paths,
             mode: SearchMode::Regex,
             options: SearchOptions::default(),
             context: CommandContext::default(),
+            compiled_regex,
         }
     }
 
@@ -65,9 +74,9 @@ impl SearchCommand {
         format!("{}", text.truecolor(red, green, 0))
     }
 
-    fn highlight_match(&self, text: &str, pattern: &str) -> String {
+    fn highlight_match(&self, text: &str, _pattern: &str) -> String {
         if self.mode == SearchMode::Regex {
-            if let Ok(re) = regex::Regex::new(pattern) {
+            if let Some(ref re) = self.compiled_regex {
                 let mut result = String::new();
                 let mut last_end = 0;
 
@@ -83,25 +92,9 @@ impl SearchCommand {
         text.to_string()
     }
 
-    fn print_summary(&self, summary: &SearchSummary) {
-        if !self.context.quiet {
-            if summary.total_matches == 0 {
-                eprintln!("No matches found");
-
-                if let Some(ref closest) = summary.closest_below_threshold {
-                    eprintln!();
-                    eprintln!("{}", style("(nearest match beneath the threshold)").dim());
-                    eprintln!("{}", self.format_result(closest));
-                }
-            } else if self.context.verbose {
-                eprintln!(
-                    "Found {} matches in {} files (searched {} files in {:.2}s)",
-                    summary.total_matches,
-                    summary.files_with_matches,
-                    summary.files_searched,
-                    summary.search_duration.as_secs_f64()
-                );
-            }
+    fn print_summary(&self, matches: usize) {
+        if !self.context.quiet && self.context.verbose {
+            eprintln!("Found {} matches", matches);
         }
     }
 }
@@ -130,31 +123,35 @@ impl Command for SearchCommand {
         }
 
         let mut all_results = Vec::new();
-        let mut total_summary = SearchSummary::default();
+        let mut total_matches = 0;
 
         for path in &search_paths {
-            let results = ck_search::search(
-                &self.pattern,
-                path,
-                self.mode,
-                self.options.clone(),
-            ).await?;
+            let results = ck_engine::search(&ck_core::SearchOptions {
+                pattern: Some(self.pattern.clone()),
+                paths: vec![path.clone()],
+                mode: self.mode,
+                recursive: self.options.recursive,
+                line_numbers: self.options.line_numbers,
+                topk: self.options.topk,
+                threshold: self.options.threshold,
+                ..Default::default()
+            }).await?;
 
-            for result in results.results {
+            for result in results {
                 if self.options.files_with_matches {
                     println!("{}", result.file);
                 } else if !self.options.files_without_matches {
                     println!("{}", self.format_result(&result));
                 }
+                total_matches += 1;
                 all_results.push(result);
             }
-
-            total_summary.merge(&results.summary);
         }
 
-        self.print_summary(&total_summary);
-
-        if total_summary.total_matches == 0 {
+        if total_matches == 0 {
+            if !self.context.quiet {
+                eprintln!("No matches found");
+            }
             anyhow::bail!("No matches found");
         }
         Ok(())

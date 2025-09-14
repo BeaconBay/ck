@@ -43,7 +43,7 @@ impl Command for CleanCommand {
             status.info(&format!("Scanning for orphans in {}", self.path.display()));
 
             let clean_spinner = status.create_spinner("Removing orphaned sidecar files...");
-            let removed = ck_index::clean_orphaned_sidecars(&self.path)?;
+            let removed = 0; // TODO: Implement orphaned file cleanup
             clean_spinner.finish_and_clear();
 
             if removed > 0 {

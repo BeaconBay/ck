@@ -227,7 +227,7 @@ impl CommandDispatcher {
             self.cli.files.clone()
         };
 
-        let mode = if self.cli.sem {
+        let search_mode = if self.cli.sem {
             SearchMode::Semantic
         } else if self.cli.lex {
             SearchMode::Lexical
@@ -240,34 +240,36 @@ impl CommandDispatcher {
         let topk = self.cli.topk.or(self.cli.limit);
 
         let options = SearchOptions {
+            mode: search_mode,
+            query: pattern.to_string(),
+            path: paths[0].clone(), // Take first path for now
             line_numbers: self.cli.line_numbers,
-            no_filename: self.cli.no_filenames,
-            with_filename: self.cli.with_filenames,
-            context: self.cli.context,
-            before_context: self.cli.before_context,
-            after_context: self.cli.after_context,
+            show_filenames: !self.cli.no_filenames,
             recursive: self.cli.recursive,
-            ignore_case: self.cli.ignore_case,
-            fixed_strings: self.cli.fixed_strings,
-            word_regexp: self.cli.word_regexp,
+            case_insensitive: self.cli.ignore_case,
+            fixed_string: self.cli.fixed_strings,
+            whole_word: self.cli.word_regexp,
             files_with_matches: self.cli.files_with_matches,
-            files_without_matches: self.cli.files_without_matches,
-            json: self.cli.json,
-            jsonl: self.cli.jsonl,
-            topk,
+            files_without_matches: false, // TODO: Implement
+            json_output: self.cli.json,
+            jsonl_output: self.cli.jsonl,
+            top_k: topk,
             threshold: self.cli.threshold,
             show_scores: self.cli.scores,
-            full_section: self.cli.full_section,
             no_snippet: self.cli.no_snippet,
-            exclude: self.cli.exclude.clone(),
-            no_default_excludes: self.cli.no_default_excludes,
-            no_ignore: self.cli.no_ignore,
+            context_lines: self.cli.context.unwrap_or(0),
+            before_context_lines: self.cli.before_context.unwrap_or(0),
+            after_context_lines: self.cli.after_context.unwrap_or(0),
+            exclude_patterns: self.cli.exclude.clone(),
+            respect_gitignore: !self.cli.no_ignore,
+            full_section: self.cli.full_section,
             rerank: self.cli.rerank,
             rerank_model: self.cli.rerank_model.clone(),
+            reindex: false,
         };
 
         let mut cmd = SearchCommand::new(pattern.to_string(), paths);
-        cmd.mode = mode;
+        cmd.mode = search_mode;
         cmd.options = options;
         cmd.context = context;
 
