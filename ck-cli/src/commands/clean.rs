@@ -56,7 +56,7 @@ impl Command for CleanCommand {
             }
         } else {
             status.section_header("Cleaning Index");
-            status.warning(&format!(
+            status.warn(&format!(
                 "This will remove the entire index for {}",
                 self.path.display()
             ));

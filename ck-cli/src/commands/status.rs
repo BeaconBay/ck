@@ -50,7 +50,7 @@ impl Command for StatusCommand {
             status.info(&format!("Last updated: {:?}", stats.last_modified));
 
             if !stats.orphaned_files.is_empty() {
-                status.warning(&format!(
+                status.warn(&format!(
                     "Found {} orphaned sidecar files",
                     stats.orphaned_files.len()
                 ));

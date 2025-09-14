@@ -2,6 +2,8 @@ use anyhow::{Context, Result, bail};
 use std::path::PathBuf;
 use std::time::Duration;
 
+type ProgressCallback = Box<dyn Fn(&str) + Send + Sync>;
+
 #[derive(Debug, Clone)]
 pub struct ModelDownloadConfig {
     pub max_retries: u32,
@@ -45,7 +47,10 @@ impl ModelDownloadConfig {
         #[cfg(target_os = "windows")]
         {
             if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-                return PathBuf::from(local_app_data).join("ck").join("cache").join("models");
+                return PathBuf::from(local_app_data)
+                    .join("ck")
+                    .join("cache")
+                    .join("models");
             }
         }
 
@@ -75,7 +80,11 @@ impl ModelDownloader {
 
             if onnx_file.exists() || optimized_file.exists() {
                 if self.config.verbose {
-                    eprintln!("✅ Model '{}' found in cache at {}", model_name, model_path.display());
+                    eprintln!(
+                        "✅ Model '{}' found in cache at {}",
+                        model_name,
+                        model_path.display()
+                    );
                 }
                 return Ok(Some(model_path));
             }
@@ -98,7 +107,7 @@ impl ModelDownloader {
     pub async fn download_with_retry(
         &self,
         model_name: &str,
-        progress_callback: Option<Box<dyn Fn(&str) + Send + Sync>>,
+        progress_callback: Option<ProgressCallback>,
     ) -> Result<PathBuf> {
         if let Some(cached_path) = self.check_model_cached(model_name)? {
             return Ok(cached_path);
@@ -130,7 +139,10 @@ impl ModelDownloader {
             match self.try_download(model_name, &progress_callback).await {
                 Ok(path) => {
                     if let Some(ref cb) = progress_callback {
-                        cb(&format!("✅ Model '{}' downloaded successfully", model_name));
+                        cb(&format!(
+                            "✅ Model '{}' downloaded successfully",
+                            model_name
+                        ));
                     }
                     return Ok(path);
                 }
@@ -144,14 +156,17 @@ impl ModelDownloader {
         }
 
         Err(last_error.unwrap_or_else(|| {
-            anyhow::anyhow!("Failed to download model after {} attempts", self.config.max_retries)
+            anyhow::anyhow!(
+                "Failed to download model after {} attempts",
+                self.config.max_retries
+            )
         }))
     }
 
     async fn try_download(
         &self,
         model_name: &str,
-        _progress_callback: &Option<Box<dyn Fn(&str) + Send + Sync>>,
+        _progress_callback: &Option<ProgressCallback>,
     ) -> Result<PathBuf> {
         std::fs::create_dir_all(&self.config.cache_dir)
             .context("Failed to create model cache directory")?;
@@ -162,15 +177,14 @@ impl ModelDownloader {
 
             let model = Self::parse_model_name(model_name)?;
 
-            let init_options = InitOptions::new(model)
-                .with_cache_dir(self.config.cache_dir.clone());
+            let init_options =
+                InitOptions::new(model).with_cache_dir(self.config.cache_dir.clone());
 
             let timeout_result = tokio::time::timeout(
                 self.config.timeout,
-                tokio::task::spawn_blocking(move || {
-                    TextEmbedding::try_new(init_options)
-                })
-            ).await;
+                tokio::task::spawn_blocking(move || TextEmbedding::try_new(init_options)),
+            )
+            .await;
 
             match timeout_result {
                 Ok(Ok(Ok(_))) => {
@@ -222,10 +236,10 @@ impl ModelDownloader {
                 let onnx_file = model_dir.join("model.onnx");
                 let optimized_file = model_dir.join("model_optimized.onnx");
 
-                if onnx_file.exists() || optimized_file.exists() {
-                    if let Some(name) = entry.file_name().to_str() {
-                        models.push(name.to_string());
-                    }
+                if (onnx_file.exists() || optimized_file.exists())
+                    && let Some(name) = entry.file_name().to_str()
+                {
+                    models.push(name.to_string());
                 }
             }
         }

@@ -100,20 +100,20 @@ impl IndexCommand {
     fn setup_progress_bars(&self) -> (MultiProgress, ProgressBar, ProgressBar) {
         let multi_progress = MultiProgress::new();
 
-        let overall_pb = multi_progress.add(ProgressBar::new(100));
+        // Start with unknown length - will be set when we know file count
+        let overall_pb = multi_progress.add(ProgressBar::new_spinner());
         overall_pb.set_style(
-            ProgressStyle::default_bar()
-                .template("📂 Files: [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+            ProgressStyle::default_spinner()
+                .template("{spinner:.green} Files: {pos} processed {msg}")
                 .unwrap()
-                .progress_chars("━━╸ ")
         );
 
-        let file_pb = multi_progress.add(ProgressBar::new(100));
+        // Start with unknown length - will be set when we know chunk count
+        let file_pb = multi_progress.add(ProgressBar::new_spinner());
         file_pb.set_style(
-            ProgressStyle::default_bar()
-                .template("📄 Chunks: [{bar:40.green/yellow}] {pos}/{len} {msg}")
+            ProgressStyle::default_spinner()
+                .template("{spinner:.cyan} Chunks: {pos} processed {msg}")
                 .unwrap()
-                .progress_chars("━━╸ ")
         );
 
         (multi_progress, overall_pb, file_pb)
@@ -208,16 +208,10 @@ impl Command for IndexCommand {
 
     fn validate(&self) -> AnyhowResult<()> {
         if let Some(ref model) = self.model {
-            let valid_models = vec![
-                "BAAI/bge-small-en-v1.5",
-                "nomic-embed-text-v1.5",
-                "jina-embeddings-v2-base-code",
-            ];
-
-            if !valid_models.contains(&model.as_str()) {
+            if !ck_models::is_valid_model(model) {
                 return Err(anyhow::anyhow!(CkError::ModelNotFound {
                     model: model.clone(),
-                    available_models: valid_models.iter().map(|s| s.to_string()).collect(),
+                    available_models: ck_models::get_valid_models(),
                 }));
             }
         }

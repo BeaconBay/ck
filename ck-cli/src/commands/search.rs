@@ -154,8 +154,10 @@ impl Command for SearchCommand {
 
         self.print_summary(&total_summary);
 
-        let exit_code = if total_summary.total_matches > 0 { 0 } else { 1 };
-        std::process::exit(exit_code);
+        if total_summary.total_matches == 0 {
+            anyhow::bail!("No matches found");
+        }
+        Ok(())
     }
 
     fn validate(&self) -> Result<()> {

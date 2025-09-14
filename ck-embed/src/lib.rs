@@ -7,7 +7,7 @@ pub mod download;
 pub mod reranker;
 pub mod tokenizer;
 
-pub use download::{ModelDownloader, ModelDownloadConfig};
+pub use download::{ModelDownloadConfig, ModelDownloader};
 pub use reranker::{RerankResult, Reranker, create_reranker, create_reranker_with_progress};
 pub use tokenizer::TokenEstimator;
 
@@ -166,7 +166,11 @@ impl FastEmbedder {
         for attempt in 0..max_retries {
             if attempt > 0 {
                 if let Some(ref callback) = progress_callback {
-                    callback(&format!("Retrying download (attempt {}/{})", attempt + 1, max_retries));
+                    callback(&format!(
+                        "Retrying download (attempt {}/{})",
+                        attempt + 1,
+                        max_retries
+                    ));
                 }
                 thread::sleep(Duration::from_secs(2_u64.pow(attempt)));
             }
@@ -184,7 +188,11 @@ impl FastEmbedder {
                 Err(e) => {
                     last_error = Some(e);
                     if let Some(ref callback) = progress_callback {
-                        callback(&format!("Download attempt {} failed: {}", attempt + 1, last_error.as_ref().unwrap()));
+                        callback(&format!(
+                            "Download attempt {} failed: {}",
+                            attempt + 1,
+                            last_error.as_ref().unwrap()
+                        ));
                     }
                 }
             }

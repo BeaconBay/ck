@@ -7,6 +7,7 @@ pub mod inspect;
 use anyhow::Result;
 use std::path::PathBuf;
 
+#[async_trait::async_trait]
 pub trait Command {
     async fn execute(&self) -> Result<()>;
     fn name(&self) -> &'static str;

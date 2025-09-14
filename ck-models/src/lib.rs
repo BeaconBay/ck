@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
+mod validation;
+pub use validation::{VALID_MODELS, get_valid_models, is_valid_model};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelConfig {
     pub name: String,
