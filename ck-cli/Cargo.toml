@@ -37,6 +37,7 @@ regex = { workspace = true }
 indicatif = "0.17"
 console = "0.15"
 owo-colors = "4.0"
+async-trait = "0.1"
 openssl = { workspace = true, optional = true }
 
 [features]

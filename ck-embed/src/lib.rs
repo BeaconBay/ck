@@ -3,9 +3,11 @@ use anyhow::Result;
 #[cfg(feature = "fastembed")]
 use std::path::{Path, PathBuf};
 
+pub mod download;
 pub mod reranker;
 pub mod tokenizer;
 
+pub use download::{ModelDownloader, ModelDownloadConfig};
 pub use reranker::{RerankResult, Reranker, create_reranker, create_reranker_with_progress};
 pub use tokenizer::TokenEstimator;
 

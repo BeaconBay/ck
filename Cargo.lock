@@ -520,6 +520,7 @@ name = "ck-search"
 version = "0.4.5"
 dependencies = [
  "anyhow",
+ "async-trait",
  "ck-ann",
  "ck-chunk",
  "ck-core",
