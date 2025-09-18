@@ -46,6 +46,9 @@ jobs:
       with:
         toolchain: ${{ matrix.rust }}
     - uses: Swatinem/rust-cache@v2
+      with:
+        prefix-key: "v0-rust-ci"
+        shared-key: "shared"
     - uses: taiki-e/install-action@cargo-hack
     - name: Build
       run: cargo test --workspace --no-run
@@ -66,6 +69,9 @@ jobs:
       with:
         toolchain: stable
     - uses: Swatinem/rust-cache@v2
+      with:
+        prefix-key: "v0-rust-ci"
+        shared-key: "shared"
     - uses: taiki-e/install-action@cargo-hack
     - name: Default features
       run: cargo hack check --each-feature --locked --rust-version --ignore-private --workspace --all-targets --keep-going
@@ -99,6 +105,9 @@ jobs:
       with:
         toolchain: stable
     - uses: Swatinem/rust-cache@v2
+      with:
+        prefix-key: "v0-rust-ci"
+        shared-key: "shared"
     - name: "Is lockfile updated?"
       run: cargo update --workspace --locked
   rustfmt:
@@ -113,6 +122,9 @@ jobs:
         toolchain: "1.89"  # STABLE
         components: rustfmt
     - uses: Swatinem/rust-cache@v2
+      with:
+        prefix-key: "v0-rust-ci"
+        shared-key: "shared"
     - name: Check formatting
       run: cargo fmt --all -- --check
   clippy:
@@ -129,6 +141,9 @@ jobs:
         toolchain: "1.89"  # STABLE
         components: clippy
     - uses: Swatinem/rust-cache@v2
+      with:
+        prefix-key: "v0-rust-ci"
+        shared-key: "shared"
     - name: Install SARIF tools
       run: cargo install clippy-sarif --locked
     - name: Install SARIF tools
