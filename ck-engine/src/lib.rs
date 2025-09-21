@@ -96,6 +96,28 @@ fn extract_lines_from_file(file_path: &Path, line_start: usize, line_end: usize)
     Ok(result.join("\n"))
 }
 
+/// Calculate the length of line ending for each line in the content
+/// This handles mixed line endings (Unix \n, Windows \r\n, old Mac \r)
+fn calculate_line_ending_lengths(content: &str) -> Vec<usize> {
+    let mut lengths = Vec::new();
+    let mut chars = content.chars().peekable();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\n' {
+            lengths.push(1); // Unix line ending
+        } else if ch == '\r' {
+            if chars.peek() == Some(&'\n') {
+                chars.next(); // consume the \n
+                lengths.push(2); // Windows line ending
+            } else {
+                lengths.push(1); // Old Mac line ending
+            }
+        }
+    }
+
+    lengths
+}
+
 fn find_nearest_index_root(path: &Path) -> Option<StdPathBuf> {
     let mut current = if path.is_file() {
         path.parent().unwrap_or(path)
@@ -403,6 +425,9 @@ fn search_file(
         let content = read_file_content(file_path, &repo_root)?;
         let lines: Vec<String> = content.lines().map(|s| s.to_string()).collect();
 
+        // Calculate actual line ending lengths to fix byte offset issues
+        let line_ending_lengths = calculate_line_ending_lengths(&content);
+
         // If full_section is enabled, try to parse the file and find code sections
         let code_sections = if options.full_section {
             extract_code_sections(file_path, &content)
@@ -410,7 +435,7 @@ fn search_file(
             None
         };
 
-        search_file_in_memory(regex, file_path, options, &lines, &code_sections)
+        search_file_in_memory(regex, file_path, options, &lines, &code_sections, &line_ending_lengths)
     } else {
         // Streaming search (simple case)
         search_file_streaming(regex, file_path, &repo_root, options)
@@ -424,6 +449,7 @@ fn search_file_in_memory(
     options: &SearchOptions,
     lines: &[String],
     code_sections: &Option<Vec<(usize, usize, String)>>,
+    line_ending_lengths: &[usize],
 ) -> Result<Vec<SearchResult>> {
     let mut results = Vec::new();
     let mut byte_offset = 0;
@@ -503,10 +529,10 @@ fn search_file_in_memory(
             }
         }
 
-        // Update byte offset for next line (add line length + newline character)
+        // Update byte offset for next line (add line length + actual line ending length)
         byte_offset += line.len();
-        if line_idx < lines.len() - 1 {
-            byte_offset += 1; // Add 1 for the newline character
+        if line_idx < line_ending_lengths.len() {
+            byte_offset += line_ending_lengths[line_idx];
         }
     }
 
@@ -520,59 +546,87 @@ fn search_file_streaming(
     repo_root: &Path,
     _options: &SearchOptions,
 ) -> Result<Vec<SearchResult>> {
-    use std::io::{BufRead, BufReader};
+    use std::io::Read;
 
     let content_path = resolve_content_path(file_path, repo_root)?;
-    let file = std::fs::File::open(&content_path)?;
-    let reader = BufReader::new(file);
+    let mut file = std::fs::File::open(&content_path)?;
+
+    // Read file as bytes to track line endings precisely
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
 
     let mut results = Vec::new();
-    let mut byte_offset = 0;
+    let mut line_start = 0;
+    let mut line_number = 1;
 
-    for (line_idx, line_result) in reader.lines().enumerate() {
-        let line = line_result?;
-        let line_number = line_idx + 1;
+    // Process byte by byte to track actual line endings
+    let mut i = 0;
+    while i < buffer.len() {
+        // Find end of current line
+        let mut line_end = i;
+        let mut line_ending_len = 0;
 
-        // Special handling for empty pattern - match the entire line once
-        if regex.as_str().is_empty() {
-            results.push(SearchResult {
-                file: file_path.to_path_buf(),
-                span: Span {
-                    byte_start: byte_offset,
-                    byte_end: byte_offset + line.len(),
-                    line_start: line_number,
-                    line_end: line_number,
-                },
-                score: 1.0,
-                preview: line.clone(), // Simple preview: just the line itself
-                lang: ck_core::Language::from_path(file_path),
-                symbol: None,
-                chunk_hash: None,
-                index_epoch: None,
-            });
-        } else {
-            // Find all matches in the line with their positions
-            for mat in regex.find_iter(&line) {
+        while line_end < buffer.len() {
+            if buffer[line_end] == b'\n' {
+                line_ending_len = 1;
+                break;
+            } else if buffer[line_end] == b'\r' {
+                if line_end + 1 < buffer.len() && buffer[line_end + 1] == b'\n' {
+                    line_ending_len = 2; // \r\n
+                } else {
+                    line_ending_len = 1; // \r
+                }
+                break;
+            }
+            line_end += 1;
+        }
+
+        // Convert line bytes to string
+        let line_bytes = &buffer[line_start..line_end];
+        if let Ok(line) = String::from_utf8(line_bytes.to_vec()) {
+            // Special handling for empty pattern - match the entire line once
+            if regex.as_str().is_empty() {
                 results.push(SearchResult {
                     file: file_path.to_path_buf(),
                     span: Span {
-                        byte_start: byte_offset + mat.start(),
-                        byte_end: byte_offset + mat.end(),
+                        byte_start: line_start,
+                        byte_end: line_end,
                         line_start: line_number,
                         line_end: line_number,
                     },
                     score: 1.0,
-                    preview: line.clone(), // Simple preview: just the line itself
+                    preview: line.clone(),
                     lang: ck_core::Language::from_path(file_path),
                     symbol: None,
                     chunk_hash: None,
                     index_epoch: None,
                 });
+            } else {
+                // Find all matches in the line with their positions
+                for mat in regex.find_iter(&line) {
+                    results.push(SearchResult {
+                        file: file_path.to_path_buf(),
+                        span: Span {
+                            byte_start: line_start + mat.start(),
+                            byte_end: line_start + mat.end(),
+                            line_start: line_number,
+                            line_end: line_number,
+                        },
+                        score: 1.0,
+                        preview: line.clone(),
+                        lang: ck_core::Language::from_path(file_path),
+                        symbol: None,
+                        chunk_hash: None,
+                        index_epoch: None,
+                    });
+                }
             }
         }
 
-        // Update byte offset for next line (add line length + newline character)
-        byte_offset += line.len() + 1; // +1 for newline
+        // Move to next line
+        line_start = line_end + line_ending_len;
+        i = line_start;
+        line_number += 1;
     }
 
     Ok(results)
@@ -1428,5 +1482,91 @@ mod tests {
 
         let results = search(&options).await.unwrap();
         assert!(!results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_regex_search_mixed_line_endings() {
+        // Regression test for byte offset issues with different line endings
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create test file with mixed line endings (Windows \r\n and Unix \n)
+        let test_file = temp_dir.path().join("mixed_endings.txt");
+        let content = "line1\r\nline2\nline3\r\npattern here\nline5\r\n";
+        std::fs::write(&test_file, content).unwrap();
+
+        let options = SearchOptions {
+            mode: SearchMode::Regex,
+            query: "pattern".to_string(),
+            path: test_file.clone(),
+            recursive: false,
+            ..Default::default()
+        };
+
+        let results = search(&options).await.unwrap();
+        assert_eq!(results.len(), 1);
+
+        let result = &results[0];
+        // Verify byte offsets are correct - should point to start of "pattern"
+        let original_content = std::fs::read_to_string(&test_file).unwrap();
+        let pattern_start = original_content.find("pattern").unwrap();
+
+        assert_eq!(result.span.byte_start, pattern_start);
+        assert_eq!(result.span.line_start, 4); // Fourth line
+    }
+
+    #[tokio::test]
+    async fn test_regex_search_windows_line_endings() {
+        // Regression test specifically for Windows \r\n line endings
+        let temp_dir = TempDir::new().unwrap();
+
+        let test_file = temp_dir.path().join("windows_endings.txt");
+        let content = "first line\r\nsecond line\r\nmatch this\r\nfourth line\r\n";
+        std::fs::write(&test_file, content).unwrap();
+
+        let options = SearchOptions {
+            mode: SearchMode::Regex,
+            query: "match".to_string(),
+            path: test_file.clone(),
+            recursive: false,
+            ..Default::default()
+        };
+
+        let results = search(&options).await.unwrap();
+        assert_eq!(results.len(), 1);
+
+        let result = &results[0];
+
+        // Verify the match is on line 3
+        assert_eq!(result.span.line_start, 3);
+
+        // Verify byte offset accounts for \r\n endings
+        // first line\r\n = 12 bytes, second line\r\n = 13 bytes, total = 25 bytes before "match"
+        let expected_byte_start = 25; // Position of "match" in the content
+        assert_eq!(result.span.byte_start, expected_byte_start);
+    }
+
+    #[test]
+    fn test_calculate_line_ending_lengths() {
+        // Test the helper function for different line ending types
+
+        // Unix line endings
+        let unix_content = "line1\nline2\nline3\n";
+        let unix_lengths = calculate_line_ending_lengths(unix_content);
+        assert_eq!(unix_lengths, vec![1, 1, 1]); // Each \n is 1 byte
+
+        // Windows line endings
+        let windows_content = "line1\r\nline2\r\nline3\r\n";
+        let windows_lengths = calculate_line_ending_lengths(windows_content);
+        assert_eq!(windows_lengths, vec![2, 2, 2]); // Each \r\n is 2 bytes
+
+        // Mixed line endings
+        let mixed_content = "line1\nline2\r\nline3\r";
+        let mixed_lengths = calculate_line_ending_lengths(mixed_content);
+        assert_eq!(mixed_lengths, vec![1, 2, 1]); // \n, \r\n, \r
+
+        // No line endings
+        let no_endings = "single line";
+        let no_lengths = calculate_line_ending_lengths(no_endings);
+        assert_eq!(no_lengths, Vec::<usize>::new()); // No line endings
     }
 }

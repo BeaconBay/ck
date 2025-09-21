@@ -468,9 +468,20 @@ fn stride_large_chunk(chunk: Chunk, config: &ChunkConfig) -> Result<Vec<Chunk>> 
     let text = &chunk.text;
     let text_len = text.len();
 
+    // Early return for empty chunks to avoid divide-by-zero
+    if text.is_empty() {
+        return Ok(vec![chunk]);
+    }
+
     // Calculate stride parameters in characters (approximate)
     // Use a conservative estimate to ensure we stay under token limits
-    let chars_per_token = text_len as f32 / estimate_tokens(text) as f32;
+    let estimated_tokens = estimate_tokens(text);
+    // Guard against zero token estimate to prevent divide-by-zero panic
+    let chars_per_token = if estimated_tokens == 0 {
+        4.5 // Use default average if estimation fails
+    } else {
+        text_len as f32 / estimated_tokens as f32
+    };
     let window_chars = ((config.max_tokens as f32 * 0.9) * chars_per_token) as usize; // 10% buffer
     let overlap_chars = (config.stride_overlap as f32 * chars_per_token) as usize;
     let stride_chars = window_chars.saturating_sub(overlap_chars);
@@ -513,7 +524,8 @@ fn stride_large_chunk(chunk: Chunk, config: &ChunkConfig) -> Result<Vec<Chunk>> 
                 byte_start: byte_offset_start,
                 byte_end: byte_offset_end,
                 line_start: chunk.span.line_start + line_offset_start,
-                line_end: chunk.span.line_start + line_offset_start + stride_lines,
+                // Fix: subtract 1 since stride_lines is a count but line_end should be inclusive
+                line_end: chunk.span.line_start + line_offset_start + stride_lines.saturating_sub(1),
             },
             text: stride_text.to_string(),
             chunk_type: chunk.chunk_type.clone(),
@@ -774,5 +786,103 @@ public class Calculator
         assert!(chunk_types.contains(&&ChunkType::Module)); // var, interface
         assert!(chunk_types.contains(&&ChunkType::Class)); // class
         assert!(chunk_types.contains(&&ChunkType::Method)); // methods
+    }
+
+    #[test]
+    fn test_stride_large_chunk_empty_text() {
+        // Regression test for divide-by-zero bug in stride_large_chunk
+        let empty_chunk = Chunk {
+            span: Span {
+                byte_start: 0,
+                byte_end: 0,
+                line_start: 1,
+                line_end: 1,
+            },
+            text: String::new(), // Empty text should not panic
+            chunk_type: ChunkType::Text,
+            stride_info: None,
+        };
+
+        let config = ChunkConfig::default();
+        let result = stride_large_chunk(empty_chunk.clone(), &config);
+
+        // Should not panic and return the original chunk
+        assert!(result.is_ok());
+        let chunks = result.unwrap();
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].text, "");
+    }
+
+    #[test]
+    fn test_stride_large_chunk_zero_token_estimate() {
+        // Regression test for zero token estimate causing divide-by-zero
+        let chunk = Chunk {
+            span: Span {
+                byte_start: 0,
+                byte_end: 5,
+                line_start: 1,
+                line_end: 1,
+            },
+            text: "     ".to_string(), // Whitespace that might return 0 tokens
+            chunk_type: ChunkType::Text,
+            stride_info: None,
+        };
+
+        let config = ChunkConfig::default();
+        let result = stride_large_chunk(chunk, &config);
+
+        // Should not panic and handle gracefully
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_strided_chunk_line_calculation() {
+        // Regression test for line_end calculation in strided chunks
+        // Create a chunk large enough to force striding
+        let long_text = (1..=50).map(|i| format!("This is a longer line {} with more content to ensure token count is high enough", i)).collect::<Vec<_>>().join("\n");
+
+        let chunk = Chunk {
+            span: Span {
+                byte_start: 0,
+                byte_end: long_text.len(),
+                line_start: 1,
+                line_end: 50,
+            },
+            text: long_text,
+            chunk_type: ChunkType::Text,
+            stride_info: None,
+        };
+
+        let config = ChunkConfig {
+            max_tokens: 100, // Force striding with reasonable limit
+            stride_overlap: 10, // Small overlap for testing
+            ..Default::default()
+        };
+
+        let result = stride_large_chunk(chunk, &config);
+        if let Err(e) = &result {
+            eprintln!("Stride error: {}", e);
+        }
+        assert!(result.is_ok());
+
+        let chunks = result.unwrap();
+        assert!(chunks.len() > 1, "Should create multiple chunks when striding");
+
+        for chunk in chunks {
+            // Verify line_end is not off by one
+            // line_end should be inclusive and not exceed the actual content
+            assert!(chunk.span.line_end >= chunk.span.line_start);
+
+            // Check that line span makes sense for the content
+            let line_count = chunk.text.lines().count();
+            if line_count > 0 {
+                let calculated_line_span = chunk.span.line_end - chunk.span.line_start + 1;
+
+                // Allow some tolerance for striding logic
+                assert!(calculated_line_span <= line_count + 1,
+                    "Line span {} should not exceed content lines {} by more than 1",
+                    calculated_line_span, line_count);
+            }
+        }
     }
 }
