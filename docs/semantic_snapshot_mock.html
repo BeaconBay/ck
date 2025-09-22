@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ck Semantic Atlas — Concept Mock</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1521;
+      --panel: #101d2d;
+      --panel-border: #1f3249;
+      --accent: #4ec9b0;
+      --accent-2: #569cd6;
+      --text: #d7e2f2;
+      --muted: #8ea1bd;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      display: grid;
+      grid-template-rows: 64px 1fr;
+      height: 100vh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(16, 29, 45, 0.9);
+      backdrop-filter: blur(12px);
+    }
+
+    header h1 {
+      font-size: 20px;
+      margin: 0;
+      font-weight: 600;
+    }
+
+    header .meta {
+      display: flex;
+      gap: 18px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: 260px 1fr 320px;
+      gap: 24px;
+      padding: 24px;
+      box-sizing: border-box;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .panel h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    #scatter {
+      width: 100%;
+      height: 100%;
+      min-height: 400px;
+    }
+
+    .facet-list,
+    .filters,
+    .neighbor-list,
+    .insight-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      scrollbar-color: var(--accent-2) transparent;
+    }
+
+    .facet-card {
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(30, 52, 76, 0.35);
+      cursor: pointer;
+      transition: border 0.2s ease, transform 0.1s ease;
+    }
+
+    .facet-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    .facet-card h3 {
+      margin: 0 0 6px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .facet-card p {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--muted);
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    select,
+    input[type="search"],
+    input[type="range"] {
+      background: rgba(13, 24, 37, 0.9);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+
+    .neighbor-card,
+    .insight-card {
+      border: 1px solid var(--panel-border);
+      border-radius: 10px;
+      padding: 12px;
+      background: rgba(30, 52, 76, 0.4);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .neighbor-card strong {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 4px;
+      color: var(--accent);
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      background: rgba(78, 201, 176, 0.12);
+      color: var(--accent);
+      border-radius: 999px;
+      padding: 3px 10px;
+      margin-right: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .legend {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .legend span::before {
+      content: "";
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .legend span[data-lang="rust"]::before {
+      background: #ff8a65;
+    }
+
+    .legend span[data-lang="python"]::before {
+      background: #ffd54f;
+    }
+
+    .legend span[data-lang="typescript"]::before {
+      background: #4fc3f7;
+    }
+
+    .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .section-title button {
+      background: none;
+      border: none;
+      color: var(--accent);
+      font-size: 12px;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    .insight-card strong {
+      color: var(--accent-2);
+    }
+
+    footer {
+      position: fixed;
+      bottom: 14px;
+      right: 20px;
+      font-size: 11px;
+      color: var(--muted);
+      background: rgba(16, 29, 45, 0.85);
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--panel-border);
+    }
+  </style>
+  <script defer src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>ck Semantic Atlas — Mock</h1>
+      <div class="legend">
+        <span data-lang="rust">Rust</span>
+        <span data-lang="python">Python</span>
+        <span data-lang="typescript">TypeScript</span>
+      </div>
+    </div>
+    <div class="meta">
+      <span>Repository: <strong>payment-platform</strong></span>
+      <span>Chunks indexed: <strong>842</strong></span>
+      <span>Snapshot: <strong>main@2025-02-11</strong></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel" style="min-width: 0;">
+      <h2>Filters & Facets</h2>
+      <div class="filters">
+        <div class="filter-group">
+          <label for="search">Search snippets / paths</label>
+          <input type="search" id="search" placeholder="auth token rotation" />
+        </div>
+        <div class="filter-group">
+          <label for="layout">Projection</label>
+          <select id="layout">
+            <option>PCA (fast)</option>
+            <option>UMAP (cluster-preserving)</option>
+            <option>Directory layout</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="score">Similarity threshold</label>
+          <input type="range" id="score" min="0" max="100" value="65" />
+        </div>
+        <div class="filter-group">
+          <label>Quick facets</label>
+          <div class="facet-list">
+            <div class="facet-card">
+              <h3>🛡️ Authentication Core</h3>
+              <p>16 chunks · rust/src/auth · avg score 0.87</p>
+              <p><span class="chip">Rust</span><span class="chip">Token</span></p>
+            </div>
+            <div class="facet-card">
+              <h3>📦 Billing Jobs</h3>
+              <p>11 chunks · python/jobs/billing · avg score 0.73</p>
+              <p><span class="chip">Python</span><span class="chip">Retry</span></p>
+            </div>
+            <div class="facet-card">
+              <h3>🚨 Outliers — Review</h3>
+              <p>3 chunks with low similarity to neighbors (possible dead code)</p>
+              <p><span class="chip">Action</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" style="position: relative;">
+      <div class="section-title">
+        <h2>Semantic Map</h2>
+        <button>Export selection</button>
+      </div>
+      <div id="scatter"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Selection Inspector</h2>
+      <div class="neighbor-list" id="neighbor-list">
+        <div class="neighbor-card">
+          <strong>rust/src/auth/token.rs:issue_warning</strong>
+          Similarity: 0.94<br />
+          Owned by: Platform Auth<br />
+          Last commit: 2 days ago
+        </div>
+        <div class="neighbor-card">
+          <strong>rust/src/auth/token.rs:rotate_key</strong>
+          Similarity: 0.91<br />
+          Owned by: Platform Auth<br />
+          Last commit: 4 days ago
+        </div>
+        <div class="neighbor-card">
+          <strong>rust/src/auth/fallback.rs:resync</strong>
+          Similarity: 0.88<br />
+          Owned by: Platform Auth<br />
+          Last commit: 9 days ago
+        </div>
+      </div>
+
+      <h2>Auto Insights</h2>
+      <div class="insight-list">
+        <div class="insight-card">
+          <strong>High duplication detected</strong><br />
+          7 token-rotation chunks across services share 0.9+ similarity. Consider extracting a shared crate.
+        </div>
+        <div class="insight-card">
+          <strong>Unowned outlier</strong><br />
+          python/legacy/migrate_sessions.py has no owner tag and low similarity—review for risk.
+        </div>
+        <div class="insight-card">
+          <strong>Recent churn hotspot</strong><br />
+          TypeScript admin console components in admin/users/ updated 12× in the past week.
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>Prototype concept — all data shown is illustrative</footer>
+
+  <script>
+    const mockNodes = [
+      {
+        id: "auth_token_rotate",
+        x: -1.4,
+        y: 1.1,
+        file: "rust/src/auth/token.rs",
+        symbol: "rotate",
+        lang: "rust",
+        score: 0.92,
+        preview: "fn rotate_token(...)",
+        owner: "Platform Auth",
+        lastCommit: "2025-02-06",
+      },
+      {
+        id: "auth_token_issue",
+        x: -1.7,
+        y: 0.8,
+        file: "rust/src/auth/token.rs",
+        symbol: "issue_warning",
+        lang: "rust",
+        score: 0.94,
+        preview: "fn issue_warning(...)",
+        owner: "Platform Auth",
+        lastCommit: "2025-02-08",
+      },
+      {
+        id: "auth_sync",
+        x: -1.1,
+        y: 1.3,
+        file: "rust/src/auth/fallback.rs",
+        symbol: "resync",
+        lang: "rust",
+        score: 0.88,
+        preview: "async fn resync(...)",
+        owner: "Platform Auth",
+        lastCommit: "2025-02-02",
+      },
+      {
+        id: "billing_retry",
+        x: 0.9,
+        y: -0.5,
+        file: "python/jobs/billing/retry.py",
+        symbol: "run",
+        lang: "python",
+        score: 0.75,
+        preview: "def run_retry(...)",
+        owner: "FinOps",
+        lastCommit: "2025-01-28",
+      },
+      {
+        id: "billing_charge",
+        x: 1.1,
+        y: -0.7,
+        file: "python/jobs/billing/charge.py",
+        symbol: "charge_card",
+        lang: "python",
+        score: 0.72,
+        preview: "def charge_card(...)",
+        owner: "FinOps",
+        lastCommit: "2025-02-05",
+      },
+      {
+        id: "legacy_migrate",
+        x: 2.4,
+        y: 1.6,
+        file: "python/legacy/migrate_sessions.py",
+        symbol: "main",
+        lang: "python",
+        score: 0.34,
+        preview: "def migrate_sessions(...)",
+        owner: "Unowned",
+        lastCommit: "2023-11-10",
+      },
+      {
+        id: "admin_console",
+        x: -0.2,
+        y: -1.4,
+        file: "web/admin/users/UserTable.tsx",
+        symbol: "UserTable",
+        lang: "typescript",
+        score: 0.66,
+        preview: "export const UserTable = (...)",
+        owner: "Console Team",
+        lastCommit: "2025-02-09",
+      },
+    ];
+
+    const colorMap = {
+      rust: "#ff8a65",
+      python: "#ffd54f",
+      typescript: "#4fc3f7",
+    };
+
+    const scatterTrace = {
+      x: mockNodes.map((n) => n.x),
+      y: mockNodes.map((n) => n.y),
+      text: mockNodes.map(
+        (n) => `${n.file}\n${n.symbol} • ${n.lang}\nscore: ${n.score}`
+      ),
+      customdata: mockNodes,
+      mode: "markers",
+      marker: {
+        size: mockNodes.map((n) => 16 + n.score * 6),
+        color: mockNodes.map((n) => colorMap[n.lang] || "#8ea1bd"),
+        opacity: 0.9,
+        line: {
+          width: 1,
+          color: "rgba(255,255,255,0.25)",
+        },
+      },
+      hovertemplate:
+        "<b>%{customdata.file}</b><br>Symbol: %{customdata.symbol}<br>Lang: %{customdata.lang}<br>Similarity: %{customdata.score}<br>Owner: %{customdata.owner}<extra></extra>",
+    };
+
+    const layout = {
+      paper_bgcolor: "rgba(0,0,0,0)",
+      plot_bgcolor: "rgba(0,0,0,0)",
+      margin: { t: 16, r: 16, b: 40, l: 40 },
+      xaxis: {
+        zeroline: false,
+        showgrid: false,
+        visible: false,
+      },
+      yaxis: {
+        zeroline: false,
+        showgrid: false,
+        visible: false,
+      },
+    };
+
+    Plotly.newPlot("scatter", [scatterTrace], layout, {
+      displaylogo: false,
+      responsive: true,
+      modeBarButtonsToRemove: ["lasso2d", "select2d"],
+    });
+
+    const neighborList = document.getElementById("neighbor-list");
+
+    scatter.on("plotly_click", (data) => {
+      const node = data.points[0].customdata;
+      neighborList.innerHTML = `
+        <div class="neighbor-card">
+          <strong>${node.file}:${node.symbol}</strong>
+          Similarity: ${node.score}<br />
+          Owner: ${node.owner}<br />
+          Last commit: ${node.lastCommit}<br />
+          <button style="margin-top:8px;">Open ck semantic search</button>
+        </div>
+        <div class="neighbor-card">
+          <strong>Nearest matches</strong>
+          <ul style="margin:6px 0 0 16px; padding:0;">
+            <li>${mockNodes[0].file} (0.94)</li>
+            <li>${mockNodes[2].file} (0.88)</li>
+            <li>${mockNodes[6].file} (0.66)</li>
+          </ul>
+        </div>
+      `;
+    });
+  </script>
+</body>
+</html>

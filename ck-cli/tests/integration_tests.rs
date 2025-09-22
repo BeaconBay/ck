@@ -3,6 +3,8 @@ use serial_test::serial;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::thread::sleep;
+use std::time::Duration;
 use tempfile::TempDir;
 
 fn ck_binary() -> PathBuf {
@@ -301,6 +303,65 @@ fn test_lexical_search() {
         let stdout = String::from_utf8(output.stdout).unwrap();
         assert!(stdout.contains("doc1.txt"));
     }
+}
+
+#[test]
+#[serial]
+fn test_lexical_search_refreshes_after_file_change() {
+    let temp_dir = TempDir::new().unwrap();
+    let doc1 = temp_dir.path().join("doc1.txt");
+    let doc2 = temp_dir.path().join("doc2.txt");
+
+    fs::write(&doc1, "machine learning algorithms").unwrap();
+    fs::write(&doc2, "neural networks and AI").unwrap();
+
+    // Build initial index
+    let output = Command::new(ck_binary())
+        .args(["--index", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck index");
+    assert!(
+        output.status.success(),
+        "ck --index failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // First lexical search should see only doc2 for the query
+    let output = Command::new(ck_binary())
+        .args(["--lex", "neural", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run initial ck lexical search");
+    assert!(
+        output.status.success(),
+        "initial ck --lex failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("doc2.txt"));
+    assert!(!stdout.contains("doc1.txt"));
+
+    // Ensure file modification timestamps advance for hash comparison
+    sleep(Duration::from_millis(1100));
+
+    // Update files without re-running `ck --index`
+    fs::write(&doc1, "fresh guide to neural networks").unwrap();
+    fs::write(&doc2, "web development frameworks").unwrap();
+
+    let output = Command::new(ck_binary())
+        .args(["--lex", "neural", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run refreshed ck lexical search");
+    assert!(
+        output.status.success(),
+        "refreshed ck --lex failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("doc1.txt"));
+    assert!(!stdout.contains("doc2.txt"));
 }
 
 #[test]

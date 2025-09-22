@@ -321,20 +321,24 @@ pub async fn search_enhanced_with_indexing_progress(
     }
 
     // Auto-update index if needed (unless it's regex-only mode)
-    if !matches!(options.mode, SearchMode::Regex) {
+    let update_stats = if !matches!(options.mode, SearchMode::Regex) {
         let need_embeddings = matches!(options.mode, SearchMode::Semantic | SearchMode::Hybrid);
-        ensure_index_updated_with_progress(
-            &options.path,
-            options.reindex,
-            need_embeddings,
-            indexing_progress_callback,
-            detailed_indexing_progress_callback,
-            options.respect_gitignore,
-            &options.exclude_patterns,
-            options.embedding_model.as_deref(),
+        Some(
+            ensure_index_updated_with_progress(
+                &options.path,
+                options.reindex,
+                need_embeddings,
+                indexing_progress_callback,
+                detailed_indexing_progress_callback,
+                options.respect_gitignore,
+                &options.exclude_patterns,
+                options.embedding_model.as_deref(),
+            )
+            .await?,
         )
-        .await?;
-    }
+    } else {
+        None
+    };
 
     let search_results = match options.mode {
         SearchMode::Regex => {
@@ -345,7 +349,7 @@ pub async fn search_enhanced_with_indexing_progress(
             }
         }
         SearchMode::Lexical => {
-            let matches = lexical_search(options).await?;
+            let matches = lexical_search(options, update_stats.as_ref()).await?;
             ck_core::SearchResults {
                 matches,
                 closest_below_threshold: None,
@@ -706,7 +710,10 @@ fn process_streaming_line(
     }
 }
 
-async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
+async fn lexical_search(
+    options: &SearchOptions,
+    update_stats: Option<&ck_index::UpdateStats>,
+) -> Result<Vec<SearchResult>> {
     // Handle both files and directories and reuse nearest existing .ck index up the tree
     let index_root = find_nearest_index_root(&options.path).unwrap_or_else(|| {
         if options.path.is_file() {
@@ -721,11 +728,9 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
         return Err(CkError::Index("No index found. Run 'ck index' first.".to_string()).into());
     }
 
-    let tantivy_index_path = index_dir.join("tantivy_index");
+    ensure_tantivy_index(options, &index_root, update_stats).await?;
 
-    if !tantivy_index_path.exists() {
-        return build_tantivy_index(options).await;
-    }
+    let tantivy_index_path = index_dir.join("tantivy_index");
 
     let mut schema_builder = Schema::builder();
     let content_field = schema_builder.add_text_field("content", TEXT | STORED);
@@ -821,17 +826,54 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
     Ok(results)
 }
 
-async fn build_tantivy_index(options: &SearchOptions) -> Result<Vec<SearchResult>> {
-    // Handle both files and directories by finding the appropriate directory for indexing
-    let index_root = if options.path.is_file() {
-        options.path.parent().unwrap_or(&options.path)
-    } else {
-        &options.path
-    };
-
+async fn ensure_tantivy_index(
+    options: &SearchOptions,
+    index_root: &Path,
+    update_stats: Option<&ck_index::UpdateStats>,
+) -> Result<()> {
     let index_dir = index_root.join(".ck");
     let tantivy_index_path = index_dir.join("tantivy_index");
 
+    let mut needs_rebuild = options.reindex || !tantivy_index_path.exists();
+
+    if let Some(stats) = update_stats {
+        if stats.files_indexed > 0 || stats.orphaned_files_removed > 0 {
+            needs_rebuild = true;
+        }
+    } else {
+        let stats = ck_index::smart_update_index_with_detailed_progress(
+            index_root,
+            options.reindex,
+            None,
+            None,
+            false,
+            options.respect_gitignore,
+            &options.exclude_patterns,
+            options.embedding_model.as_deref(),
+        )
+        .await?;
+
+        if stats.files_indexed > 0 || stats.orphaned_files_removed > 0 {
+            needs_rebuild = true;
+        }
+    }
+
+    if needs_rebuild {
+        rebuild_tantivy_index(index_root, options)?;
+    }
+
+    Ok(())
+}
+
+fn rebuild_tantivy_index(index_root: &Path, options: &SearchOptions) -> Result<()> {
+    let index_dir = index_root.join(".ck");
+    let tantivy_index_path = index_dir.join("tantivy_index");
+
+    if tantivy_index_path.exists() {
+        fs::remove_dir_all(&tantivy_index_path).map_err(|e| {
+            CkError::Index(format!("Failed to clear Tantivy index directory: {}", e))
+        })?;
+    }
     fs::create_dir_all(&tantivy_index_path)?;
 
     let mut schema_builder = Schema::builder();
@@ -840,122 +882,44 @@ async fn build_tantivy_index(options: &SearchOptions) -> Result<Vec<SearchResult
     let schema = schema_builder.build();
 
     let index = Index::create_in_dir(&tantivy_index_path, schema.clone())
-        .map_err(|e| CkError::Index(format!("Failed to create tantivy index: {}", e)))?;
+        .map_err(|e| CkError::Index(format!("Failed to create Tantivy index: {}", e)))?;
 
     let mut index_writer = index
         .writer(50_000_000)
-        .map_err(|e| CkError::Index(format!("Failed to create index writer: {}", e)))?;
+        .map_err(|e| CkError::Index(format!("Failed to create Tantivy index writer: {}", e)))?;
 
-    let files = collect_files(index_root, true, &options.exclude_patterns)?;
+    let files = ck_index::collect_files(
+        index_root,
+        options.respect_gitignore,
+        &options.exclude_patterns,
+    )?;
 
-    for file_path in &files {
-        if let Ok(content) = fs::read_to_string(file_path) {
-            let doc = doc!(
-                content_field => content,
-                path_field => file_path.display().to_string()
-            );
-            index_writer.add_document(doc)?;
+    for file_path in files {
+        match fs::read_to_string(&file_path) {
+            Ok(content) => {
+                let doc = doc!(
+                    content_field => content,
+                    path_field => file_path.display().to_string()
+                );
+                index_writer.add_document(doc).map_err(|e| {
+                    CkError::Index(format!("Failed to add document to Tantivy index: {}", e))
+                })?;
+            }
+            Err(err) => {
+                tracing::debug!(
+                    "Skipping file {:?} while rebuilding Tantivy index: {}",
+                    file_path,
+                    err
+                );
+            }
         }
     }
 
     index_writer
         .commit()
-        .map_err(|e| CkError::Index(format!("Failed to commit index: {}", e)))?;
+        .map_err(|e| CkError::Index(format!("Failed to commit Tantivy index: {}", e)))?;
 
-    // After building, search again with the same options
-    let tantivy_index_path = index_root.join(".ck").join("tantivy_index");
-    let mut schema_builder = Schema::builder();
-    let content_field = schema_builder.add_text_field("content", TEXT | STORED);
-    let path_field = schema_builder.add_text_field("path", TEXT | STORED);
-    let _schema = schema_builder.build();
-
-    let index = Index::open_in_dir(&tantivy_index_path)
-        .map_err(|e| CkError::Index(format!("Failed to open tantivy index: {}", e)))?;
-
-    let reader = index
-        .reader_builder()
-        .reload_policy(ReloadPolicy::OnCommitWithDelay)
-        .try_into()
-        .map_err(|e| CkError::Index(format!("Failed to create index reader: {}", e)))?;
-
-    let searcher = reader.searcher();
-    let query_parser = QueryParser::for_index(&index, vec![content_field]);
-
-    let query = query_parser
-        .parse_query(&options.query)
-        .map_err(|e| CkError::Search(format!("Failed to parse query: {}", e)))?;
-
-    let top_docs = if let Some(top_k) = options.top_k {
-        searcher.search(&query, &TopDocs::with_limit(top_k))?
-    } else {
-        searcher.search(&query, &TopDocs::with_limit(100))?
-    };
-
-    // First, collect all results with raw scores
-    let mut raw_results = Vec::new();
-    for (_score, doc_address) in top_docs {
-        let retrieved_doc: TantivyDocument = searcher.doc(doc_address)?;
-        let path_text = retrieved_doc
-            .get_first(path_field)
-            .map(|field_value| field_value.as_str().unwrap_or(""))
-            .unwrap_or("");
-        let content_text = retrieved_doc
-            .get_first(content_field)
-            .map(|field_value| field_value.as_str().unwrap_or(""))
-            .unwrap_or("");
-
-        let file_path = PathBuf::from(path_text);
-        let preview = if options.full_section {
-            content_text.to_string()
-        } else {
-            content_text.lines().take(3).collect::<Vec<_>>().join("\n")
-        };
-
-        raw_results.push((
-            _score,
-            SearchResult {
-                file: file_path,
-                span: Span {
-                    byte_start: 0,
-                    byte_end: content_text.len(),
-                    line_start: 1,
-                    line_end: content_text.lines().count(),
-                },
-                score: _score,
-                preview,
-                lang: ck_core::Language::from_path(&PathBuf::from(path_text)),
-                symbol: None,
-                chunk_hash: None,
-                index_epoch: None,
-            },
-        ));
-    }
-
-    // Normalize scores to 0-1 range and apply threshold
-    let mut results = Vec::new();
-    if !raw_results.is_empty() {
-        let max_score = raw_results
-            .iter()
-            .map(|(score, _)| *score)
-            .fold(0.0f32, f32::max);
-        if max_score > 0.0 {
-            for (raw_score, mut result) in raw_results {
-                let normalized_score = raw_score / max_score;
-
-                // Apply threshold filtering with normalized score
-                if let Some(threshold) = options.threshold
-                    && normalized_score < threshold
-                {
-                    continue;
-                }
-
-                result.score = normalized_score;
-                results.push(result);
-            }
-        }
-    }
-
-    Ok(results)
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -1128,7 +1092,7 @@ async fn ensure_index_updated_with_progress(
     respect_gitignore: bool,
     exclude_patterns: &[String],
     model_override: Option<&str>,
-) -> Result<()> {
+) -> Result<ck_index::UpdateStats> {
     // Handle both files and directories and reuse nearest existing .ck index up the tree
     let index_root_buf = find_nearest_index_root(path).unwrap_or_else(|| {
         if path.is_file() {
@@ -1159,7 +1123,7 @@ async fn ensure_index_updated_with_progress(
                 stats.orphaned_files_removed
             );
         }
-        return Ok(());
+        return Ok(stats);
     }
 
     // Always use smart_update_index for incremental updates (handles both new and existing indexes)
@@ -1182,7 +1146,7 @@ async fn ensure_index_updated_with_progress(
         );
     }
 
-    Ok(())
+    Ok(stats)
 }
 
 fn get_context_preview(lines: &[String], line_idx: usize, options: &SearchOptions) -> String {
