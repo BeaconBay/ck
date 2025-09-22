@@ -11,8 +11,8 @@ keywords = ["parsing", "chunking", "tree-sitter"]
 categories = ["parsing"]
 
 [dependencies]
-ck-core = { version = "0.5.2", path = "../ck-core" }
-ck-embed = { version = "0.5.2", path = "../ck-embed" }
+ck-core = { version = "0.5.3", path = "../ck-core" }
+ck-embed = { version = "0.5.3", path = "../ck-embed" }
 
 anyhow = { workspace = true }
 serde = { workspace = true }

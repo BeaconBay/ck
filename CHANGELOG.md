@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.3] - 2025-09-22
+
+### Fixed
+- **Tantivy index refresh**: Lexical search now automatically detects file changes and rebuilds Tantivy index when needed
+- **Index synchronization**: Eliminated redundant index operations by reusing semantic index update statistics for Tantivy rebuild decisions
+- **Performance optimization**: Avoided unnecessary Tantivy index rebuilds by tracking actual file changes through UpdateStats
+
+### Technical
+- **Refactored lexical search**: Split Tantivy index management into `ensure_tantivy_index()` and `rebuild_tantivy_index()` for cleaner separation of concerns
+- **UpdateStats propagation**: Modified `ensure_index_updated_with_progress()` to return statistics used for intelligent Tantivy rebuild decisions
+- **Improved error handling**: Added specific error messages for Tantivy index operations with proper cleanup on rebuild
+- **Test coverage**: Added integration test `test_lexical_search_refreshes_after_file_change` to validate auto-refresh behavior
+
 ## [0.4.7] - 2025-09-19
 
 ### Added
