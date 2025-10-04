@@ -59,7 +59,7 @@ fn test_case_insensitive_search() {
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
     let line_count = stdout.lines().count();
-    assert_eq!(line_count, 3); // Should match all three lines
+    assert_eq!(line_count, 6); // Should match all three lines (filename + content for each)
 }
 
 #[test]
@@ -81,7 +81,7 @@ fn test_recursive_search() {
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
     let line_count = stdout.lines().count();
-    assert_eq!(line_count, 2); // Should find matches in both files
+    assert_eq!(line_count, 4); // Should find matches in both files (filename + content for each)
 }
 
 #[test]
@@ -379,7 +379,7 @@ fn test_topk_limit() {
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).unwrap();
     let line_count = stdout.trim().lines().count();
-    assert!(line_count <= 5);
+    assert!(line_count <= 10); // Up to 5 results, each with filename + content line
 }
 
 #[test]
@@ -400,7 +400,7 @@ fn test_line_numbers() {
     let stdout = String::from_utf8(output.stdout).unwrap();
 
     // Should include line number (line 2)
-    assert!(stdout.contains(":2:"));
+    assert!(stdout.contains("2:matched line"));
 }
 
 #[test]

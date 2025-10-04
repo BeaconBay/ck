@@ -319,7 +319,140 @@ fn chunk_language(text: &str, language: ParseableLanguage) -> Result<Vec<Chunk>>
         return chunk_generic(text);
     }
 
+    // Post-process Haskell chunks to merge function equations
+    if language == ParseableLanguage::Haskell {
+        chunks = merge_haskell_functions(chunks, text);
+    }
+
     Ok(chunks)
+}
+
+/// Merge Haskell function equations that belong to the same function definition
+fn merge_haskell_functions(chunks: Vec<Chunk>, source: &str) -> Vec<Chunk> {
+    if chunks.is_empty() {
+        return chunks;
+    }
+
+    let mut merged = Vec::new();
+    let mut i = 0;
+
+    while i < chunks.len() {
+        let chunk = &chunks[i];
+
+        // Skip chunks that are just fragments or comments
+        let trimmed = chunk.text.trim();
+        if trimmed.is_empty()
+            || trimmed.starts_with("--")
+            || trimmed.starts_with("{-")
+            || !chunk.text.contains(|c: char| c.is_alphanumeric())
+        {
+            i += 1;
+            continue;
+        }
+
+        // Extract function name from the chunk text
+        // Check if it's a signature first (contains ::)
+        let is_signature = chunk.text.contains("::");
+        let function_name = if is_signature {
+            // For signatures like "factorial :: Integer -> Integer", extract "factorial"
+            chunk.text.split("::").next()
+                .and_then(|s| s.trim().split_whitespace().next())
+                .map(|s| s.to_string())
+        } else {
+            extract_haskell_function_name(&chunk.text)
+        };
+
+        if function_name.is_none() {
+            // Not a function (might be data, newtype, etc.), keep as-is
+            merged.push(chunk.clone());
+            i += 1;
+            continue;
+        }
+
+        let name = function_name.unwrap();
+        let group_start = chunk.span.byte_start;
+        let mut group_end = chunk.span.byte_end;
+        let line_start = chunk.span.line_start;
+        let mut line_end = chunk.span.line_end;
+
+        // Look ahead for function equations with the same name
+        let mut j = i + 1;
+        while j < chunks.len() {
+            let next_chunk = &chunks[j];
+
+            // Skip comments
+            let next_trimmed = next_chunk.text.trim();
+            if next_trimmed.starts_with("--") || next_trimmed.starts_with("{-") {
+                j += 1;
+                continue;
+            }
+
+            let next_is_signature = next_chunk.text.contains("::");
+            let next_name = if next_is_signature {
+                next_chunk.text.split("::").next()
+                    .and_then(|s| s.trim().split_whitespace().next())
+                    .map(|s| s.to_string())
+            } else {
+                extract_haskell_function_name(&next_chunk.text)
+            };
+
+            if next_name == Some(name.clone()) {
+                // Extend the group to include this equation
+                group_end = next_chunk.span.byte_end;
+                line_end = next_chunk.span.line_end;
+                j += 1;
+            } else {
+                break;
+            }
+        }
+
+        // Create merged chunk
+        let merged_text = source
+            .get(group_start..group_end)
+            .unwrap_or("")
+            .to_string();
+
+        merged.push(Chunk {
+            span: Span {
+                byte_start: group_start,
+                byte_end: group_end,
+                line_start,
+                line_end,
+            },
+            text: merged_text,
+            chunk_type: ChunkType::Function,
+            stride_info: None,
+        });
+
+        i = j; // Skip past all merged chunks
+    }
+
+    merged
+}
+
+/// Extract the function name from a Haskell function equation
+fn extract_haskell_function_name(text: &str) -> Option<String> {
+    // Haskell function equations start with the function name followed by patterns or =
+    // Examples: "factorial 0 = 1", "map f [] = []"
+    let trimmed = text.trim();
+
+    // Find the first word (function name)
+    let first_word = trimmed
+        .split_whitespace()
+        .next()?
+        .trim_end_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '\'');
+
+    // Validate it's a valid Haskell identifier (starts with lowercase or underscore)
+    if first_word.is_empty() {
+        return None;
+    }
+
+    let first_char = first_word.chars().next()?;
+    if first_char.is_lowercase() || first_char == '_' {
+        Some(first_word.to_string())
+    } else {
+        None
+    }
 }
 
 fn chunk_language_with_model(
@@ -340,19 +473,72 @@ fn extract_code_chunks(
     language: ParseableLanguage,
 ) {
     let node = cursor.node();
-    let node_kind = node.kind();
 
-    let is_chunk = match language {
-        ParseableLanguage::Python => {
-            matches!(node_kind, "function_definition" | "class_definition")
+    // For Haskell: skip "function" nodes that are nested anywhere inside "signature" nodes
+    // (these are type expressions, not actual function definitions)
+    let should_skip = if language == ParseableLanguage::Haskell && node.kind() == "function" {
+        // Walk up parent chain to check if we're inside a signature
+        let mut current = node.parent();
+        while let Some(parent) = current {
+            if parent.kind() == "signature" {
+                return; // Skip this node and don't recurse
+            }
+            current = parent.parent();
         }
+        false
+    } else {
+        false
+    };
+
+    if !should_skip {
+        if let Some(initial_chunk_type) = chunk_type_for_node(language, &node) {
+            if let Some(chunk) = build_chunk(node, source, initial_chunk_type, language) {
+                let is_duplicate = chunks.iter().any(|existing| {
+                    existing.span.byte_start == chunk.span.byte_start
+                        && existing.span.byte_end == chunk.span.byte_end
+                });
+
+                if !is_duplicate {
+                    chunks.push(chunk);
+                }
+            }
+        }
+    }
+
+    // For Haskell signatures: don't recurse into children (they're just type expressions)
+    let should_recurse = if language == ParseableLanguage::Haskell && node.kind() == "signature" {
+        false
+    } else {
+        true
+    };
+
+    if should_recurse && cursor.goto_first_child() {
+        loop {
+            extract_code_chunks(cursor, source, chunks, language);
+            if !cursor.goto_next_sibling() {
+                break;
+            }
+        }
+        cursor.goto_parent();
+    }
+}
+
+fn chunk_type_for_node(
+    language: ParseableLanguage,
+    node: &tree_sitter::Node<'_>,
+) -> Option<ChunkType> {
+    let kind = node.kind();
+
+    let supported = match language {
+        ParseableLanguage::Python => matches!(kind, "function_definition" | "class_definition"),
         ParseableLanguage::TypeScript | ParseableLanguage::JavaScript => matches!(
-            node_kind,
+            kind,
             "function_declaration" | "class_declaration" | "method_definition" | "arrow_function"
         ),
         ParseableLanguage::Haskell => matches!(
-            node_kind,
-            "signature"
+            kind,
+            "function" // Capture function equations
+                | "signature" // Capture type signatures (will be merged with functions)
                 | "data_type"
                 | "newtype"
                 | "type_synonym"
@@ -361,15 +547,14 @@ fn extract_code_chunks(
                 | "instance"
         ),
         ParseableLanguage::Rust => matches!(
-            node_kind,
+            kind,
             "function_item" | "impl_item" | "struct_item" | "enum_item" | "trait_item" | "mod_item"
         ),
-        ParseableLanguage::Ruby => matches!(
-            node_kind,
-            "method" | "class" | "module" | "singleton_method"
-        ),
+        ParseableLanguage::Ruby => {
+            matches!(kind, "method" | "class" | "module" | "singleton_method")
+        }
         ParseableLanguage::Go => matches!(
-            node_kind,
+            kind,
             "function_declaration"
                 | "method_declaration"
                 | "type_declaration"
@@ -377,14 +562,14 @@ fn extract_code_chunks(
                 | "const_declaration"
         ),
         ParseableLanguage::CSharp => matches!(
-            node_kind,
+            kind,
             "method_declaration"
                 | "class_declaration"
                 | "interface_declaration"
                 | "variable_declaration"
         ),
         ParseableLanguage::Zig => matches!(
-            node_kind,
+            kind,
             "function_declaration"
                 | "test_declaration"
                 | "variable_declaration"
@@ -397,86 +582,258 @@ fn extract_code_chunks(
         ),
     };
 
-    if is_chunk {
-        let start_byte = node.start_byte();
-        let end_byte = node.end_byte();
-        let start_pos = node.start_position();
-        let end_pos = node.end_position();
-
-        let text = &source[start_byte..end_byte];
-
-        let chunk_type = match node_kind {
-            "function_definition"
-            | "function_declaration"
-            | "arrow_function"
-            | "function"
-            | "signature"
-            | "function_item"
-            | "def"
-            | "defp"
-            | "method"
-            | "singleton_method"
-            | "defn"
-            | "defn-" => ChunkType::Function,
-            "class_definition"
-            | "class_declaration"
-            | "instance_declaration"
-            | "class"
-            | "instance"
-            | "struct_item"
-            | "enum_item"
-            | "defstruct"
-            | "defrecord"
-            | "deftype"
-            | "type_declaration"
-            | "struct_declaration"
-            | "enum_declaration"
-            | "union_declaration"
-            | "opaque_declaration"
-            | "error_set_declaration" => ChunkType::Class,
-            "method_definition" | "method_declaration" | "defmacro" => ChunkType::Method,
-            "data_type"
-            | "newtype"
-            | "type_synomym"
-            | "type_family"
-            | "impl_item"
-            | "trait_item"
-            | "mod_item"
-            | "defmodule"
-            | "module"
-            | "defprotocol"
-            | "interface_declaration"
-            | "ns"
-            | "var_declaration"
-            | "const_declaration"
-            | "variable_declaration"
-            | "test_declaration"
-            | "comptime_declaration" => ChunkType::Module,
-            _ => ChunkType::Text,
-        };
-
-        chunks.push(Chunk {
-            span: Span {
-                byte_start: start_byte,
-                byte_end: end_byte,
-                line_start: start_pos.row + 1,
-                line_end: end_pos.row + 1,
-            },
-            text: text.to_string(),
-            chunk_type,
-            stride_info: None,
-        });
+    if !supported {
+        return None;
     }
 
-    if cursor.goto_first_child() {
-        loop {
-            extract_code_chunks(cursor, source, chunks, language);
-            if !cursor.goto_next_sibling() {
-                break;
+    match language {
+        ParseableLanguage::Go
+            if matches!(node.kind(), "var_declaration" | "const_declaration")
+                && node.parent().is_some_and(|p| p.kind() == "block") =>
+        {
+            return None;
+        }
+        ParseableLanguage::CSharp if node.kind() == "variable_declaration" => {
+            if !is_csharp_field_like(node.clone()) {
+                return None;
             }
         }
-        cursor.goto_parent();
+        _ => {}
     }
+
+    Some(classify_chunk_kind(kind))
+}
+
+fn classify_chunk_kind(kind: &str) -> ChunkType {
+    match kind {
+        "function_definition"
+        | "function_declaration"
+        | "arrow_function"
+        | "function"
+        | "function_item"
+        | "def"
+        | "defp"
+        | "defn"
+        | "defn-"
+        | "method"
+        | "singleton_method" => ChunkType::Function,
+        "signature" => ChunkType::Function, // Haskell type signatures will be merged with functions
+        "class_definition"
+        | "class_declaration"
+        | "instance_declaration"
+        | "class"
+        | "instance"
+        | "struct_item"
+        | "enum_item"
+        | "defstruct"
+        | "defrecord"
+        | "deftype"
+        | "type_declaration"
+        | "struct_declaration"
+        | "enum_declaration"
+        | "union_declaration"
+        | "opaque_declaration"
+        | "error_set_declaration" => ChunkType::Class,
+        "method_definition" | "method_declaration" | "defmacro" => ChunkType::Method,
+        "data_type"
+        | "newtype"
+        | "type_synonym"
+        | "type_family"
+        | "impl_item"
+        | "trait_item"
+        | "mod_item"
+        | "defmodule"
+        | "module"
+        | "defprotocol"
+        | "interface_declaration"
+        | "ns"
+        | "var_declaration"
+        | "const_declaration"
+        | "variable_declaration"
+        | "test_declaration"
+        | "comptime_declaration" => ChunkType::Module,
+        _ => ChunkType::Text,
+    }
+}
+
+fn build_chunk(
+    node: tree_sitter::Node<'_>,
+    source: &str,
+    initial_type: ChunkType,
+    language: ParseableLanguage,
+) -> Option<Chunk> {
+    let target_node = adjust_node_for_language(node, language);
+    let (byte_start, start_row) = extend_with_leading_trivia(target_node, language, source);
+
+    let byte_end = target_node.end_byte();
+    let end_pos = target_node.end_position();
+
+    if byte_start >= byte_end || byte_end > source.len() {
+        return None;
+    }
+
+    let text = source.get(byte_start..byte_end)?.to_string();
+
+    if text.trim().is_empty() {
+        return None;
+    }
+
+    let chunk_type = adjust_chunk_type_for_context(target_node, initial_type, language);
+
+    Some(Chunk {
+        span: Span {
+            byte_start,
+            byte_end,
+            line_start: start_row + 1,
+            line_end: end_pos.row + 1,
+        },
+        text,
+        chunk_type,
+        stride_info: None,
+    })
+}
+
+fn adjust_node_for_language(
+    node: tree_sitter::Node<'_>,
+    language: ParseableLanguage,
+) -> tree_sitter::Node<'_> {
+    match language {
+        ParseableLanguage::TypeScript | ParseableLanguage::JavaScript => {
+            if node.kind() == "arrow_function" {
+                return expand_arrow_function_context(node);
+            }
+            node
+        }
+        _ => node,
+    }
+}
+
+fn expand_arrow_function_context(mut node: tree_sitter::Node<'_>) -> tree_sitter::Node<'_> {
+    const PARENTS: &[&str] = &[
+        "parenthesized_expression",
+        "variable_declarator",
+        "variable_declaration",
+        "lexical_declaration",
+        "assignment_expression",
+        "expression_statement",
+        "public_field_definition",
+        "export_statement",
+    ];
+
+    while let Some(parent) = node.parent() {
+        let kind = parent.kind();
+        if PARENTS.contains(&kind) {
+            node = parent;
+            continue;
+        }
+        break;
+    }
+
+    node
+}
+
+fn extend_with_leading_trivia(
+    node: tree_sitter::Node<'_>,
+    language: ParseableLanguage,
+    source: &str,
+) -> (usize, usize) {
+    let mut start_byte = node.start_byte();
+    let mut start_row = node.start_position().row;
+    let mut current = node;
+
+    while let Some(prev) = current.prev_sibling() {
+        if should_attach_leading_trivia(language, &prev)
+            && only_whitespace_between(source, prev.end_byte(), start_byte)
+        {
+            start_byte = prev.start_byte();
+            start_row = prev.start_position().row;
+            current = prev;
+            continue;
+        }
+        break;
+    }
+
+    (start_byte, start_row)
+}
+
+fn should_attach_leading_trivia(language: ParseableLanguage, node: &tree_sitter::Node<'_>) -> bool {
+    let kind = node.kind();
+    if kind == "comment" {
+        return true;
+    }
+
+    match language {
+        ParseableLanguage::Rust => kind == "attribute_item",
+        ParseableLanguage::Python => kind == "decorator",
+        ParseableLanguage::TypeScript | ParseableLanguage::JavaScript => kind == "decorator",
+        ParseableLanguage::CSharp => matches!(kind, "attribute_list" | "attribute"),
+        _ => false,
+    }
+}
+
+fn only_whitespace_between(source: &str, start: usize, end: usize) -> bool {
+    if start >= end || end > source.len() {
+        return true;
+    }
+
+    source[start..end].chars().all(|c| c.is_whitespace())
+}
+
+fn adjust_chunk_type_for_context(
+    node: tree_sitter::Node<'_>,
+    chunk_type: ChunkType,
+    language: ParseableLanguage,
+) -> ChunkType {
+    if chunk_type != ChunkType::Function {
+        return chunk_type;
+    }
+
+    if is_method_context(node, language) {
+        ChunkType::Method
+    } else {
+        chunk_type
+    }
+}
+
+fn is_method_context(node: tree_sitter::Node<'_>, language: ParseableLanguage) -> bool {
+    const PYTHON_CONTAINERS: &[&str] = &["class_definition"];
+    const TYPESCRIPT_CONTAINERS: &[&str] = &["class_body", "class_declaration"];
+    const RUBY_CONTAINERS: &[&str] = &["class", "module"];
+    const RUST_CONTAINERS: &[&str] = &["impl_item", "trait_item"];
+
+    match language {
+        ParseableLanguage::Python => ancestor_has_kind(node, PYTHON_CONTAINERS),
+        ParseableLanguage::TypeScript | ParseableLanguage::JavaScript => {
+            ancestor_has_kind(node, TYPESCRIPT_CONTAINERS)
+        }
+        ParseableLanguage::Ruby => ancestor_has_kind(node, RUBY_CONTAINERS),
+        ParseableLanguage::Rust => ancestor_has_kind(node, RUST_CONTAINERS),
+        ParseableLanguage::Go => false,
+        ParseableLanguage::CSharp => false,
+        ParseableLanguage::Haskell => false,
+        ParseableLanguage::Zig => false,
+    }
+}
+
+fn ancestor_has_kind(node: tree_sitter::Node<'_>, kinds: &[&str]) -> bool {
+    let mut current = node;
+    while let Some(parent) = current.parent() {
+        if kinds.contains(&parent.kind()) {
+            return true;
+        }
+        current = parent;
+    }
+    false
+}
+
+fn is_csharp_field_like(node: tree_sitter::Node<'_>) -> bool {
+    if let Some(parent) = node.parent() {
+        return matches!(
+            parent.kind(),
+            "field_declaration" | "event_field_declaration"
+        );
+    }
+    false
 }
 
 /// Apply striding to chunks that exceed the token limit
@@ -808,6 +1165,79 @@ func main() {
     }
 
     #[test]
+    fn test_chunk_typescript_arrow_context() {
+        let ts_code = r#"
+// Utility function
+export const util = () => {
+    // comment about util
+    return 42;
+};
+
+export class Example {
+    // leading comment for method
+    constructor() {}
+
+    // Another comment
+    run = () => {
+        return util();
+    };
+}
+
+const compute = (x: number) => x * 2;
+"#;
+
+        let chunks = chunk_language(ts_code, ParseableLanguage::TypeScript).unwrap();
+
+        let util_chunk = chunks
+            .iter()
+            .find(|chunk| chunk.text.contains("export const util"))
+            .expect("Expected chunk for util arrow function");
+        assert_eq!(util_chunk.chunk_type, ChunkType::Function);
+        assert!(
+            util_chunk.text.contains("// Utility function"),
+            "expected leading comment to be included"
+        );
+        assert!(util_chunk.text.contains("export const util ="));
+
+        // The class field arrow function should be classified as a method and include its comment
+        let method_chunk = chunks
+            .iter()
+            .find(|chunk| {
+                chunk.chunk_type == ChunkType::Method && chunk.text.contains("run = () =>")
+            })
+            .expect("Expected chunk for class field arrow function");
+
+        assert_eq!(method_chunk.chunk_type, ChunkType::Method);
+        assert!(
+            method_chunk.text.contains("// Another comment"),
+            "expected inline comment to be included"
+        );
+
+        let compute_chunk = chunks
+            .iter()
+            .find(|chunk| chunk.text.contains("const compute"))
+            .expect("Expected chunk for compute arrow function");
+        assert_eq!(compute_chunk.chunk_type, ChunkType::Function);
+        assert!(
+            compute_chunk
+                .text
+                .contains("const compute = (x: number) => x * 2;")
+        );
+
+        // Ensure we don't create bare arrow-expression chunks without context
+        assert!(
+            chunks
+                .iter()
+                .all(|chunk| !chunk.text.trim_start().starts_with("() =>"))
+        );
+        assert!(
+            chunks
+                .iter()
+                .all(|chunk| !chunk.text.trim_start().starts_with("(x: number) =>"))
+        );
+    }
+
+    #[test]
     fn test_chunk_zig() {
         let zig_code = r#"
 const std = @import("std");
@@ -1069,5 +1499,63 @@ public class Calculator
                 );
             }
         }
+    }
+
+    #[test]
+    fn test_haskell_function_chunking() {
+        let haskell_code = r#"
+factorial :: Integer -> Integer
+factorial 0 = 1
+factorial n = n * factorial (n - 1)
+
+fibonacci :: Integer -> Integer
+fibonacci 0 = 0
+fibonacci 1 = 1
+fibonacci n = fibonacci (n - 1) + fibonacci (n - 2)
+"#;
+
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&tree_sitter_haskell::LANGUAGE.into()).unwrap();
+        let tree = parser.parse(haskell_code, None).unwrap();
+
+        // Debug: print tree structure
+        fn walk(node: tree_sitter::Node, src: &str, depth: usize) {
+            let kind = node.kind();
+            let start = node.start_position();
+            let end = node.end_position();
+            eprintln!("{}{:30} L{}-{}", "  ".repeat(depth), kind, start.row + 1, end.row + 1);
+
+            let mut cursor = node.walk();
+            if cursor.goto_first_child() {
+                loop {
+                    walk(cursor.node(), src, depth + 1);
+                    if !cursor.goto_next_sibling() { break; }
+                }
+            }
+        }
+
+        eprintln!("\n=== TREE STRUCTURE ===");
+        walk(tree.root_node(), haskell_code, 0);
+        eprintln!("=== END TREE ===\n");
+
+        let chunks = chunk_language(haskell_code, ParseableLanguage::Haskell).unwrap();
+
+        eprintln!("\n=== CHUNKS ===");
+        for (i, chunk) in chunks.iter().enumerate() {
+            eprintln!("Chunk {}: {:?} L{}-{}", i, chunk.chunk_type, chunk.span.line_start, chunk.span.line_end);
+            eprintln!("  Text: {:?}", chunk.text);
+        }
+        eprintln!("=== END CHUNKS ===\n");
+
+        assert!(!chunks.is_empty(), "Should find chunks in Haskell code");
+
+        // Find factorial chunk and verify it includes both signature and implementation
+        let factorial_chunk = chunks.iter().find(|c| c.text.contains("factorial 0 = 1"));
+        assert!(factorial_chunk.is_some(), "Should find factorial function body");
+
+        let fac = factorial_chunk.unwrap();
+        assert!(fac.text.contains("factorial :: Integer -> Integer"), "Should include type signature");
+        assert!(fac.text.contains("factorial 0 = 1"), "Should include base case");
+        assert!(fac.text.contains("factorial n = n * factorial (n - 1)"), "Should include recursive case");
     }
 }

@@ -192,6 +192,13 @@ ck --sem --scores "machine learning" docs/
 # [0.732] ./statistics.txt: Statistical learning methods...
 ```
 
+
+### Language Coverage
+
+| Language | Indexing | Chunking | AST-aware | Notes |
+|----------|----------|----------|-----------|-------|
+| Zig | ✅ | ✅ | ✅ | contributed by [@Nevon](https://github.com/Nevon) (PR #72) |
+
 ### Model Selection
 
 Choose the right embedding model for your needs:

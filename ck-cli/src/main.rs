@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 mod mcp;
 mod mcp_server;
 mod progress;
+mod tui;
 
 use progress::StatusReporter;
 
@@ -339,10 +340,26 @@ struct Cli {
             "semantic", "lexical", "hybrid", "regex", "top_k", "threshold", "show_scores",
             "json", "json_v1", "jsonl", "no_snippet", "reindex", "exclude", "no_default_excludes",
             "no_ignore", "full_section", "index", "clean", "clean_orphans", "switch_model",
-            "force", "add", "status", "status_verbose", "inspect", "model", "rerank", "rerank_model"
+            "force", "add", "status", "status_verbose", "inspect", "model", "rerank", "rerank_model", "tui"
         ]
     )]
     serve: bool,
+
+    // TUI mode
+    #[arg(
+        long = "tui",
+        help = "Interactive TUI mode - like fzf but semantic. Live search with arrow keys, Tab to switch modes, Enter to open in $EDITOR",
+        conflicts_with_all = [
+            "line_numbers", "no_filenames", "with_filenames",
+            "files_with_matches", "files_without_matches", "ignore_case", "word_regexp",
+            "fixed_strings", "recursive", "context", "after_context", "before_context",
+            "semantic", "lexical", "hybrid", "regex", "top_k", "threshold", "show_scores",
+            "json", "json_v1", "jsonl", "no_snippet", "reindex", "exclude", "no_default_excludes",
+            "no_ignore", "full_section", "index", "clean", "clean_orphans", "switch_model",
+            "force", "add", "status", "status_verbose", "inspect", "model", "rerank", "rerank_model", "serve"
+        ]
+    )]
+    tui: bool,
 }
 
 fn expand_glob_patterns(paths: &[PathBuf], exclude_patterns: &[String]) -> Result<Vec<PathBuf>> {
@@ -778,6 +795,18 @@ async fn inspect_file_metadata(file_path: &PathBuf, status: &StatusReporter) -> 
             ck_chunk::ChunkType::Text => "text",
         };
 
+        let stride_display = chunk
+            .stride_info
+            .as_ref()
+            .map(|stride| {
+                format!(
+                    " [stride {}/{}]",
+                    stride.stride_index + 1,
+                    stride.total_strides
+                )
+            })
+            .unwrap_or_default();
+
         // Simple preview - first 80 chars
         let preview = chunk
             .text
@@ -791,9 +820,10 @@ async fn inspect_file_metadata(file_path: &PathBuf, status: &StatusReporter) -> 
             .to_string();
 
         println!(
-            "  {} {}: {} tokens | L{}-{} | {}{}",
+            "  {} {}{}: {} tokens | L{}-{} | {}{}",
             style(format!("{:2}.", i + 1)).dim(),
             style(type_display).blue(),
+            stride_display,
             style(chunk_tokens).yellow(),
             chunk.span.line_start,
             chunk.span.line_end,
@@ -846,6 +876,17 @@ async fn run_main() -> Result<()> {
     // Handle MCP server mode first
     if cli.serve {
         return run_mcp_server().await;
+    }
+
+    // Handle TUI mode
+    if cli.tui {
+        let search_path = cli
+            .files
+            .first()
+            .cloned()
+            .unwrap_or_else(|| PathBuf::from("."));
+        let initial_query = cli.pattern.clone();
+        return tui::run_tui(search_path, initial_query).await;
     }
 
     // Regular CLI mode
@@ -1728,7 +1769,7 @@ async fn run_search(
             };
 
             let file_text = if options.show_filenames {
-                format!("{}:", style(result.file.display()).cyan().bold())
+                format!("{}:\n", style(result.file.display()).cyan().bold())
             } else {
                 String::new()
             };
