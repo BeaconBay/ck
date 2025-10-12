@@ -26,70 +26,18 @@ export class CkSearchPanel implements vscode.WebviewViewProvider {
   private currentIndexRoot: string | undefined;
   private adapterDisposables: vscode.Disposable[] = [];
 
-  // Fallback copy of ck-core defaults; extension fetches live content when possible.
+  // Minimal fallback used only when backend fetch fails
   private static readonly FALLBACK_CKIGNORE_CONTENT = `# .ckignore - Default patterns for ck semantic search
-# Created automatically during first index
+#
+# ERROR: Could not fetch default patterns from ck backend.
+# This may indicate a problem with your ck installation.
+#
+# To get the default patterns, run:
+#   ck --print-default-ckignore
+#
+# Or reinstall/update the ck extension.
+#
 # Syntax: same as .gitignore (glob patterns, ! for negation)
-
-# Images
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.bmp
-*.svg
-*.ico
-*.webp
-*.tiff
-
-# Video
-*.mp4
-*.avi
-*.mov
-*.mkv
-*.wmv
-*.flv
-*.webm
-
-# Audio
-*.mp3
-*.wav
-*.flac
-*.aac
-*.ogg
-*.m4a
-
-# Binary/Compiled
-*.exe
-*.dll
-*.so
-*.dylib
-*.a
-*.lib
-*.obj
-*.o
-
-# Archives
-*.zip
-*.tar
-*.tar.gz
-*.tgz
-*.rar
-*.7z
-*.bz2
-*.gz
-
-# Data files
-*.db
-*.sqlite
-*.sqlite3
-*.parquet
-*.arrow
-
-# Config formats (issue #27)
-*.json
-*.yaml
-*.yml
 
 # Add your custom patterns below this line
 `;
@@ -527,15 +475,21 @@ export class CkSearchPanel implements vscode.WebviewViewProvider {
       const indexRoot = this.resolveIndexRoot(workspaceFolder);
       const adapter = this.getAdapter(indexRoot);
       let defaultContent = CkSearchPanel.FALLBACK_CKIGNORE_CONTENT;
+      let usedFallback = true;
 
       if (adapter.getDefaultCkignoreContent) {
         try {
           const fetched = await adapter.getDefaultCkignoreContent(indexRoot);
           if (typeof fetched === 'string' && fetched.trim().length > 0) {
             defaultContent = fetched;
+            usedFallback = false;
           }
         } catch (error) {
-          console.warn('Failed to fetch default .ckignore content from ck backend:', error);
+          console.error('Failed to fetch default .ckignore content from ck backend:', error);
+          vscode.window.showWarningMessage(
+            'Could not fetch default .ckignore patterns from ck. Using minimal template. ' +
+            'Please check your ck installation.'
+          );
         }
       }
 
@@ -547,7 +501,14 @@ export class CkSearchPanel implements vscode.WebviewViewProvider {
         ckignoreUri,
         Buffer.from(defaultContent, 'utf8')
       );
-      vscode.window.showInformationMessage('.ckignore created with default ck patterns');
+
+      if (usedFallback) {
+        vscode.window.showWarningMessage(
+          '.ckignore created with minimal template. Run "ck --print-default-ckignore" to get the default patterns.'
+        );
+      } else {
+        vscode.window.showInformationMessage('.ckignore created with default ck patterns');
+      }
     }
 
     const document = await vscode.workspace.openTextDocument(ckignoreUri);

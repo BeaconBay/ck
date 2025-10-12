@@ -101,7 +101,7 @@ export class CkCliAdapter {
    */
   async getIndexStatus(path: string): Promise<IndexStatus> {
     return new Promise((resolve, reject) => {
-      const child = spawn(this.cliPath, ['--status', path], {
+      const child = spawn(this.cliPath, ['--status-json', path], {
         shell: false
       });
 
@@ -117,27 +117,30 @@ export class CkCliAdapter {
       });
 
       child.on('close', (code) => {
-        // Parse status output
-        // This is a simplified version - actual parsing depends on ck's status output format
-        const exists = !stdout.includes('No index found');
-
-        const indexDir = pathModule.join(path, '.ck');
-        let lastModified: number | undefined;
-        try {
-          const stats = fs.statSync(indexDir);
-          lastModified = Math.floor(stats.mtimeMs / 1000);
-        } catch {
-          // ignore missing directory or access issues
+        if (code !== 0) {
+          reject(new Error(`ck exited with code ${code}: ${stderr}`));
+          return;
         }
 
-        resolve({
-          exists,
-          path,
-          totalFiles: this.extractNumber(stdout, /(\d+)\s+files/),
-          totalChunks: this.extractNumber(stdout, /(\d+)\s+chunks/),
-          indexPath: indexDir,
-          lastModified
-        });
+        try {
+          // Parse JSON output from --status-json
+          const json = JSON.parse(stdout);
+
+          resolve({
+            exists: Boolean(json.index_exists),
+            path: json.path || path,
+            totalFiles: json.total_files,
+            totalChunks: json.total_chunks,
+            indexPath: pathModule.join(path, '.ck'),
+            lastModified: json.index_updated || json.index_created,
+            embeddedChunks: json.embedded_chunks,
+            indexSizeBytes: json.index_size_bytes,
+            totalSizeBytes: json.total_size_bytes,
+            model: json.model
+          });
+        } catch (err) {
+          reject(new Error(`Failed to parse status JSON: ${err instanceof Error ? err.message : String(err)}`));
+        }
       });
 
       child.on('error', (err) => {
@@ -286,20 +289,7 @@ export class CkCliAdapter {
       args.push('--no-default-excludes');
     }
 
-    // Query
-    args.push(options.query);
-
-    // File targets (include patterns)
-    if (options.includePatterns && options.includePatterns.length > 0) {
-      options.includePatterns
-        .filter(pattern => pattern.trim().length > 0)
-        .forEach(pattern => args.push(pattern.trim()));
-    } else {
-      // Default to searching the current workspace directory
-      args.push('.');
-    }
-
-    // Optional parameters
+    // Optional parameters (must come before positional args)
     if (options.topK !== undefined) {
       args.push('--topk', options.topK.toString());
     }
@@ -327,6 +317,22 @@ export class CkCliAdapter {
       });
     }
 
+    // Add -- separator to prevent query from being parsed as a flag
+    args.push('--');
+
+    // Query (after -- separator to handle dash-prefixed queries)
+    args.push(options.query);
+
+    // File targets (include patterns)
+    if (options.includePatterns && options.includePatterns.length > 0) {
+      options.includePatterns
+        .filter(pattern => pattern.trim().length > 0)
+        .forEach(pattern => args.push(pattern.trim()));
+    } else {
+      // Default to searching the current workspace directory
+      args.push('.');
+    }
+
     return args;
   }
 
@@ -350,14 +356,6 @@ export class CkCliAdapter {
       score: data.score,
       language: data.language || data.lang
     };
-  }
-
-  /**
-   * Extract a number from text using regex
-   */
-  private extractNumber(text: string, regex: RegExp): number | undefined {
-    const match = text.match(regex);
-    return match ? parseInt(match[1], 10) : undefined;
   }
 
   dispose(): void {

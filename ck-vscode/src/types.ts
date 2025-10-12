@@ -44,11 +44,18 @@ export interface IndexStatus {
   path: string;
   totalFiles?: number;
   totalChunks?: number;
+  embeddedChunks?: number;
   lastModified?: number;
   indexPath?: string;
   indexSizeBytes?: number;
+  totalSizeBytes?: number;
   estimatedFileCount?: number;
   cacheHit?: boolean;
+  model?: {
+    name: string;
+    alias: string;
+    dimensions: number;
+  };
 }
 
 export interface SearchResponse {

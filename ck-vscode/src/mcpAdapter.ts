@@ -91,11 +91,18 @@ export class CkMcpAdapter {
       path: status.path ?? pathToCheck,
       totalFiles: status.total_files,
       totalChunks: status.total_chunks,
+      embeddedChunks: status.embedded_chunks,
+      totalSizeBytes: status.total_size_bytes,
       lastModified: status.last_modified,
       indexPath: status.index_path,
       indexSizeBytes: status.index_size_bytes,
       estimatedFileCount: status.estimated_file_count,
-      cacheHit: status.cache_hit
+      cacheHit: status.cache_hit,
+      model: status.model ? {
+        name: status.model.name,
+        alias: status.model.alias,
+        dimensions: status.model.dimensions
+      } : undefined
     };
   }
 
