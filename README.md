@@ -389,7 +389,7 @@ ck uses a modular Rust workspace:
 - **`ck-index`** - File indexing, hashing, and sidecar management
 - **`ck-embed`** - Text embedding providers (FastEmbed, API backends)
 - **`ck-ann`** - Approximate nearest neighbor search indices
-- **`ck-chunk`** - Text segmentation and language-aware parsing ([query-based chunking](docs/QUERY_BASED_CHUNKING.md))
+- **`ck-chunk`** - Text segmentation and language-aware parsing ([query-based chunking](docs/explanation/query-based-chunking.md))
 - **`ck-models`** - Model registry and configuration management
 
 ### Index Storage
