@@ -3,7 +3,9 @@ name: Deploy Documentation to GitHub Pages
 on:
   push:
     branches:
-      - docs-site
+      - main
+    paths:
+      - 'docs-site/**'
   workflow_dispatch:
 
 permissions:
