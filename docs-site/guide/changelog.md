@@ -1,6 +1,11 @@
+---
+title: Changelog
+description: Complete version history for ck with all notable changes, features, fixes, and technical improvements. Follows semantic versioning.
+---
+
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to ck are documented here following [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
@@ -14,60 +19,6 @@ All notable changes to this project will be documented in this file.
 - **Node.js integration**: Documentation site uses Node.js 18+, pnpm 10+, and VitePress 1.6+ for modern documentation experience
 - **GitHub integration**: Edit links and social links configured for easy contribution
 
-## [0.7.0] - 2025-10-13
-
-### Added
-- **Chunk-level incremental indexing**: Smart caching system that reuses embeddings for unchanged chunks, dramatically improving reindexing performance (80-90% cache hit rate for typical code changes)
-- **Content-aware cache invalidation**: Hash-based invalidation using blake3(chunk_text + leading_trivia + trailing_trivia) ensures doc comment and whitespace changes properly invalidate cache
-- **Model compatibility enforcement**: Prevents silent embedding corruption by validating model consistency across indexing operations with clear error messages and recovery guidance
-- **Chunk hash versioning**: Manifest tracking of hash scheme version (v2) for future compatibility and reliable version detection
-
-### Performance
-- **Selective re-embedding**: Only changed chunks are re-embedded; unchanged chunks reuse cached embeddings from previous index
-- **Cache hit validation**: Both hash match AND dimension match required before reusing cached embeddings
-- **Typical performance**: For code changes affecting 10-20% of file chunks, 80-90% of embeddings are reused from cache
-
-### Technical
-- **Blake3 hashing**: Fast cryptographic hashing of chunk content including all trivia for reliable change detection
-- **Sidecar-based cache**: Old sidecars loaded into memory to build chunk_hash → embedding cache for efficient lookup
-- **Model validation**: Index operations validate embedding model matches existing index and return actionable errors on mismatch
-- **Backward compatibility**: Existing manifests auto-upgrade to chunk_hash_version v2 on load
-- **Comprehensive testing**: All 181 tests passing with full coverage of cache invalidation, model validation, and version tracking
-
-## [0.6.0] - 2025-10-12
-
-### Added
-- **MCP Server**: Full Model Context Protocol implementation with stdio transport for AI agent integration
-- **Pagination Support**: Cursor-based pagination for all search modes (page_size: 1-200, default: 50)
-- **Session Management**: TTL-based session cleanup for paginated results with automatic expiration (60s)
-- **MCP Search Tools**: `semantic_search`, `regex_search`, `hybrid_search`, `lexical_search` with unified interface
-- **MCP Index Tools**: `index_status`, `reindex`, `health_check` for index management
-- **CLI Heatmap Visualization**: Color-coded similarity scores with RGB gradient highlighting (red→yellow→green)
-- **Enhanced Visual Output**: Unicode box drawing and sophisticated match highlighting in CLI
-- **Near-Miss Tracking**: Track closest result below threshold for better search feedback
-- **Fallback Strategies**: Automatic fallback from semantic to lexical search when embeddings unavailable
-- **Graceful Error Handling**: Skip stale index entries when files no longer exist
-
-### Fixed
-- **Mixed Line Endings**: Proper handling of Unix (\n), Windows (\r\n), and Mac (\r) line endings
-- **Span Validation**: Prevent invalid spans with zero line numbers using `Span::new()` validation
-- **Streaming File Operations**: Memory-efficient line extraction without loading entire files
-- **PDF Content Resolution**: Better content path resolution and caching for PDF files
-
-### Technical
-- **MCP Protocol**: Full implementation with tool discovery, validation, and error handling
-- **Session Cleanup**: LRU-based eviction with periodic cleanup task (every 30s)
-- **Streaming Reads**: Optimized `extract_lines_from_file()` for minimal memory footprint
-- **SearchResults Enhancement**: Added `closest_below_threshold` field for improved UX
-- **Comprehensive Testing**: 7 new MCP integration tests covering pagination, validation, and edge cases
-- **Line Ending Support**: `split_lines_with_endings()` tracks exact byte lengths per line
-- **TUI Refactoring**: Extracted TUI functionality into dedicated `ck-tui` crate (3,084 lines)
-- **Modular Architecture**: Clean separation of TUI components with public API
-- **Config Persistence**: TUI preferences saved to `~/.config/ck/tui.json`
-
-### Breaking Changes
-- **Span Construction**: Use `Span::new()` for validated construction instead of struct literals (backward compatible via `Span::new_unchecked()`)
-
 ## [0.5.3] - 2025-09-29
 
 ### Added
@@ -78,9 +29,9 @@ All notable changes to this project will be documented in this file.
 - **Persistent patterns**: Exclusion patterns persist across searches without needing command-line flags each time
 
 ### Fixed
-- **Exclusion pattern persistence** (issue #67): Patterns now persist in `.ckignore` instead of requiring `--exclude` flags on every search
-- **Media file indexing** (issue #66): Images, videos, and other binary files no longer indexed by default
-- **Config file noise** (issue #27): JSON/YAML config files excluded to focus search on actual code
+- **Exclusion pattern persistence** ([#67](https://github.com/BeaconBay/ck/issues/67)): Patterns now persist in `.ckignore` instead of requiring `--exclude` flags on every search
+- **Media file indexing** ([#66](https://github.com/BeaconBay/ck/issues/66)): Images, videos, and other binary files no longer indexed by default
+- **Config file noise** ([#27](https://github.com/BeaconBay/ck/issues/27)): JSON/YAML config files excluded to focus search on actual code
 
 ### Technical
 - **Additive pattern merging**: `.gitignore` + `.ckignore` + CLI + defaults all merge together (not mutually exclusive)
@@ -106,7 +57,7 @@ All notable changes to this project will be documented in this file.
 ### Technical
 - **Atomic file operations**: Uses `tempfile::NamedTempFile` for cross-platform atomic writes with proper sync guarantees
 - **Model registry integration**: Centralized model management with alias support and dimension tracking
-- **Enhanced error messages**: User-friendly error messages with exact commands to resolve issues (e.g., "run `ck --clean .` then rebuild")
+- **Enhanced error messages**: User-friendly error messages with exact commands to resolve issues (e.g., "run `ck --clean .` then rebuild”)
 - **Legacy code cleanup**: Removed 338 lines of unused ANN semantic search implementation
 - **Interrupt handling**: Proper Ctrl+C handling during indexing with graceful cleanup
 
@@ -182,11 +133,6 @@ All notable changes to this project will be documented in this file.
 - **Agent documentation**: Comprehensive README section explaining JSONL benefits over traditional JSON
 - **Agent examples**: Python code demonstrating stream processing patterns for AI workflows
 - **UTF-8 warning suppression**: Eliminated noisy warnings for binary files in .git directories
-- **JSONL output format**: Stream-friendly `--jsonl` flag for AI agent workflows with structured output
-- **No-snippet mode**: `--no-snippet` flag for metadata-only output to reduce bandwidth for agents
-- **Agent documentation**: Comprehensive README section explaining JSONL benefits over traditional JSON
-- **Agent examples**: Python code demonstrating stream processing patterns for AI workflows
-- **UTF-8 warning suppression**: Eliminated noisy warnings for binary files in .git directories
 
 ### Technical
 - **JsonlSearchResult struct**: New agent-friendly output format with conversion methods
@@ -195,11 +141,12 @@ All notable changes to this project will be documented in this file.
 - **Updated help text**: Dedicated JSONL section explaining streaming benefits for agents
 - **Phase 1 PRD**: Complete specification for agent-ready code navigation features
 
-### Why JSONL for AI Agents?
+::: tip Why JSONL for AI Agents?
 - **Streaming friendly**: Process results as they arrive, no waiting for complete response
 - **Memory efficient**: Parse one result at a time, not entire array into memory
-- **Error resilient**: Malformed lines don't break entire response
+- **Error resilient**: Malformed lines don’t break entire response
 - **Standard format**: Used by OpenAI, Anthropic, and modern ML pipelines
+:::
 
 ## [0.3.9] - 2025-09-10
 
@@ -230,7 +177,7 @@ All notable changes to this project will be documented in this file.
 - **Broader text file support**: Now automatically indexes log files (`.log`), config files (`.env`, `.conf`), and any other text format regardless of extension
 - **Improved accuracy**: Files without extensions containing text content are now correctly detected and indexed
 - **Binary file exclusion**: Files containing NUL bytes (executables, images, etc.) are correctly identified as binary and excluded from indexing
-- **Performance**: Fast detection using only the first 8KB of file content, similar to ripgrep's approach
+- **Performance**: Fast detection using only the first 8KB of file content, similar to ripgrep’s approach
 
 ### Technical
 - **Content-based detection**: `is_text_file()` function now reads file content instead of checking against a hardcoded extension allowlist
@@ -241,11 +188,11 @@ All notable changes to this project will be documented in this file.
 ### Fixed
 - **Exclude patterns functionality**: Fixed critical bug where `--exclude` patterns were completely ignored during indexing operations
 - **Directory exclusion**: `--exclude "node_modules"` and similar patterns now work correctly to exclude directories and files
-- **Pattern matching**: Added support for gitignore-style glob patterns using ripgrep's `OverrideBuilder` for consistent, performant exclusion
+- **Pattern matching**: Added support for gitignore-style glob patterns using ripgrep’s `OverrideBuilder` for consistent, performant exclusion
 - **Multiple exclusions**: Fixed support for multiple `--exclude` flags (e.g., `--exclude "node_modules" --exclude "*.log"`)
 
 ### Technical
-- **ripgrep alignment**: Leveraged the `ignore` crate's `OverrideBuilder` for exclude pattern matching, aligning with ripgrep's proven approach
+- **ripgrep alignment**: Leveraged the `ignore` crate’s `OverrideBuilder` for exclude pattern matching, aligning with ripgrep’s proven approach
 - **Streaming integration**: Exclude patterns now work correctly with the new streaming indexing architecture
 - **API consistency**: Updated all indexing functions (`index_directory`, `smart_update_index`, etc.) to support exclude patterns
 
@@ -264,7 +211,7 @@ All notable changes to this project will be documented in this file.
 ### Improved
 - **Enhanced UX for semantic search**: Added intelligent defaults (topk=10, threshold=0.6) for semantic search to reduce cognitive load
 - **Better CLI discoverability**: Added `--limit` as intuitive alias for `--topk` flag
-- **Improved help documentation**: Clear signposting of relevant flags with aligned messaging across examples and descriptions  
+- **Improved help documentation**: Clear signposting of relevant flags with aligned messaging across examples and descriptions
 - **Informational output**: Semantic search now shows current parameters (e.g., "ℹ Semantic search: top 10 results, threshold ≥0.6")
 - **Consistent flag documentation**: Help text now clearly shows defaults and relationships between flags
 
@@ -277,13 +224,13 @@ All notable changes to this project will be documented in this file.
 - **NaN sort handling**: Fixed edge cases with NaN values in similarity scoring that could cause inconsistent results
 
 ### Added
-- **File listing flags**: Added grep-compatible `-l/--files-with-matches` and `-L/--files-without-matches` flags for listing filenames only
+- **File listing flags**: Added grep-compatible `-l/--files-with-matches` and `-L/--files-without-match` flags for listing filenames only
 - **Enhanced visual output**: Implemented sophisticated match highlighting with color-coded similarity heatmaps using RGB gradients
 - **Better user experience**: Added "No matches found" message to stderr when no results are found, improving clarity for users
 - **Improved error handling**: Enhanced directory traversal error handling and graceful degradation for individual file failures
 - **Incremental indexing**: Smart hash-based index updates that only reprocess changed files, dramatically improving index update performance
 
-### Improved  
+### Improved
 - **Indexing strategy optimization**: Smart embedding computation that only processes embeddings when needed for semantic/hybrid search, dramatically improving performance for regex-only workflows
 - **Semantic search v3**: New implementation using pre-computed embeddings from sidecar files with span-based content extraction
 - **Test infrastructure**: Enhanced integration tests with better binary path resolution and more resilient semantic search testing
@@ -316,3 +263,48 @@ All notable changes to this project will be documented in this file.
 - Basic regex, semantic, lexical, and hybrid search modes
 - JSON output format for agent-friendly integration
 - File indexing and sidecar management system
+
+## Version Timeline
+
+| Version | Focus Area | Release Date | Status |
+|---------|-----------|--------------|--------|
+| 0.1.0 | MVP, basic search | 2025-08-30 | ✅ Released |
+| 0.2.0 | Tree-sitter, chunking | 2025-08-30 | ✅ Released |
+| 0.3.x | Incremental indexing | 2025-09-06 | ✅ Released |
+| 0.4.x | Multiple models | 2025-09-13 | ✅ Released |
+| 0.5.x | MCP integration | 2025-09-29 | ✅ Released (current) |
+| 0.6.0 | Config, distribution | TBD | 🚧 Planned |
+| 0.7.0 | Editor integrations | TBD | 📋 Planned |
+| 0.8.0 | Advanced features | TBD | 💭 Conceptual |
+| 1.0.0 | Stability | TBD | 🎯 Goal |
+
+## Breaking Changes Policy
+
+ck follows [Semantic Versioning](https://semver.org/):
+
+- **MAJOR** (1.0.0): Breaking changes to CLI or API
+- **MINOR** (0.X.0): New features, backward compatible
+- **PATCH** (0.0.X): Bug fixes, backward compatible
+
+### Before v1.0
+
+During the 0.x series, minor versions may introduce breaking changes, but we strive for backward compatibility where possible:
+
+- **CLI compatibility**: We avoid changing existing flags and maintain grep-like behavior
+- **Index format**: Indexes are regenerated automatically when format changes
+- **Output format**: JSON/JSONL structure remains stable; new fields may be added
+
+### v1.0 Stability Goals
+
+Before reaching v1.0, ck will:
+- ✅ Stabilize CLI interface
+- ✅ Finalize MCP tool signatures
+- ✅ Complete core feature set
+- ✅ Achieve production maturity
+- ✅ Document upgrade paths
+
+## See Also
+
+- [Roadmap](/guide/roadmap) — Planned features and timeline
+- [GitHub Releases](https://github.com/BeaconBay/ck/releases) — Download releases
+- [Contributing](/contributing/development) — Help build ck

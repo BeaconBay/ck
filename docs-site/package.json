@@ -1,0 +1,19 @@
+{
+  "name": "ck-docs",
+  "version": "0.5.3",
+  "description": "Documentation site for ck - semantic code search",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "keywords": ["documentation", "vitepress", "ck", "search"],
+  "author": "BeaconBay",
+  "license": "MIT OR Apache-2.0",
+  "packageManager": "pnpm@10.12.4",
+  "devDependencies": {
+    "vitepress": "^1.6.4",
+    "vue": "^3.5.22"
+  }
+}

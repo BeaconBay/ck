@@ -25,3 +25,12 @@ Thumbs.db
 # MCP config files (user-specific)
 .mcp.json
 *mcp_config*.json
+
+# Documentation site (Node.js)
+docs-site/node_modules/
+docs-site/.vitepress/dist/
+docs-site/.vitepress/cache/
+docs-site/.vitepress/.temp
+
+# Claude Code local settings
+.claude/

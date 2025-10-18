@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/Charles/Projects/ck/**)",
+      "Bash(ck:*)",
+      "Bash(pnpm view:*)",
+      "Bash(pnpm list:*)",
+      "Bash(tree:*)",
+      "WebSearch"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
