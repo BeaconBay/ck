@@ -5,6 +5,7 @@
 [![Downloads](https://img.shields.io/crates/d/ck-search.svg)](https://crates.io/crates/ck-search)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
 [![MSRV](https://img.shields.io/badge/rust-1.88%2B-blue.svg)](https://www.rust-lang.org)
+[![Documentation](https://img.shields.io/badge/docs-beaconbay.github.io%2Fck-blue)](https://beaconbay.github.io/ck/)
 
 **ck (seek)** finds code by meaning, not just keywords. It's grep that understands what you're looking for — search for "error handling" and find try/catch blocks, error returns, and exception handling code even when those exact words aren't present.
 
@@ -26,6 +27,8 @@ ck -R "TODO|FIXME" .
 # Combine both: semantic relevance + keyword filtering
 ck --hybrid "connection timeout" src/
 ```
+
+> **📚 [Full Documentation](https://beaconbay.github.io/ck/)** — Installation guides, tutorials, feature deep-dives, and API reference
 
 ## ✨ Headline Features
 
