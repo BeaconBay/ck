@@ -430,7 +430,7 @@ fn regex_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
         // Use ck_index's collect_files which respects gitignore
         let file_options = ck_core::FileCollectionOptions {
             respect_gitignore: options.respect_gitignore,
-            use_ckignore: true,
+            use_ckignore: options.use_ckignore,
             exclude_patterns: options.exclude_patterns.clone(),
         };
         let collected = ck_index::collect_files(&options.path, &file_options)?;
