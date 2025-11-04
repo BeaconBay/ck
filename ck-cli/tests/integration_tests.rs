@@ -821,3 +821,66 @@ fn test_add_file_with_relative_path() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("Relative path content"));
 }
+
+#[test]
+#[serial]
+fn test_no_ckignore_flag_disables_hierarchical_ignore() {
+    let temp_dir = TempDir::new().unwrap();
+    let parent = temp_dir.path();
+    let subdir = parent.join("subdir");
+    fs::create_dir(&subdir).unwrap();
+
+    // Create .ckignore at parent level excluding *.tmp files
+    fs::write(parent.join(".ckignore"), "*.tmp\n").unwrap();
+
+    // Create test files with easily searchable pattern
+    fs::write(parent.join("test.txt"), "FINDME_TEXT").unwrap();
+    fs::write(parent.join("ignored.tmp"), "FINDME_TMP").unwrap();
+    fs::write(subdir.join("nested.txt"), "FINDME_TEXT").unwrap();
+    fs::write(subdir.join("also_ignored.tmp"), "FINDME_TMP").unwrap();
+
+    // Test WITH --no-ckignore flag - .tmp files should be INCLUDED
+    // Using -r for recursive grep-style search (no indexing needed)
+    let output = Command::new(ck_binary())
+        .args(["-r", "--no-ckignore", "FINDME", "."])
+        .current_dir(parent)
+        .output()
+        .expect("Failed to run ck search --no-ckignore");
+
+    assert!(
+        output.status.success(),
+        "Search with --no-ckignore failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // With --no-ckignore, should find .tmp files
+    assert!(
+        stdout.contains("ignored.tmp") || stdout.contains("also_ignored.tmp"),
+        "Should find .tmp files when --no-ckignore is used. Output: {}",
+        stdout
+    );
+
+    // Test WITHOUT --no-ckignore flag (default behavior) - .tmp files should be EXCLUDED
+    let output = Command::new(ck_binary())
+        .args(["-r", "FINDME", "."])
+        .current_dir(parent)
+        .output()
+        .expect("Failed to run ck search");
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    // Without --no-ckignore (default), should NOT find .tmp files
+    assert!(
+        !stdout.contains("ignored.tmp") && !stdout.contains("also_ignored.tmp"),
+        "Should NOT find .tmp files when .ckignore is active (default). Output: {}",
+        stdout
+    );
+
+    // Should still find .txt files
+    assert!(
+        stdout.contains("test.txt") || stdout.contains("nested.txt"),
+        "Should find .txt files even with .ckignore active"
+    );
+}
