@@ -567,10 +567,7 @@ pub fn create_ckignore_if_missing(repo_root: &Path) -> Result<bool> {
 ///
 /// # Returns
 /// Combined list of exclusion patterns
-pub fn build_exclude_patterns(
-    additional_excludes: &[String],
-    use_defaults: bool,
-) -> Vec<String> {
+pub fn build_exclude_patterns(additional_excludes: &[String], use_defaults: bool) -> Vec<String> {
     let mut patterns = Vec::new();
 
     // 1. Add additional exclude patterns (e.g., from command-line)

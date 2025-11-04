@@ -19,6 +19,74 @@ All notable changes to ck are documented here following [Semantic Versioning](ht
 - **Node.js integration**: Documentation site uses Node.js 18+, pnpm 10+, and VitePress 1.6+ for modern documentation experience
 - **GitHub integration**: Edit links and social links configured for easy contribution
 
+## [0.7.1] - 2025-11-05
+
+### Fixed
+- **Hierarchical .ckignore support**: Fixed MCP daemon subdirectory search failures and indexing performance issues by implementing proper hierarchical .ckignore file loading using WalkBuilder's custom ignore filename support ([#84](https://github.com/BeaconBay/ck/pull/84))
+- **Subdirectory search**: MCP searches in subdirectories now correctly respect parent directories' .ckignore files, matching .gitignore behavior
+- **Indexing performance**: Eliminated repeated indexing of ignored files, significantly improving indexing speed in large repositories
+
+### Technical
+- **FileCollectionOptions refactor**: Replaced parameter threading anti-pattern with unified config struct for cleaner architecture
+- **WalkBuilder integration**: Configured with `.add_custom_ignore_filename(".ckignore")` for hierarchical ignore file support
+- **CLI flag addition**: Added `--no-ckignore` flag to disable .ckignore support when needed
+- **Test coverage**: Added regression test `test_subdirectory_search_uses_parent_ckignore` to prevent future regressions
+- **Dependencies**: Bumped vite from 5.4.20 to 5.4.21 in docs-site ([#82](https://github.com/BeaconBay/ck/pull/82))
+
+## [0.7.0] - 2025-10-13
+
+### Added
+- **Chunk-level incremental indexing**: Smart caching system that reuses embeddings for unchanged chunks, dramatically improving reindexing performance (80-90% cache hit rate for typical code changes)
+- **Content-aware cache invalidation**: Hash-based invalidation using blake3(chunk_text + leading_trivia + trailing_trivia) ensures doc comment and whitespace changes properly invalidate cache
+- **Model compatibility enforcement**: Prevents silent embedding corruption by validating model consistency across indexing operations with clear error messages and recovery guidance
+- **Chunk hash versioning**: Manifest tracking of hash scheme version (v2) for future compatibility and reliable version detection
+
+### Performance
+- **Selective re-embedding**: Only changed chunks are re-embedded; unchanged chunks reuse cached embeddings from previous index
+- **Cache hit validation**: Both hash match AND dimension match required before reusing cached embeddings
+- **Typical performance**: For code changes affecting 10-20% of file chunks, 80-90% of embeddings are reused from cache
+
+### Technical
+- **Blake3 hashing**: Fast cryptographic hashing of chunk content including all trivia for reliable change detection
+- **Sidecar-based cache**: Old sidecars loaded into memory to build chunk_hash → embedding cache for efficient lookup
+- **Model validation**: Index operations validate embedding model matches existing index and return actionable errors on mismatch
+- **Backward compatibility**: Existing manifests auto-upgrade to chunk_hash_version v2 on load
+- **Comprehensive testing**: All 181 tests passing with full coverage of cache invalidation, model validation, and version tracking
+
+## [0.6.0] - 2025-10-12
+
+### Added
+- **MCP Server**: Full Model Context Protocol implementation with stdio transport for AI agent integration
+- **Pagination Support**: Cursor-based pagination for all search modes (page_size: 1-200, default: 50)
+- **Session Management**: TTL-based session cleanup for paginated results with automatic expiration (60s)
+- **MCP Search Tools**: `semantic_search`, `regex_search`, `hybrid_search`, `lexical_search` with unified interface
+- **MCP Index Tools**: `index_status`, `reindex`, `health_check` for index management
+- **CLI Heatmap Visualization**: Color-coded similarity scores with RGB gradient highlighting (red→yellow→green)
+- **Enhanced Visual Output**: Unicode box drawing and sophisticated match highlighting in CLI
+- **Near-Miss Tracking**: Track closest result below threshold for better search feedback
+- **Fallback Strategies**: Automatic fallback from semantic to lexical search when embeddings unavailable
+- **Graceful Error Handling**: Skip stale index entries when files no longer exist
+
+### Fixed
+- **Mixed Line Endings**: Proper handling of Unix (\n), Windows (\r\n), and Mac (\r) line endings
+- **Span Validation**: Prevent invalid spans with zero line numbers using `Span::new()` validation
+- **Streaming File Operations**: Memory-efficient line extraction without loading entire files
+- **PDF Content Resolution**: Better content path resolution and caching for PDF files
+
+### Technical
+- **MCP Protocol**: Full implementation with tool discovery, validation, and error handling
+- **Session Cleanup**: LRU-based eviction with periodic cleanup task (every 30s)
+- **Streaming Reads**: Optimized `extract_lines_from_file()` for minimal memory footprint
+- **SearchResults Enhancement**: Added `closest_below_threshold` field for improved UX
+- **Comprehensive Testing**: 7 new MCP integration tests covering pagination, validation, and edge cases
+- **Line Ending Support**: `split_lines_with_endings()` tracks exact byte lengths per line
+- **TUI Refactoring**: Extracted TUI functionality into dedicated `ck-tui` crate (3,084 lines)
+- **Modular Architecture**: Clean separation of TUI components with public API
+- **Config Persistence**: TUI preferences saved to `~/.config/ck/tui.json`
+
+### Breaking Changes
+- **Span Construction**: Use `Span::new()` for validated construction instead of struct literals (backward compatible via `Span::new_unchecked()`)
+
 ## [0.5.3] - 2025-09-29
 
 ### Added
@@ -272,10 +340,12 @@ All notable changes to ck are documented here following [Semantic Versioning](ht
 | 0.2.0 | Tree-sitter, chunking | 2025-08-30 | ✅ Released |
 | 0.3.x | Incremental indexing | 2025-09-06 | ✅ Released |
 | 0.4.x | Multiple models | 2025-09-13 | ✅ Released |
-| 0.5.x | MCP integration | 2025-09-29 | ✅ Released (current) |
-| 0.6.0 | Config, distribution | TBD | 🚧 Planned |
-| 0.7.0 | Editor integrations | TBD | 📋 Planned |
-| 0.8.0 | Advanced features | TBD | 💭 Conceptual |
+| 0.5.x | .ckignore support | 2025-09-29 | ✅ Released |
+| 0.6.0 | MCP Server, pagination | 2025-10-12 | ✅ Released |
+| 0.7.0 | Chunk-level indexing | 2025-10-13 | ✅ Released |
+| 0.7.1 | .ckignore fixes | 2025-11-05 | ✅ Released (current) |
+| 0.8.0 | Editor integrations | TBD | 🚧 Planned |
+| 0.9.0 | Advanced features | TBD | 💭 Conceptual |
 | 1.0.0 | Stability | TBD | 🎯 Goal |
 
 ## Breaking Changes Policy

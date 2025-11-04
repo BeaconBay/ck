@@ -1728,7 +1728,11 @@ mod tests {
 
         // Create test files in subdirectory
         fs::write(subdir.join("nested.txt"), "searchable content in subdir").unwrap();
-        fs::write(subdir.join("also_ignored.tmp"), "this should not be indexed either").unwrap();
+        fs::write(
+            subdir.join("also_ignored.tmp"),
+            "this should not be indexed either",
+        )
+        .unwrap();
 
         // First, search from parent to create the index
         let parent_options = SearchOptions {
@@ -1760,7 +1764,8 @@ mod tests {
         let results = search(&subdir_options).await.unwrap();
 
         // ASSERTION 1: .tmp files should be excluded (currently FAILS due to bug)
-        let tmp_files: Vec<_> = results.iter()
+        let tmp_files: Vec<_> = results
+            .iter()
             .filter(|r| r.file.to_string_lossy().ends_with(".tmp"))
             .collect();
         assert!(
@@ -1771,12 +1776,8 @@ mod tests {
         );
 
         // ASSERTION 2: Should find .txt files in subdirectory
-        let txt_in_subdir = results.iter()
-            .any(|r| r.file.ends_with("nested.txt"));
-        assert!(
-            txt_in_subdir,
-            "Should find nested.txt in subdirectory"
-        );
+        let txt_in_subdir = results.iter().any(|r| r.file.ends_with("nested.txt"));
+        assert!(txt_in_subdir, "Should find nested.txt in subdirectory");
 
         // ASSERTION 3: No .ck directory should be created in subdirectory
         assert!(
