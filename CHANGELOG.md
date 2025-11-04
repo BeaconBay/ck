@@ -14,6 +14,20 @@ All notable changes to this project will be documented in this file.
 - **Node.js integration**: Documentation site uses Node.js 18+, pnpm 10+, and VitePress 1.6+ for modern documentation experience
 - **GitHub integration**: Edit links and social links configured for easy contribution
 
+## [0.7.1] - 2025-11-05
+
+### Fixed
+- **Hierarchical .ckignore support**: Fixed MCP daemon subdirectory search failures and indexing performance issues by implementing proper hierarchical .ckignore file loading using WalkBuilder's custom ignore filename support (PR #84)
+- **Subdirectory search**: MCP searches in subdirectories now correctly respect parent directories' .ckignore files, matching .gitignore behavior
+- **Indexing performance**: Eliminated repeated indexing of ignored files, significantly improving indexing speed in large repositories
+
+### Technical
+- **FileCollectionOptions refactor**: Replaced parameter threading anti-pattern with unified config struct for cleaner architecture
+- **WalkBuilder integration**: Configured with `.add_custom_ignore_filename(".ckignore")` for hierarchical ignore file support
+- **CLI flag addition**: Added `--no-ckignore` flag to disable .ckignore support when needed
+- **Test coverage**: Added regression test `test_subdirectory_search_uses_parent_ckignore` to prevent future regressions
+- **Dependencies**: Bumped vite from 5.4.20 to 5.4.21 in docs-site (PR #82)
+
 ## [0.7.0] - 2025-10-13
 
 ### Added

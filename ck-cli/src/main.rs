@@ -448,10 +448,7 @@ fn find_search_root(include_patterns: &[IncludePattern]) -> PathBuf {
 fn build_exclude_patterns(cli: &Cli) -> Vec<String> {
     // Use the centralized pattern builder from ck-core
     // Note: .ckignore handling is now done by WalkBuilder via the use_ckignore parameter
-    ck_core::build_exclude_patterns(
-        &cli.exclude,
-        !cli.no_default_excludes,
-    )
+    ck_core::build_exclude_patterns(&cli.exclude, !cli.no_default_excludes)
 }
 
 fn resolve_model_selection(
@@ -1414,7 +1411,7 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
     Ok(())
 }
 
-fn build_options(cli: &Cli, reindex: bool, repo_root: Option<&Path>) -> SearchOptions {
+fn build_options(cli: &Cli, reindex: bool, _repo_root: Option<&Path>) -> SearchOptions {
     let mode = if cli.semantic {
         SearchMode::Semantic
     } else if cli.lexical {

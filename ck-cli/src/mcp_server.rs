@@ -999,10 +999,8 @@ impl CkMcpServer {
 
         let respect_gitignore = request.respect_gitignore.unwrap_or(true);
         let use_default_excludes = request.use_default_excludes.unwrap_or(true);
-        let exclude_patterns = resolve_exclude_patterns(
-            request.exclude_patterns.clone(),
-            Some(use_default_excludes),
-        );
+        let exclude_patterns =
+            resolve_exclude_patterns(request.exclude_patterns.clone(), Some(use_default_excludes));
         let include_patterns = resolve_include_patterns(
             &search_root,
             request.include_patterns.clone(),
@@ -1240,10 +1238,8 @@ impl CkMcpServer {
 
         let respect_gitignore = request.respect_gitignore.unwrap_or(true);
         let use_default_excludes = request.use_default_excludes.unwrap_or(true);
-        let exclude_patterns = resolve_exclude_patterns(
-            request.exclude_patterns.clone(),
-            Some(use_default_excludes),
-        );
+        let exclude_patterns =
+            resolve_exclude_patterns(request.exclude_patterns.clone(), Some(use_default_excludes));
         let include_patterns = resolve_include_patterns(
             &search_root,
             request.include_patterns.clone(),
@@ -1375,10 +1371,8 @@ impl CkMcpServer {
 
         let respect_gitignore = request.respect_gitignore.unwrap_or(true);
         let use_default_excludes = request.use_default_excludes.unwrap_or(true);
-        let exclude_patterns = resolve_exclude_patterns(
-            request.exclude_patterns.clone(),
-            Some(use_default_excludes),
-        );
+        let exclude_patterns =
+            resolve_exclude_patterns(request.exclude_patterns.clone(), Some(use_default_excludes));
         let include_patterns = resolve_include_patterns(
             &search_root,
             request.include_patterns.clone(),
@@ -1511,10 +1505,8 @@ impl CkMcpServer {
 
         let respect_gitignore = request.respect_gitignore.unwrap_or(true);
         let use_default_excludes = request.use_default_excludes.unwrap_or(true);
-        let exclude_patterns = resolve_exclude_patterns(
-            request.exclude_patterns.clone(),
-            Some(use_default_excludes),
-        );
+        let exclude_patterns =
+            resolve_exclude_patterns(request.exclude_patterns.clone(), Some(use_default_excludes));
         let include_patterns = resolve_include_patterns(
             &search_root,
             request.include_patterns.clone(),

@@ -213,9 +213,7 @@ pub fn collect_files(
         let combined_overrides = build_overrides(path, &all_patterns)?;
 
         let mut walker_builder = WalkBuilder::new(path);
-        walker_builder
-            .git_ignore(false)
-            .hidden(true);
+        walker_builder.git_ignore(false).hidden(true);
 
         // Add .ckignore support even without gitignore
         if options.use_ckignore {
