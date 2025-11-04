@@ -445,12 +445,11 @@ fn find_search_root(include_patterns: &[IncludePattern]) -> PathBuf {
     }
 }
 
-fn build_exclude_patterns(cli: &Cli, repo_root: Option<&Path>) -> Vec<String> {
+fn build_exclude_patterns(cli: &Cli) -> Vec<String> {
     // Use the centralized pattern builder from ck-core
+    // Note: .ckignore handling is now done by WalkBuilder via the use_ckignore parameter
     ck_core::build_exclude_patterns(
-        repo_root,
         &cli.exclude,
-        !cli.no_ckignore,
         !cli.no_default_excludes,
     )
 }
@@ -537,7 +536,7 @@ async fn run_index_workflow(
         status.info("📄 Created .ckignore with default patterns");
     }
 
-    let exclude_patterns = build_exclude_patterns(cli, Some(path));
+    let exclude_patterns = build_exclude_patterns(cli);
 
     if clean_first {
         let index_dir = path.join(".ck");
@@ -633,6 +632,7 @@ async fn run_index_workflow(
 
     let file_options = ck_core::FileCollectionOptions {
         respect_gitignore: !cli.no_ignore,
+        use_ckignore: !cli.no_ckignore,
         exclude_patterns: exclude_patterns.clone(),
     };
     let index_future = ck_index::smart_update_index_with_detailed_progress(
@@ -1074,11 +1074,12 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
             status.info(&format!("Scanning for orphans in {}", clean_path.display()));
 
             // Build exclusion patterns using unified builder
-            let exclude_patterns = build_exclude_patterns(&cli, Some(&clean_path));
+            let exclude_patterns = build_exclude_patterns(&cli);
 
             let cleanup_spinner = status.create_spinner("Removing orphaned entries...");
             let file_options = ck_core::FileCollectionOptions {
                 respect_gitignore: !cli.no_ignore,
+                use_ckignore: !cli.no_ckignore,
                 exclude_patterns: exclude_patterns.clone(),
             };
             let cleanup_stats = ck_index::cleanup_index(&clean_path, &file_options)?;
@@ -1429,7 +1430,7 @@ fn build_options(cli: &Cli, reindex: bool, repo_root: Option<&Path>) -> SearchOp
     let after_context = cli.after_context.unwrap_or(context);
 
     // Use the unified pattern builder
-    let exclude_patterns = build_exclude_patterns(cli, repo_root);
+    let exclude_patterns = build_exclude_patterns(cli);
 
     // Set intelligent defaults for semantic search
     let default_topk = match mode {
@@ -1466,6 +1467,7 @@ fn build_options(cli: &Cli, reindex: bool, repo_root: Option<&Path>) -> SearchOp
         exclude_patterns,
         include_patterns: Vec::new(),
         respect_gitignore: !cli.no_ignore,
+        use_ckignore: !cli.no_ckignore,
         full_section: cli.full_section,
         // Enhanced embedding options (search-time only)
         rerank: cli.rerank,
@@ -1876,6 +1878,7 @@ mod tests {
             case_insensitive: false,
             fixed_string: false,
             whole_word: false,
+            use_ckignore: true,
             ..Default::default()
         };
 
@@ -1894,6 +1897,7 @@ mod tests {
             case_insensitive: false,
             fixed_string: false,
             whole_word: false,
+            use_ckignore: true,
             ..Default::default()
         };
 

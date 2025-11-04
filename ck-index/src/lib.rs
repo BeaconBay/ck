@@ -186,13 +186,20 @@ pub fn collect_files(
 
     if options.respect_gitignore {
         let overrides = build_overrides(path, &options.exclude_patterns)?;
-        let walker = WalkBuilder::new(path)
+        let mut walker_builder = WalkBuilder::new(path);
+        walker_builder
             .git_ignore(true)
             .git_global(true)
             .git_exclude(true)
-            .hidden(true)
-            .overrides(overrides)
-            .build();
+            .hidden(true);
+
+        // Add .ckignore support (hierarchical, like .gitignore)
+        if options.use_ckignore {
+            walker_builder.add_custom_ignore_filename(".ckignore");
+        }
+
+        walker_builder.overrides(overrides);
+        let walker = walker_builder.build();
 
         Ok(filter_and_collect_files(walker, &index_dir))
     } else {
@@ -205,11 +212,18 @@ pub fn collect_files(
         all_patterns.extend(options.exclude_patterns.iter().cloned());
         let combined_overrides = build_overrides(path, &all_patterns)?;
 
-        let walker = WalkBuilder::new(path)
+        let mut walker_builder = WalkBuilder::new(path);
+        walker_builder
             .git_ignore(false)
-            .hidden(true)
-            .overrides(combined_overrides)
-            .build();
+            .hidden(true);
+
+        // Add .ckignore support even without gitignore
+        if options.use_ckignore {
+            walker_builder.add_custom_ignore_filename(".ckignore");
+        }
+
+        walker_builder.overrides(combined_overrides);
+        let walker = walker_builder.build();
 
         Ok(filter_and_collect_files(walker, &index_dir))
     }
@@ -1816,6 +1830,7 @@ mod tests {
 
         let file_options = ck_core::FileCollectionOptions {
             respect_gitignore: true,
+            use_ckignore: true,
             exclude_patterns: vec![],
         };
 
@@ -1877,6 +1892,7 @@ mod tests {
         // Cleanup should remove orphaned entry
         let file_options = ck_core::FileCollectionOptions {
             respect_gitignore: true,
+            use_ckignore: true,
             exclude_patterns: vec![],
         };
         let stats = cleanup_index(test_path, &file_options).unwrap();

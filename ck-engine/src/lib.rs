@@ -430,6 +430,7 @@ fn regex_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
         // Use ck_index's collect_files which respects gitignore
         let file_options = ck_core::FileCollectionOptions {
             respect_gitignore: options.respect_gitignore,
+            use_ckignore: true,
             exclude_patterns: options.exclude_patterns.clone(),
         };
         let collected = ck_index::collect_files(&options.path, &file_options)?;
@@ -1705,5 +1706,82 @@ mod tests {
         let (no_lines, no_endings_vec) = split_lines_with_endings(no_endings);
         assert_eq!(no_lines, vec!["single line"]);
         assert_eq!(no_endings_vec, vec![0]);
+    }
+
+    #[tokio::test]
+    async fn test_subdirectory_search_uses_parent_ckignore() {
+        // Regression test for issue where searching in subdirectory doesn't use parent .ckignore
+        // Bug: When searching ~/parent/subdir/, .ckignore is loaded from subdir (doesn't exist)
+        // instead of from parent (where index and .ckignore live)
+
+        let temp_dir = TempDir::new().unwrap();
+        let parent = temp_dir.path();
+        let subdir = parent.join("subproject");
+        fs::create_dir(&subdir).unwrap();
+
+        // Create .ckignore at parent level excluding *.tmp files
+        fs::write(parent.join(".ckignore"), "*.tmp\n").unwrap();
+
+        // Create test files in parent directory
+        fs::write(parent.join("parent.txt"), "searchable content in parent").unwrap();
+        fs::write(parent.join("ignored.tmp"), "this should not be indexed").unwrap();
+
+        // Create test files in subdirectory
+        fs::write(subdir.join("nested.txt"), "searchable content in subdir").unwrap();
+        fs::write(subdir.join("also_ignored.tmp"), "this should not be indexed either").unwrap();
+
+        // First, search from parent to create the index
+        let parent_options = SearchOptions {
+            mode: SearchMode::Semantic,
+            query: "searchable".to_string(),
+            path: parent.to_path_buf(),
+            top_k: Some(10),
+            threshold: Some(0.1),
+            ..Default::default()
+        };
+
+        let _ = search(&parent_options).await;
+
+        // Give indexing a moment to complete
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Now search from SUBDIRECTORY - this is where the bug occurs
+        // The engine should find parent .ck index and use parent .ckignore
+        // But currently it loads .ckignore from subdir (doesn't exist)
+        let subdir_options = SearchOptions {
+            mode: SearchMode::Semantic,
+            query: "content".to_string(),
+            path: subdir.clone(),
+            top_k: Some(10),
+            threshold: Some(0.1),
+            ..Default::default()
+        };
+
+        let results = search(&subdir_options).await.unwrap();
+
+        // ASSERTION 1: .tmp files should be excluded (currently FAILS due to bug)
+        let tmp_files: Vec<_> = results.iter()
+            .filter(|r| r.file.to_string_lossy().ends_with(".tmp"))
+            .collect();
+        assert!(
+            tmp_files.is_empty(),
+            "Bug: .tmp files were indexed despite parent .ckignore. Found {} .tmp files: {:?}",
+            tmp_files.len(),
+            tmp_files.iter().map(|r| &r.file).collect::<Vec<_>>()
+        );
+
+        // ASSERTION 2: Should find .txt files in subdirectory
+        let txt_in_subdir = results.iter()
+            .any(|r| r.file.ends_with("nested.txt"));
+        assert!(
+            txt_in_subdir,
+            "Should find nested.txt in subdirectory"
+        );
+
+        // ASSERTION 3: No .ck directory should be created in subdirectory
+        assert!(
+            !subdir.join(".ck").exists(),
+            "Should not create .ck directory in subdirectory"
+        );
     }
 }

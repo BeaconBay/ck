@@ -53,6 +53,7 @@ impl McpContext {
             exclude_patterns: get_default_exclude_patterns(),
             include_patterns: Vec::new(),
             respect_gitignore: true,
+            use_ckignore: true,
             full_section: false,
             rerank: false,
             rerank_model: None,

@@ -294,6 +294,8 @@ pub struct IncludePattern {
 pub struct FileCollectionOptions {
     /// Whether to respect .gitignore files
     pub respect_gitignore: bool,
+    /// Whether to respect .ckignore files hierarchically
+    pub use_ckignore: bool,
     /// Patterns to exclude files/directories
     pub exclude_patterns: Vec<String>,
 }
@@ -302,6 +304,7 @@ impl From<&SearchOptions> for FileCollectionOptions {
     fn from(opts: &SearchOptions) -> Self {
         Self {
             respect_gitignore: opts.respect_gitignore,
+            use_ckignore: true, // Always use .ckignore for hierarchical ignore support
             exclude_patterns: opts.exclude_patterns.clone(),
         }
     }
@@ -333,6 +336,7 @@ pub struct SearchOptions {
     pub exclude_patterns: Vec<String>,
     pub include_patterns: Vec<IncludePattern>,
     pub respect_gitignore: bool,
+    pub use_ckignore: bool,
     pub full_section: bool,
     // Enhanced embedding options (search-time only)
     pub rerank: bool,
@@ -389,6 +393,7 @@ impl Default for SearchOptions {
             exclude_patterns: get_default_exclude_patterns(),
             include_patterns: Vec::new(),
             respect_gitignore: true,
+            use_ckignore: true,
             full_section: false,
             // Enhanced embedding options (search-time only)
             rerank: false,
@@ -546,40 +551,33 @@ pub fn create_ckignore_if_missing(repo_root: &Path) -> Result<bool> {
 /// This centralizes the pattern building logic used across CLI, TUI, and MCP interfaces
 /// to prevent drift and ensure consistent behavior.
 ///
-/// Priority order (highest to lowest):
-/// 1. .ckignore patterns (if use_ckignore is true)
-/// 2. Additional excludes (from command-line or API calls)
-/// 3. Default patterns (if use_defaults is true)
+/// Builds exclusion patterns for file collection by combining command-line
+/// excludes with default patterns. .ckignore files are now handled separately
+/// by WalkBuilder's hierarchical ignore system.
+///
+/// Priority order:
+/// 1. Additional excludes (from command-line or API calls)
+/// 2. Default patterns (if use_defaults is true)
+///
+/// Note: .ckignore files are loaded hierarchically by WalkBuilder, not here.
 ///
 /// # Arguments
-/// * `repo_root` - Optional repository root for loading .ckignore file
 /// * `additional_excludes` - Additional exclusion patterns (e.g., from CLI flags)
-/// * `use_ckignore` - Whether to load and include .ckignore patterns
 /// * `use_defaults` - Whether to include default exclusion patterns
 ///
 /// # Returns
-/// Combined list of exclusion patterns in priority order
+/// Combined list of exclusion patterns
 pub fn build_exclude_patterns(
-    repo_root: Option<&Path>,
     additional_excludes: &[String],
-    use_ckignore: bool,
     use_defaults: bool,
 ) -> Vec<String> {
     let mut patterns = Vec::new();
 
-    // 1. Load .ckignore patterns (highest priority among additional patterns)
-    if use_ckignore
-        && let Some(root) = repo_root
-        && let Ok(ckignore_patterns) = read_ckignore_patterns(root)
-        && !ckignore_patterns.is_empty()
-    {
-        patterns.extend(ckignore_patterns);
-    }
-
-    // 2. Add additional exclude patterns (e.g., from command-line)
+    // 1. Add additional exclude patterns (e.g., from command-line)
     patterns.extend(additional_excludes.iter().cloned());
 
-    // 3. Add defaults (lowest priority)
+    // 2. Add defaults (lowest priority)
+    // Note: .ckignore files are now handled hierarchically by WalkBuilder
     if use_defaults {
         patterns.extend(get_default_exclude_patterns());
     }

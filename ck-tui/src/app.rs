@@ -544,10 +544,9 @@ impl TuiApp {
         };
 
         // Use the centralized pattern builder from ck-core
+        // Note: .ckignore handling is now done by WalkBuilder hierarchically
         let exclude_patterns = ck_core::build_exclude_patterns(
-            Some(&self.state.search_path),
             &[],  // No additional excludes in TUI
-            true, // Use .ckignore
             true, // Use defaults
         );
 
@@ -576,6 +575,7 @@ impl TuiApp {
             exclude_patterns,
             include_patterns: Vec::new(),
             respect_gitignore: true,
+            use_ckignore: true,
             full_section: false,
             rerank: false,
             rerank_model: None,
