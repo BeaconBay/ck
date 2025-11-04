@@ -1785,4 +1785,91 @@ mod tests {
             "Should not create .ck directory in subdirectory"
         );
     }
+
+    #[tokio::test]
+    async fn test_multiple_ckignore_files_merge_correctly() {
+        // Test that multiple .ckignore files in the hierarchy are all applied
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let parent = temp_dir.path();
+        let subdir = parent.join("subdir");
+        let deeper = subdir.join("deeper");
+        fs::create_dir(&subdir).unwrap();
+        fs::create_dir(&deeper).unwrap();
+
+        // Create hierarchical .ckignore files
+        fs::write(parent.join(".ckignore"), "*.log\n").unwrap();
+        fs::write(subdir.join(".ckignore"), "*.tmp\n").unwrap();
+        fs::write(deeper.join(".ckignore"), "*.cache\n").unwrap();
+
+        // Create test files at each level
+        fs::write(parent.join("root.txt"), "searchable").unwrap();
+        fs::write(parent.join("root.log"), "should be ignored").unwrap();
+
+        fs::write(subdir.join("mid.txt"), "searchable").unwrap();
+        fs::write(subdir.join("mid.log"), "should be ignored by parent").unwrap();
+        fs::write(subdir.join("mid.tmp"), "should be ignored by local").unwrap();
+
+        fs::write(deeper.join("deep.txt"), "searchable").unwrap();
+        fs::write(deeper.join("deep.log"), "should be ignored by grandparent").unwrap();
+        fs::write(deeper.join("deep.tmp"), "should be ignored by parent").unwrap();
+        fs::write(deeper.join("deep.cache"), "should be ignored by local").unwrap();
+
+        // Index from parent
+        let parent_options = SearchOptions {
+            mode: SearchMode::Semantic,
+            query: "searchable".to_string(),
+            path: parent.to_path_buf(),
+            top_k: Some(20),
+            threshold: Some(0.1),
+            ..Default::default()
+        };
+
+        let _ = search(&parent_options).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Search from deeper directory - should respect ALL three .ckignore files
+        let deeper_options = SearchOptions {
+            mode: SearchMode::Semantic,
+            query: "ignored".to_string(),
+            path: deeper.clone(),
+            top_k: Some(20),
+            threshold: Some(0.1),
+            ..Default::default()
+        };
+
+        let results = search(&deeper_options).await.unwrap();
+
+        // All ignored files should be excluded
+        let has_log = results
+            .iter()
+            .any(|r| r.file.to_string_lossy().ends_with(".log"));
+        let has_tmp = results
+            .iter()
+            .any(|r| r.file.to_string_lossy().ends_with(".tmp"));
+        let has_cache = results
+            .iter()
+            .any(|r| r.file.to_string_lossy().ends_with(".cache"));
+
+        assert!(
+            !has_log,
+            "*.log files should be excluded by parent .ckignore"
+        );
+        assert!(
+            !has_tmp,
+            "*.tmp files should be excluded by subdir .ckignore"
+        );
+        assert!(
+            !has_cache,
+            "*.cache files should be excluded by deeper .ckignore"
+        );
+
+        // Should still find .txt files
+        let has_txt = results
+            .iter()
+            .any(|r| r.file.to_string_lossy().ends_with(".txt"));
+        assert!(has_txt, "Should find .txt files (not ignored)");
+    }
 }

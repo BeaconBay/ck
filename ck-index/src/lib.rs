@@ -2014,6 +2014,78 @@ mod tests {
         assert!(!test_path.join("level1").join("level2").exists());
         assert!(!test_path.join("level1").exists());
     }
+
+    #[test]
+    fn test_ckignore_works_without_gitignore() {
+        // Test that .ckignore is respected even when respect_gitignore is false
+        let temp_dir = TempDir::new().unwrap();
+        let test_path = temp_dir.path();
+
+        // Create .gitignore and .ckignore with different patterns
+        fs::write(test_path.join(".gitignore"), "*.git\n").unwrap();
+        fs::write(test_path.join(".ckignore"), "*.ck\n").unwrap();
+
+        // Create test files
+        fs::write(test_path.join("normal.txt"), "normal content").unwrap();
+        fs::write(test_path.join("ignored_by_git.git"), "git ignored").unwrap();
+        fs::write(test_path.join("ignored_by_ck.ck"), "ck ignored").unwrap();
+
+        // Test with respect_gitignore=false, use_ckignore=true
+        let options = ck_core::FileCollectionOptions {
+            respect_gitignore: false,
+            use_ckignore: true,
+            exclude_patterns: vec![],
+        };
+
+        let files = collect_files(test_path, &options).unwrap();
+        let file_names: Vec<String> = files
+            .iter()
+            .filter_map(|p| p.file_name())
+            .map(|n| n.to_string_lossy().to_string())
+            .collect();
+
+        // Should find normal.txt
+        assert!(
+            file_names.contains(&"normal.txt".to_string()),
+            "Should find normal.txt"
+        );
+
+        // Should find .git file (gitignore not respected)
+        assert!(
+            file_names.contains(&"ignored_by_git.git".to_string()),
+            "Should find .git file when respect_gitignore=false"
+        );
+
+        // Should NOT find .ck file (ckignore is respected)
+        assert!(
+            !file_names.contains(&"ignored_by_ck.ck".to_string()),
+            "Should NOT find .ck file when use_ckignore=true"
+        );
+
+        // Test with both disabled
+        let options_both_disabled = ck_core::FileCollectionOptions {
+            respect_gitignore: false,
+            use_ckignore: false,
+            exclude_patterns: vec![],
+        };
+
+        let files_all = collect_files(test_path, &options_both_disabled).unwrap();
+        let file_names_all: Vec<String> = files_all
+            .iter()
+            .filter_map(|p| p.file_name())
+            .map(|n| n.to_string_lossy().to_string())
+            .collect();
+
+        // Should find ALL files when both are disabled
+        assert!(
+            file_names_all.contains(&"ignored_by_git.git".to_string()),
+            "Should find .git file"
+        );
+        assert!(
+            file_names_all.contains(&"ignored_by_ck.ck".to_string()),
+            "Should find .ck file when use_ckignore=false"
+        );
+    }
 }
 
 // ============================================================================

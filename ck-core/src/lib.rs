@@ -1411,4 +1411,94 @@ mod tests {
         // Check for issue reference
         assert!(content.contains("issue #27"));
     }
+
+    #[test]
+    fn test_build_exclude_patterns_with_defaults() {
+        // Test with defaults enabled
+        let additional = vec!["*.custom".to_string(), "temp/".to_string()];
+        let patterns = build_exclude_patterns(&additional, true);
+
+        // Should include additional patterns
+        assert!(patterns.contains(&"*.custom".to_string()));
+        assert!(patterns.contains(&"temp/".to_string()));
+
+        // Should include default patterns (from get_default_exclude_patterns)
+        assert!(patterns.iter().any(|p| p.contains(".git")));
+        assert!(patterns.iter().any(|p| p.contains("node_modules")));
+
+        // Additional patterns should come before defaults
+        let custom_idx = patterns.iter().position(|p| p == "*.custom").unwrap();
+        let default_idx = patterns.iter().position(|p| p.contains(".git")).unwrap();
+        assert!(custom_idx < default_idx);
+    }
+
+    #[test]
+    fn test_build_exclude_patterns_without_defaults() {
+        // Test with defaults disabled
+        let additional = vec!["*.custom".to_string(), "temp/".to_string()];
+        let patterns = build_exclude_patterns(&additional, false);
+
+        // Should include additional patterns
+        assert!(patterns.contains(&"*.custom".to_string()));
+        assert!(patterns.contains(&"temp/".to_string()));
+
+        // Should NOT include default patterns
+        assert!(!patterns.iter().any(|p| p.contains(".git")));
+        assert!(!patterns.iter().any(|p| p.contains("node_modules")));
+
+        // Should only have the 2 additional patterns
+        assert_eq!(patterns.len(), 2);
+    }
+
+    #[test]
+    fn test_build_exclude_patterns_empty_additional() {
+        // Test with empty additional patterns and defaults enabled
+        let patterns = build_exclude_patterns(&[], true);
+
+        // Should only have default patterns
+        assert!(patterns.iter().any(|p| p.contains(".git")));
+        assert!(!patterns.is_empty());
+
+        // Test with empty additional patterns and defaults disabled
+        let patterns = build_exclude_patterns(&[], false);
+
+        // Should be empty
+        assert!(patterns.is_empty());
+    }
+
+    #[test]
+    fn test_read_ckignore_edge_cases() {
+        let temp_dir = TempDir::new().unwrap();
+        let test_path = temp_dir.path();
+
+        // Test 1: Empty .ckignore file
+        let ckignore_path = test_path.join(".ckignore");
+        fs::write(&ckignore_path, "").unwrap();
+        let patterns = read_ckignore_patterns(test_path).unwrap();
+        assert_eq!(patterns.len(), 0);
+
+        // Test 2: .ckignore with only comments
+        fs::write(&ckignore_path, "# Comment 1\n# Comment 2\n# Comment 3\n").unwrap();
+        let patterns = read_ckignore_patterns(test_path).unwrap();
+        assert_eq!(patterns.len(), 0);
+
+        // Test 3: .ckignore with only whitespace
+        fs::write(&ckignore_path, "   \n\t\n  \t  \n").unwrap();
+        let patterns = read_ckignore_patterns(test_path).unwrap();
+        assert_eq!(patterns.len(), 0);
+
+        // Test 4: .ckignore with mixed content
+        fs::write(
+            &ckignore_path,
+            "# Comment\n\n  \n*.tmp  \n  *.log\n\n# Another comment\n",
+        )
+        .unwrap();
+        let patterns = read_ckignore_patterns(test_path).unwrap();
+        assert_eq!(patterns.len(), 2);
+        assert!(patterns.contains(&"*.tmp".to_string()));
+        assert!(patterns.contains(&"*.log".to_string()));
+        // Patterns should be trimmed
+        assert!(!patterns.iter().any(|p| p.starts_with(' ')));
+        assert!(!patterns.iter().any(|p| p.ends_with(' ')));
+    }
 }
