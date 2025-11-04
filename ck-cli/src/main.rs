@@ -312,6 +312,9 @@ struct Cli {
     #[arg(long = "status-verbose", help = "Show detailed index statistics")]
     status_verbose: bool,
 
+    #[arg(long = "status-json", help = "Output index status as JSON")]
+    status_json: bool,
+
     #[arg(
         long = "inspect",
         help = "Show detailed metadata for a specific file (chunks, embeddings, tree-sitter parsing info)"
@@ -1140,8 +1143,8 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
         return Ok(());
     }
 
-    if cli.status || cli.status_verbose {
-        // Handle --status and --status-verbose flags
+    if cli.status || cli.status_verbose || cli.status_json {
+        // Handle --status, --status-verbose, and --status-json flags
         let status_path = cli
             .files
             .first()
@@ -1149,12 +1152,64 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
             .unwrap_or_else(|| PathBuf::from("."));
         let verbose = cli.status_verbose;
 
-        status.section_header("Index Status");
-        let check_spinner = status.create_spinner("Reading index...");
-        let stats = ck_index::get_index_stats(&status_path)?;
-        status.finish_progress(check_spinner, "Status retrieved");
+        let stats = if cli.status_json {
+            // For JSON output, skip spinner and human-readable messages
+            ck_index::get_index_stats(&status_path)?
+        } else {
+            status.section_header("Index Status");
+            let check_spinner = status.create_spinner("Reading index...");
+            let stats = ck_index::get_index_stats(&status_path)?;
+            status.finish_progress(check_spinner, "Status retrieved");
+            stats
+        };
 
-        if stats.total_files == 0 {
+        if cli.status_json {
+            // Output JSON format
+            let mut json_output = serde_json::json!({
+                "path": status_path.to_string_lossy(),
+                "index_exists": stats.total_files > 0,
+                "total_files": stats.total_files,
+                "total_chunks": stats.total_chunks,
+                "embedded_chunks": stats.embedded_chunks,
+                "total_size_bytes": stats.total_size_bytes,
+                "index_size_bytes": stats.index_size_bytes,
+                "index_created": stats.index_created,
+                "index_updated": stats.index_updated,
+            });
+
+            // Add model information if available
+            let manifest_path = status_path.join(".ck").join("manifest.json");
+            if let Ok(data) = std::fs::read(&manifest_path)
+                && let Ok(manifest) = serde_json::from_slice::<ck_index::IndexManifest>(&data)
+                && let Some(model_name) = manifest.embedding_model
+            {
+                let registry = ck_models::ModelRegistry::default();
+                let alias = registry
+                    .models
+                    .iter()
+                    .find(|(_, config)| config.name == model_name)
+                    .map(|(alias, _)| alias.clone())
+                    .unwrap_or_else(|| model_name.clone());
+                let dims = manifest
+                    .embedding_dimensions
+                    .or_else(|| {
+                        registry
+                            .models
+                            .iter()
+                            .find(|(_, config)| config.name == model_name)
+                            .map(|(_, config)| config.dimensions)
+                    })
+                    .unwrap_or(0);
+
+                json_output["model"] = serde_json::json!({
+                    "name": model_name,
+                    "alias": alias,
+                    "dimensions": dims,
+                });
+            }
+
+            println!("{}", serde_json::to_string_pretty(&json_output)?);
+        } else if stats.total_files == 0 {
             status.warn(&format!("No index found at {}", status_path.display()));
             status.info("Run 'ck --index .' to create an index");
         } else {

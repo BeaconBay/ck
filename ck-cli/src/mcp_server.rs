@@ -1672,7 +1672,40 @@ impl CkMcpServer {
             } else if let Ok(index_stats) = ck_index::get_index_stats(&path_buf) {
                 index_info["total_files"] = json!(index_stats.total_files);
                 index_info["total_chunks"] = json!(index_stats.total_chunks);
+                index_info["embedded_chunks"] = json!(index_stats.embedded_chunks);
+                index_info["total_size_bytes"] = json!(index_stats.total_size_bytes);
                 index_info["cache_hit"] = json!(false);
+
+                // Add model information if available
+                let manifest_path = path_buf.join(".ck").join("manifest.json");
+                if let Ok(data) = std::fs::read(&manifest_path)
+                    && let Ok(manifest) = serde_json::from_slice::<ck_index::IndexManifest>(&data)
+                    && let Some(model_name) = manifest.embedding_model
+                {
+                    let registry = ck_models::ModelRegistry::default();
+                    let alias = registry
+                        .models
+                        .iter()
+                        .find(|(_, config)| config.name == model_name)
+                        .map(|(alias, _)| alias.clone())
+                        .unwrap_or_else(|| model_name.clone());
+                    let dims = manifest
+                        .embedding_dimensions
+                        .or_else(|| {
+                            registry
+                                .models
+                                .iter()
+                                .find(|(_, config)| config.name == model_name)
+                                .map(|(_, config)| config.dimensions)
+                        })
+                        .unwrap_or(0);
+
+                    index_info["model"] = json!({
+                        "name": model_name,
+                        "alias": alias,
+                        "dimensions": dims,
+                    });
+                }
 
                 // Update cache with fresh stats
                 let cache_stats = crate::mcp::cache::IndexStats {
