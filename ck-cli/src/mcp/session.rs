@@ -463,6 +463,7 @@ mod tests {
             exclude_patterns: vec![],
             include_patterns: Vec::new(),
             respect_gitignore: true,
+            use_ckignore: true,
             full_section: false,
             rerank: false,
             rerank_model: None,

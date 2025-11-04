@@ -77,25 +77,15 @@ mod tests {
 }
 
 fn resolve_exclude_patterns(
-    base_path: &Path,
     explicit: Option<Vec<String>>,
     use_default_excludes: Option<bool>,
 ) -> Vec<String> {
-    let mut patterns = Vec::new();
-
-    if let Ok(ckignore_patterns) = ck_core::read_ckignore_patterns(base_path) {
-        patterns.extend(ckignore_patterns);
-    }
-
-    if let Some(mut provided) = explicit {
-        patterns.append(&mut provided);
-    }
-
-    if use_default_excludes.unwrap_or(true) {
-        patterns.extend(get_default_exclude_patterns());
-    }
-
-    patterns
+    // Note: .ckignore files are now handled hierarchically by WalkBuilder
+    // This function only combines explicit excludes with defaults
+    ck_core::build_exclude_patterns(
+        &explicit.unwrap_or_default(),
+        use_default_excludes.unwrap_or(true),
+    )
 }
 
 fn resolve_include_patterns(
@@ -1010,7 +1000,6 @@ impl CkMcpServer {
         let respect_gitignore = request.respect_gitignore.unwrap_or(true);
         let use_default_excludes = request.use_default_excludes.unwrap_or(true);
         let exclude_patterns = resolve_exclude_patterns(
-            &search_root,
             request.exclude_patterns.clone(),
             Some(use_default_excludes),
         );
@@ -1099,6 +1088,7 @@ impl CkMcpServer {
             exclude_patterns,
             include_patterns,
             respect_gitignore,
+            use_ckignore: true,
             full_section: false,
             rerank: request.rerank.unwrap_or(false),
             rerank_model: request.rerank_model.clone(),
@@ -1251,7 +1241,6 @@ impl CkMcpServer {
         let respect_gitignore = request.respect_gitignore.unwrap_or(true);
         let use_default_excludes = request.use_default_excludes.unwrap_or(true);
         let exclude_patterns = resolve_exclude_patterns(
-            &search_root,
             request.exclude_patterns.clone(),
             Some(use_default_excludes),
         );
@@ -1308,6 +1297,7 @@ impl CkMcpServer {
             exclude_patterns,
             include_patterns,
             respect_gitignore,
+            use_ckignore: true,
             full_section: false,
             rerank: false,
             rerank_model: None,
@@ -1386,7 +1376,6 @@ impl CkMcpServer {
         let respect_gitignore = request.respect_gitignore.unwrap_or(true);
         let use_default_excludes = request.use_default_excludes.unwrap_or(true);
         let exclude_patterns = resolve_exclude_patterns(
-            &search_root,
             request.exclude_patterns.clone(),
             Some(use_default_excludes),
         );
@@ -1445,6 +1434,7 @@ impl CkMcpServer {
             exclude_patterns,
             include_patterns,
             respect_gitignore,
+            use_ckignore: true,
             full_section: false,
             rerank: false,
             rerank_model: None,
@@ -1522,7 +1512,6 @@ impl CkMcpServer {
         let respect_gitignore = request.respect_gitignore.unwrap_or(true);
         let use_default_excludes = request.use_default_excludes.unwrap_or(true);
         let exclude_patterns = resolve_exclude_patterns(
-            &search_root,
             request.exclude_patterns.clone(),
             Some(use_default_excludes),
         );
@@ -1582,6 +1571,7 @@ impl CkMcpServer {
             exclude_patterns,
             include_patterns,
             respect_gitignore,
+            use_ckignore: true,
             full_section: false,
             rerank: request.rerank.unwrap_or(false),
             rerank_model: request.rerank_model.clone(),
@@ -1836,6 +1826,7 @@ impl CkMcpServer {
             exclude_patterns: get_default_exclude_patterns(),
             include_patterns: Vec::new(),
             respect_gitignore: true,
+            use_ckignore: true,
             full_section: false,
             rerank: false,
             rerank_model: None,

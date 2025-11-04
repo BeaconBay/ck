@@ -180,20 +180,26 @@ fn filter_and_collect_files(walker: ignore::Walk, index_dir: &Path) -> Vec<PathB
 
 pub fn collect_files(
     path: &Path,
-    respect_gitignore: bool,
-    exclude_patterns: &[String],
+    options: &ck_core::FileCollectionOptions,
 ) -> Result<Vec<PathBuf>> {
     let index_dir = path.join(".ck");
 
-    if respect_gitignore {
-        let overrides = build_overrides(path, exclude_patterns)?;
-        let walker = WalkBuilder::new(path)
+    if options.respect_gitignore {
+        let overrides = build_overrides(path, &options.exclude_patterns)?;
+        let mut walker_builder = WalkBuilder::new(path);
+        walker_builder
             .git_ignore(true)
             .git_global(true)
             .git_exclude(true)
-            .hidden(true)
-            .overrides(overrides)
-            .build();
+            .hidden(true);
+
+        // Add .ckignore support (hierarchical, like .gitignore)
+        if options.use_ckignore {
+            walker_builder.add_custom_ignore_filename(".ckignore");
+        }
+
+        walker_builder.overrides(overrides);
+        let walker = walker_builder.build();
 
         Ok(filter_and_collect_files(walker, &index_dir))
     } else {
@@ -203,14 +209,21 @@ pub fn collect_files(
 
         // Combine default patterns with user exclude patterns
         let mut all_patterns = default_patterns;
-        all_patterns.extend(exclude_patterns.iter().cloned());
+        all_patterns.extend(options.exclude_patterns.iter().cloned());
         let combined_overrides = build_overrides(path, &all_patterns)?;
 
-        let walker = WalkBuilder::new(path)
+        let mut walker_builder = WalkBuilder::new(path);
+        walker_builder
             .git_ignore(false)
-            .hidden(true)
-            .overrides(combined_overrides)
-            .build();
+            .hidden(true);
+
+        // Add .ckignore support even without gitignore
+        if options.use_ckignore {
+            walker_builder.add_custom_ignore_filename(".ckignore");
+        }
+
+        walker_builder.overrides(combined_overrides);
+        let walker = walker_builder.build();
 
         Ok(filter_and_collect_files(walker, &index_dir))
     }
@@ -218,19 +231,15 @@ pub fn collect_files(
 
 fn collect_files_as_hashset(
     path: &Path,
-    respect_gitignore: bool,
-    exclude_patterns: &[String],
+    options: &ck_core::FileCollectionOptions,
 ) -> Result<HashSet<PathBuf>> {
-    Ok(collect_files(path, respect_gitignore, exclude_patterns)?
-        .into_iter()
-        .collect())
+    Ok(collect_files(path, options)?.into_iter().collect())
 }
 
 pub async fn index_directory(
     path: &Path,
     compute_embeddings: bool,
-    respect_gitignore: bool,
-    exclude_patterns: &[String],
+    options: &ck_core::FileCollectionOptions,
     model: Option<&str>,
 ) -> Result<()> {
     tracing::info!(
@@ -295,7 +304,7 @@ pub async fn index_directory(
         None
     };
 
-    let files = collect_files(path, respect_gitignore, exclude_patterns)?;
+    let files = collect_files(path, options)?;
 
     if compute_embeddings {
         // Sequential processing with small-batch embeddings for streaming performance
@@ -434,16 +443,14 @@ pub async fn index_file(file_path: &Path, compute_embeddings: bool) -> Result<()
 pub async fn update_index(
     path: &Path,
     compute_embeddings: bool,
-    respect_gitignore: bool,
-    exclude_patterns: &[String],
+    options: &ck_core::FileCollectionOptions,
 ) -> Result<()> {
     let index_dir = path.join(".ck");
     if !index_dir.exists() {
         return index_directory(
             path,
             compute_embeddings,
-            respect_gitignore,
-            exclude_patterns,
+            options,
             None, // model - use existing from manifest for update
         )
         .await;
@@ -452,7 +459,7 @@ pub async fn update_index(
     let manifest_path = index_dir.join("manifest.json");
     let mut manifest = load_or_create_manifest(&manifest_path)?;
 
-    let files = collect_files(path, respect_gitignore, exclude_patterns)?;
+    let files = collect_files(path, options)?;
 
     let updates: Vec<(PathBuf, IndexEntry)> = if compute_embeddings {
         // Sequential processing when computing embeddings (for memory efficiency)
@@ -563,8 +570,7 @@ pub fn clean_index(path: &Path) -> Result<()> {
 
 pub fn cleanup_index(
     path: &Path,
-    respect_gitignore: bool,
-    exclude_patterns: &[String],
+    options: &ck_core::FileCollectionOptions,
 ) -> Result<CleanupStats> {
     let index_dir = path.join(".ck");
     if !index_dir.exists() {
@@ -576,13 +582,8 @@ pub fn cleanup_index(
     normalize_manifest_paths(&mut manifest, path);
 
     // Use the new unified cleanup validation
-    let stats = cleanup_validation::validate_and_cleanup_index(
-        path,
-        &index_dir,
-        &mut manifest,
-        respect_gitignore,
-        exclude_patterns,
-    )?;
+    let stats =
+        cleanup_validation::validate_and_cleanup_index(path, &index_dir, &mut manifest, options)?;
 
     // Content cache cleanup is now handled by the unified cleanup validation
 
@@ -659,16 +660,14 @@ pub fn get_index_stats(path: &Path) -> Result<IndexStats> {
 pub async fn smart_update_index(
     path: &Path,
     compute_embeddings: bool,
-    respect_gitignore: bool,
-    exclude_patterns: &[String],
+    options: &ck_core::FileCollectionOptions,
 ) -> Result<UpdateStats> {
     smart_update_index_with_progress(
         path,
         false,
         None,
         compute_embeddings,
-        respect_gitignore,
-        exclude_patterns,
+        options,
         None, // model - use default for backward compatibility
     )
     .await
@@ -679,8 +678,7 @@ pub async fn smart_update_index_with_progress(
     force_rebuild: bool,
     progress_callback: Option<ProgressCallback>,
     compute_embeddings: bool,
-    respect_gitignore: bool,
-    exclude_patterns: &[String],
+    options: &ck_core::FileCollectionOptions,
     model: Option<&str>,
 ) -> Result<UpdateStats> {
     smart_update_index_with_detailed_progress(
@@ -689,23 +687,20 @@ pub async fn smart_update_index_with_progress(
         progress_callback,
         None, // No detailed progress callback for backward compatibility
         compute_embeddings,
-        respect_gitignore,
-        exclude_patterns,
+        options,
         model,
     )
     .await
 }
 
 /// Enhanced indexing with detailed embedding progress
-#[allow(clippy::too_many_arguments)]
 pub async fn smart_update_index_with_detailed_progress(
     path: &Path,
     force_rebuild: bool,
     progress_callback: Option<ProgressCallback>,
     detailed_progress_callback: Option<DetailedProgressCallback>,
     compute_embeddings: bool,
-    respect_gitignore: bool,
-    exclude_patterns: &[String],
+    options: &ck_core::FileCollectionOptions,
     model: Option<&str>,
 ) -> Result<UpdateStats> {
     let index_dir = path.join(".ck");
@@ -724,14 +719,7 @@ pub async fn smart_update_index_with_detailed_progress(
 
     if force_rebuild {
         clean_index(path)?;
-        index_directory(
-            path,
-            compute_embeddings,
-            respect_gitignore,
-            exclude_patterns,
-            model,
-        )
-        .await?;
+        index_directory(path, compute_embeddings, options, model).await?;
         let index_stats = get_index_stats(path)?;
         stats.files_indexed = index_stats.total_files;
         return Ok(stats);
@@ -810,7 +798,7 @@ pub async fn smart_update_index_with_detailed_progress(
 
     // For incremental updates, only process files in the search scope
     // The cleanup phase already handled removing orphaned files from the entire repo
-    let current_files = collect_files(path, respect_gitignore, exclude_patterns)?;
+    let current_files = collect_files(path, options)?;
 
     // First pass: determine which files need updating and collect stats
     let mut files_to_update = Vec::new();
@@ -1840,15 +1828,21 @@ mod tests {
         // Create initial file
         fs::write(test_path.join("file1.txt"), "initial content").unwrap();
 
+        let file_options = ck_core::FileCollectionOptions {
+            respect_gitignore: true,
+            use_ckignore: true,
+            exclude_patterns: vec![],
+        };
+
         // First index
-        let stats1 = smart_update_index(test_path, false, true, &[])
+        let stats1 = smart_update_index(test_path, false, &file_options)
             .await
             .unwrap();
         assert_eq!(stats1.files_added, 1);
         assert_eq!(stats1.files_indexed, 1);
 
         // No changes, should be up to date
-        let stats2 = smart_update_index(test_path, false, true, &[])
+        let stats2 = smart_update_index(test_path, false, &file_options)
             .await
             .unwrap();
         assert_eq!(stats2.files_up_to_date, 1);
@@ -1856,7 +1850,7 @@ mod tests {
 
         // Modify file
         fs::write(test_path.join("file1.txt"), "modified content").unwrap();
-        let stats3 = smart_update_index(test_path, false, true, &[])
+        let stats3 = smart_update_index(test_path, false, &file_options)
             .await
             .unwrap();
         assert_eq!(stats3.files_modified, 1);
@@ -1864,7 +1858,7 @@ mod tests {
 
         // Add new file
         fs::write(test_path.join("file2.txt"), "new file content").unwrap();
-        let stats4 = smart_update_index(test_path, false, true, &[])
+        let stats4 = smart_update_index(test_path, false, &file_options)
             .await
             .unwrap();
         assert_eq!(stats4.files_added, 1);
@@ -1896,7 +1890,12 @@ mod tests {
         save_manifest(&manifest_path, &manifest).unwrap();
 
         // Cleanup should remove orphaned entry
-        let stats = cleanup_index(test_path, true, &[]).unwrap();
+        let file_options = ck_core::FileCollectionOptions {
+            respect_gitignore: true,
+            use_ckignore: true,
+            exclude_patterns: vec![],
+        };
+        let stats = cleanup_index(test_path, &file_options).unwrap();
         assert_eq!(stats.orphaned_entries_removed, 1);
 
         // Check that manifest was updated
@@ -2033,14 +2032,12 @@ mod cleanup_validation {
         repo_root: &Path,
         index_dir: &Path,
         manifest: &mut IndexManifest,
-        respect_gitignore: bool,
-        exclude_patterns: &[String],
+        options: &ck_core::FileCollectionOptions,
     ) -> Result<CleanupStats> {
         let mut stats = CleanupStats::default();
 
         // Step 1: Get all files that actually exist in the repository
-        let existing_files =
-            collect_files_as_hashset(repo_root, respect_gitignore, exclude_patterns)?;
+        let existing_files = collect_files_as_hashset(repo_root, options)?;
         let standard_existing_files: HashSet<PathBuf> = existing_files
             .into_iter()
             .map(|path| path_utils::to_standard_path(&path, repo_root))
