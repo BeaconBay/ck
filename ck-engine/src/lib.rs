@@ -366,14 +366,14 @@ pub async fn search_enhanced_with_indexing_progress(
     // Auto-update index if needed (unless it's regex-only mode)
     if !matches!(options.mode, SearchMode::Regex) {
         let need_embeddings = matches!(options.mode, SearchMode::Semantic | SearchMode::Hybrid);
+        let file_options = ck_core::FileCollectionOptions::from(options);
         ensure_index_updated_with_progress(
             &options.path,
             options.reindex,
             need_embeddings,
             indexing_progress_callback,
             detailed_indexing_progress_callback,
-            options.respect_gitignore,
-            &options.exclude_patterns,
+            &file_options,
             options.embedding_model.as_deref(),
         )
         .await?;
@@ -428,11 +428,11 @@ fn regex_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
     let should_recurse = options.path.is_dir() || options.recursive;
     let files = if should_recurse {
         // Use ck_index's collect_files which respects gitignore
-        let collected = ck_index::collect_files(
-            &options.path,
-            options.respect_gitignore,
-            &options.exclude_patterns,
-        )?;
+        let file_options = ck_core::FileCollectionOptions {
+            respect_gitignore: options.respect_gitignore,
+            exclude_patterns: options.exclude_patterns.clone(),
+        };
+        let collected = ck_index::collect_files(&options.path, &file_options)?;
         filter_files_by_include(collected, &options.include_patterns)
     } else {
         // For non-recursive, use the local collect_files
@@ -1168,15 +1168,13 @@ fn collect_files(
     Ok(files)
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn ensure_index_updated_with_progress(
     path: &Path,
     force_reindex: bool,
     need_embeddings: bool,
     progress_callback: Option<ck_index::ProgressCallback>,
     detailed_progress_callback: Option<ck_index::DetailedProgressCallback>,
-    respect_gitignore: bool,
-    exclude_patterns: &[String],
+    file_options: &ck_core::FileCollectionOptions,
     model_override: Option<&str>,
 ) -> Result<()> {
     // Find index root for .ck directory location
@@ -1198,8 +1196,7 @@ async fn ensure_index_updated_with_progress(
             progress_callback,
             detailed_progress_callback,
             need_embeddings,
-            respect_gitignore,
-            exclude_patterns, // Use search-specific exclude patterns
+            file_options,
             model_override,
         )
         .await?;
@@ -1227,8 +1224,7 @@ async fn ensure_index_updated_with_progress(
             progress_callback,
             detailed_progress_callback,
             need_embeddings,
-            respect_gitignore,
-            exclude_patterns,
+            file_options,
             model_override,
         )
         .await?;

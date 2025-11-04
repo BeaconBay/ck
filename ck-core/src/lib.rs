@@ -287,6 +287,26 @@ pub struct IncludePattern {
     pub is_dir: bool,
 }
 
+/// Configuration for file collection during indexing and search operations.
+/// This struct encapsulates all settings related to which files should be included
+/// or excluded when traversing a directory tree.
+#[derive(Debug, Clone)]
+pub struct FileCollectionOptions {
+    /// Whether to respect .gitignore files
+    pub respect_gitignore: bool,
+    /// Patterns to exclude files/directories
+    pub exclude_patterns: Vec<String>,
+}
+
+impl From<&SearchOptions> for FileCollectionOptions {
+    fn from(opts: &SearchOptions) -> Self {
+        Self {
+            respect_gitignore: opts.respect_gitignore,
+            exclude_patterns: opts.exclude_patterns.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SearchOptions {
     pub mode: SearchMode,

@@ -631,14 +631,17 @@ async fn run_index_workflow(
         (None, None, None, None)
     };
 
+    let file_options = ck_core::FileCollectionOptions {
+        respect_gitignore: !cli.no_ignore,
+        exclude_patterns: exclude_patterns.clone(),
+    };
     let index_future = ck_index::smart_update_index_with_detailed_progress(
         path,
         false,
         progress_callback,
         detailed_progress_callback,
         true,
-        !cli.no_ignore,
-        &exclude_patterns,
+        &file_options,
         Some(model_alias),
     );
     tokio::pin!(index_future);
@@ -1074,8 +1077,11 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
             let exclude_patterns = build_exclude_patterns(&cli, Some(&clean_path));
 
             let cleanup_spinner = status.create_spinner("Removing orphaned entries...");
-            let cleanup_stats =
-                ck_index::cleanup_index(&clean_path, !cli.no_ignore, &exclude_patterns)?;
+            let file_options = ck_core::FileCollectionOptions {
+                respect_gitignore: !cli.no_ignore,
+                exclude_patterns: exclude_patterns.clone(),
+            };
+            let cleanup_stats = ck_index::cleanup_index(&clean_path, &file_options)?;
             status.finish_progress(cleanup_spinner, "Cleanup complete");
 
             if cleanup_stats.orphaned_entries_removed > 0
@@ -1567,13 +1573,8 @@ async fn run_search(
 
     if options.reindex {
         let reindex_spinner = status.create_spinner("Updating index...");
-        ck_index::update_index(
-            &options.path,
-            true,
-            options.respect_gitignore,
-            &options.exclude_patterns,
-        )
-        .await?;
+        let file_options = ck_core::FileCollectionOptions::from(&options);
+        ck_index::update_index(&options.path, true, &file_options).await?;
         status.finish_progress(reindex_spinner, "Index updated");
     }
 
