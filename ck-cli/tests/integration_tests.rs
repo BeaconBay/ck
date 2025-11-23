@@ -821,3 +821,198 @@ fn test_add_file_with_relative_path() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("Relative path content"));
 }
+
+#[test]
+#[serial]
+#[ignore] // Requires models to be downloaded - run with: CK_MIXEDBREAD_MODELS_READY=1 cargo test -- --ignored
+fn test_mixedbread_index_and_search() {
+    // Skip if models aren't ready (set CK_MIXEDBREAD_MODELS_READY=1 to enable)
+    if std::env::var("CK_MIXEDBREAD_MODELS_READY").is_err() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create test files with semantic content
+    fs::write(
+        temp_dir.path().join("rust_error.rs"),
+        r#"fn handle_error() -> Result<String, String> {
+    let result = risky_operation()?;
+    Ok(result)
+}"#,
+    )
+    .unwrap();
+    fs::write(
+        temp_dir.path().join("python_web.py"),
+        "from flask import Flask\napp = Flask(__name__)\n@app.route('/')\ndef hello(): return 'Hello'",
+    )
+    .unwrap();
+    fs::write(
+        temp_dir.path().join("error_handling.md"),
+        "Error handling in Rust uses Result and Option types for safe error propagation",
+    )
+    .unwrap();
+
+    // Test indexing with Mixedbread model
+    let output = Command::new(ck_binary())
+        .args(["--index", "--model", "mxbai-xsmall", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck index with Mixedbread");
+
+    assert!(
+        output.status.success(),
+        "Indexing failed: stderr: {}, stdout: {}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
+
+    // Verify index was created
+    assert!(temp_dir.path().join(".ck").exists(), "Index directory should exist");
+
+    // Check manifest contains Mixedbread model
+    let manifest_path = temp_dir.path().join(".ck").join("manifest.json");
+    let manifest_data = fs::read(&manifest_path).expect("manifest should exist");
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&manifest_data).expect("valid json");
+    let embedding_model = manifest
+        .get("embedding_model")
+        .and_then(|v| v.as_str())
+        .expect("embedding_model should be set");
+    assert!(
+        embedding_model.contains("mxbai-embed-xsmall-v1"),
+        "Manifest should record Mixedbread model, got: {}",
+        embedding_model
+    );
+
+    let embedding_dimensions = manifest
+        .get("embedding_dimensions")
+        .and_then(|v| v.as_u64())
+        .expect("embedding_dimensions should be set");
+    assert_eq!(
+        embedding_dimensions, 384,
+        "Mixedbread xsmall should have 384 dimensions"
+    );
+
+    // Test semantic search with Mixedbread
+    let output = Command::new(ck_binary())
+        .args([
+            "--sem",
+            "error handling",
+            "--model",
+            "mxbai-xsmall",
+            ".",
+        ])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck semantic search with Mixedbread");
+
+    assert!(
+        output.status.success(),
+        "Semantic search failed: stderr: {}, stdout: {}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    // Should find error handling related content
+    assert!(
+        stdout.contains("error") || stdout.contains("Error"),
+        "Should find error handling content"
+    );
+
+    // Test reranking with Mixedbread reranker
+    let output = Command::new(ck_binary())
+        .args([
+            "--sem",
+            "error handling",
+            "--model",
+            "mxbai-xsmall",
+            "--rerank",
+            "--rerank-model",
+            "mxbai",
+            ".",
+        ])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck search with Mixedbread reranker");
+
+    assert!(
+        output.status.success(),
+        "Reranked search failed: stderr: {}, stdout: {}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(!stdout.is_empty(), "Should return results");
+}
+
+#[test]
+#[serial]
+#[ignore] // Requires models to be downloaded
+fn test_switch_model_to_mixedbread() {
+    if std::env::var("CK_MIXEDBREAD_MODELS_READY").is_err() {
+        return;
+    }
+
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(
+        temp_dir.path().join("test.rs"),
+        "fn main() { println!(\"Hello\"); }",
+    )
+    .unwrap();
+
+    // Create index with default model
+    let output = Command::new(ck_binary())
+        .args(["--index", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to create initial index");
+
+    assert!(output.status.success());
+
+    let updated_before = read_manifest_updated(temp_dir.path());
+
+    std::thread::sleep(std::time::Duration::from_secs(1));
+
+    // Switch to Mixedbread model
+    let output = Command::new(ck_binary())
+        .args(["--switch-model", "mxbai-xsmall"])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to switch model");
+
+    assert!(
+        output.status.success(),
+        "Switch model failed: stderr: {}, stdout: {}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.contains("Switching") || stderr.contains("Rebuilding"),
+        "Should indicate model switch"
+    );
+
+    let updated_after = read_manifest_updated(temp_dir.path());
+    assert!(
+        updated_after > updated_before,
+        "Manifest should be updated after model switch"
+    );
+
+    // Verify manifest now has Mixedbread model
+    let manifest_path = temp_dir.path().join(".ck").join("manifest.json");
+    let manifest_data = fs::read(&manifest_path).expect("manifest should exist");
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&manifest_data).expect("valid json");
+    let embedding_model = manifest
+        .get("embedding_model")
+        .and_then(|v| v.as_str())
+        .expect("embedding_model should be set");
+    assert!(
+        embedding_model.contains("mxbai-embed-xsmall-v1"),
+        "Manifest should now have Mixedbread model"
+    );
+}
