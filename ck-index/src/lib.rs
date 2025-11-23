@@ -15,6 +15,16 @@ use std::time::SystemTime;
 use tempfile::NamedTempFile;
 use walkdir::WalkDir;
 
+fn legacy_model_config(name: &str, dimensions: Option<usize>) -> ck_models::ModelConfig {
+    ck_models::ModelConfig {
+        name: name.to_string(),
+        provider: "fastembed".to_string(),
+        dimensions: dimensions.unwrap_or(384),
+        max_tokens: 8192,
+        description: "Legacy ck embedding model (inferred from manifest)".to_string(),
+    }
+}
+
 pub type ProgressCallback = Box<dyn Fn(&str) + Send + Sync>;
 
 /// Detailed progress information for embedding operations
@@ -253,51 +263,27 @@ pub async fn index_directory(
 
     // Handle model configuration for embeddings
     let resolved_model = if compute_embeddings {
-        // Resolve the model name and get its dimensions
         let model_registry = ck_models::ModelRegistry::default();
-        let selected_model = if let Some(model_name) = model {
-            // User specified a model
-            if let Some(model_config) = model_registry.get_model(model_name) {
-                model_config.name.clone()
-            } else {
+        let (alias, config) = model_registry
+            .resolve(model)
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+
+        if let Some(existing_model) = &manifest.embedding_model {
+            if existing_model != &config.name {
                 return Err(anyhow::anyhow!(
-                    "Unknown model '{}'. Available models: bge-small, nomic-v1.5, jina-code",
-                    model_name
+                    "Model mismatch: Index was created with '{}', but you're trying to use '{}'. \
+                Please run 'ck --clean {}' to remove the old index, then rerun with the new model.",
+                    existing_model,
+                    config.name,
+                    path.display()
                 ));
             }
-        } else {
-            // Use default model
-            let default_config = model_registry
-                .get_default_model()
-                .ok_or_else(|| anyhow::anyhow!("No default model available"))?;
-            default_config.name.clone()
-        };
-
-        // Check for model compatibility with existing index
-        if let Some(existing_model) = &manifest.embedding_model
-            && existing_model != &selected_model
-        {
-            // Model mismatch - this is an error to prevent reusing embeddings from a different model
-            return Err(anyhow::anyhow!(
-                "Model mismatch: Index was created with '{}', but you're trying to use '{}'. \
-                Please run 'ck --clean {}' to remove the old index, then rerun with the new model.",
-                existing_model,
-                selected_model,
-                path.display()
-            ));
         }
 
-        // Set the model info in the manifest
-        manifest.embedding_model = Some(selected_model.clone());
-        if let Some(model_name) = model {
-            if let Some(model_config) = model_registry.get_model(model_name) {
-                manifest.embedding_dimensions = Some(model_config.dimensions);
-            }
-        } else if let Some(default_config) = model_registry.get_default_model() {
-            manifest.embedding_dimensions = Some(default_config.dimensions);
-        }
+        manifest.embedding_model = Some(config.name.clone());
+        manifest.embedding_dimensions = Some(config.dimensions);
 
-        Some(selected_model)
+        Some((alias, config))
     } else {
         None
     };
@@ -307,7 +293,10 @@ pub async fn index_directory(
     if compute_embeddings {
         // Sequential processing with small-batch embeddings for streaming performance
         tracing::info!("Creating embedder for {} files", files.len());
-        let mut embedder = ck_embed::create_embedder(resolved_model.as_deref())?;
+        let (_, config) = resolved_model
+            .as_ref()
+            .expect("resolved model must be present when computing embeddings");
+        let mut embedder = ck_embed::create_embedder_for_config(config, None)?;
 
         for file_path in files.iter() {
             match index_single_file(file_path, path, Some(&mut embedder)) {
@@ -416,9 +405,26 @@ pub async fn index_file(file_path: &Path, compute_embeddings: bool) -> Result<()
     let mut manifest = load_or_create_manifest(&manifest_path)?;
 
     let entry = if compute_embeddings {
-        // Use the model from the existing index, or default if none specified
-        let model_name = manifest.embedding_model.as_deref();
-        let mut embedder = ck_embed::create_embedder(model_name)?;
+        let model_registry = ck_models::ModelRegistry::default();
+        let (alias, config) = if let Some(existing) = manifest.embedding_model.as_deref() {
+            match model_registry.resolve(Some(existing)) {
+                Ok(resolved) => resolved,
+                Err(_) => (
+                    existing.to_string(),
+                    legacy_model_config(existing, manifest.embedding_dimensions),
+                ),
+            }
+        } else {
+            model_registry
+                .resolve(None)
+                .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        };
+
+        manifest.embedding_model = Some(config.name.clone());
+        manifest.embedding_dimensions = Some(config.dimensions);
+        tracing::debug!("Using embedding model '{}' ({})", config.name, alias);
+
+        let mut embedder = ck_embed::create_embedder_for_config(&config, None)?;
         index_single_file(file_path, &repo_root, Some(&mut embedder))?
     } else {
         index_single_file(file_path, &repo_root, None)?
@@ -461,8 +467,30 @@ pub async fn update_index(
 
     let updates: Vec<(PathBuf, IndexEntry)> = if compute_embeddings {
         // Sequential processing when computing embeddings (for memory efficiency)
-        let model_name = manifest.embedding_model.as_deref();
-        let mut embedder = ck_embed::create_embedder(model_name)?;
+        let model_registry = ck_models::ModelRegistry::default();
+        let (alias, config) = if let Some(existing) = manifest.embedding_model.as_deref() {
+            match model_registry.resolve(Some(existing)) {
+                Ok(resolved) => resolved,
+                Err(_) => (
+                    existing.to_string(),
+                    legacy_model_config(existing, manifest.embedding_dimensions),
+                ),
+            }
+        } else {
+            model_registry
+                .resolve(None)
+                .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        };
+
+        manifest.embedding_model = Some(config.name.clone());
+        manifest.embedding_dimensions = Some(config.dimensions);
+        tracing::debug!(
+            "Updating index with embedding model '{}' ({})",
+            config.name,
+            alias
+        );
+
+        let mut embedder = ck_embed::create_embedder_for_config(&config, None)?;
         files
             .iter()
             .filter_map(|file_path| {
@@ -737,61 +765,45 @@ pub async fn smart_update_index_with_detailed_progress(
     normalize_manifest_paths(&mut manifest, &repo_root);
 
     // Handle model configuration for embeddings
-    let (resolved_model, _model_dimensions) = if compute_embeddings {
-        // Resolve the model name and get its dimensions
+    let resolved_model = if compute_embeddings {
         let model_registry = ck_models::ModelRegistry::default();
-        let (selected_model, model_dims) = if let Some(model_name) = model {
-            // User specified a model
-            if let Some(model_config) = model_registry.get_model(model_name) {
-                (model_config.name.clone(), model_config.dimensions)
-            } else {
-                return Err(anyhow::anyhow!(
-                    "Unknown model '{}'. Available models: bge-small, nomic-v1.5, jina-code",
-                    model_name
-                ));
+
+        let resolved = if let Some(requested) = model {
+            model_registry
+                .resolve(Some(requested))
+                .map_err(|e| anyhow::anyhow!(e.to_string()))?
+        } else if let Some(existing_model) = &manifest.embedding_model {
+            match model_registry.resolve(Some(existing_model.as_str())) {
+                Ok(resolved) => resolved,
+                Err(_) => (
+                    existing_model.clone(),
+                    legacy_model_config(existing_model, manifest.embedding_dimensions),
+                ),
             }
         } else {
-            // Use default model
-            let default_config = model_registry
-                .get_default_model()
-                .ok_or_else(|| anyhow::anyhow!("No default model available"))?;
-            (default_config.name.clone(), default_config.dimensions)
+            model_registry
+                .resolve(None)
+                .map_err(|e| anyhow::anyhow!(e.to_string()))?
         };
 
-        // Check for model compatibility with existing index
-        let (final_model, final_dims) = if let Some(existing_model) = &manifest.embedding_model {
-            // If we're updating an existing index and no model was specified,
-            // use the existing model from the index
-            if model.is_none() {
-                // Use the existing model - this is an auto-update during search
-                (
-                    existing_model.clone(),
-                    manifest.embedding_dimensions.unwrap_or(384),
-                )
-            } else if existing_model != &selected_model {
-                // User explicitly specified a different model - that's an error
+        if let Some(existing_model) = &manifest.embedding_model {
+            if existing_model != &resolved.1.name {
                 return Err(anyhow::anyhow!(
                     "Model mismatch: Index was created with '{}', but you're trying to use '{}'. \
                     Please run 'ck --clean .' to remove the old index, then 'ck --index --model {}' to rebuild with the new model.",
                     existing_model,
-                    selected_model,
+                    resolved.1.name,
                     model.unwrap_or("default")
                 ));
-            } else {
-                // Model matches, proceed
-                (selected_model, model_dims)
             }
-        } else {
-            // This is either a new index or an old index without model info
-            // Set the model info in the manifest
-            manifest.embedding_model = Some(selected_model.clone());
-            manifest.embedding_dimensions = Some(model_dims);
-            (selected_model, model_dims)
-        };
+        }
 
-        (Some(final_model), Some(final_dims))
+        manifest.embedding_model = Some(resolved.1.name.clone());
+        manifest.embedding_dimensions = Some(resolved.1.dimensions);
+
+        Some(resolved)
     } else {
-        (None, None)
+        None
     };
 
     // For incremental updates, only process files in the search scope
@@ -872,7 +884,10 @@ pub async fn smart_update_index_with_detailed_progress(
     // Second pass: index the files that need updating
     if compute_embeddings {
         // Sequential processing with streaming - write each file immediately
-        let mut embedder = ck_embed::create_embedder(resolved_model.as_deref())?;
+        let (_, config) = resolved_model
+            .as_ref()
+            .expect("resolved model must exist for embedding updates");
+        let mut embedder = ck_embed::create_embedder_for_config(config, None)?;
         let mut _processed_count = 0;
 
         for file_path in files_to_update.iter() {

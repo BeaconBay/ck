@@ -201,24 +201,28 @@ fn find_nearest_index_root(path: &Path) -> Option<StdPathBuf> {
 
 #[derive(Clone, Debug)]
 pub struct ResolvedModel {
-    pub canonical_name: String,
     pub alias: String,
-    pub dimensions: usize,
+    pub config: ck_models::ModelConfig,
 }
 
-fn find_model_entry<'a>(
-    registry: &'a ck_models::ModelRegistry,
-    key: &str,
-) -> Option<(String, &'a ck_models::ModelConfig)> {
-    if let Some(config) = registry.get_model(key) {
-        return Some((key.to_string(), config));
+impl ResolvedModel {
+    pub fn canonical_name(&self) -> &str {
+        self.config.name.as_str()
     }
 
-    registry
-        .models
-        .iter()
-        .find(|(_, config)| config.name == key)
-        .map(|(alias, config)| (alias.clone(), config))
+    pub fn dimensions(&self) -> usize {
+        self.config.dimensions
+    }
+}
+
+fn legacy_model_config(name: &str, dimensions: usize) -> ck_models::ModelConfig {
+    ck_models::ModelConfig {
+        name: name.to_string(),
+        provider: "fastembed".to_string(),
+        dimensions,
+        max_tokens: 8192,
+        description: "Legacy ck embedding model preserved for backwards compatibility".to_string(),
+    }
 }
 
 pub(crate) fn resolve_model_from_root(
@@ -236,35 +240,25 @@ pub(crate) fn resolve_model_from_root(
         let manifest: ck_index::IndexManifest = serde_json::from_slice(&data)?;
 
         if let Some(existing_model) = manifest.embedding_model {
-            let (alias, config_opt) = find_model_entry(&registry, &existing_model)
-                .map(|(alias, config)| (alias, Some(config)))
-                .unwrap_or_else(|| (existing_model.clone(), None));
-
-            let dims = manifest
-                .embedding_dimensions
-                .or_else(|| config_opt.map(|c| c.dimensions))
-                .unwrap_or(384);
+            let dims_hint = manifest.embedding_dimensions.unwrap_or(384);
+            let resolved_existing = match registry.resolve(Some(existing_model.as_str())) {
+                Ok((alias, config)) => ResolvedModel { alias, config },
+                Err(_) => ResolvedModel {
+                    alias: existing_model.clone(),
+                    config: legacy_model_config(&existing_model, dims_hint),
+                },
+            };
 
             if let Some(requested) = cli_model {
-                let (_, requested_config) =
-                    find_model_entry(&registry, requested).ok_or_else(|| {
-                        CkError::Embedding(format!(
-                            "Unknown model '{}'. Available models: {}",
-                            requested,
-                            registry
-                                .models
-                                .keys()
-                                .cloned()
-                                .collect::<Vec<_>>()
-                                .join(", ")
-                        ))
-                    })?;
+                let (requested_alias, requested_config) = registry
+                    .resolve(Some(requested))
+                    .map_err(|e| CkError::Embedding(e.to_string()))?;
 
-                if requested_config.name != existing_model {
-                    let suggested_alias = alias.clone();
+                if requested_config.name != resolved_existing.config.name {
+                    let suggested_alias = resolved_existing.alias.clone();
                     return Err(CkError::Embedding(format!(
                         "Index was built with embedding model '{}' (alias '{}'), but '--model {}' was requested. To switch models run `ck --clean .` then `ck --index --model {}`. To keep using this index rerun your command with '--model {}'.",
-                        existing_model,
+                        resolved_existing.config.name,
                         suggested_alias,
                         requested,
                         requested,
@@ -272,42 +266,22 @@ pub(crate) fn resolve_model_from_root(
                     ))
                     .into());
                 }
+
+                return Ok(ResolvedModel {
+                    alias: requested_alias,
+                    config: requested_config,
+                });
             }
 
-            return Ok(ResolvedModel {
-                canonical_name: existing_model,
-                alias,
-                dimensions: dims,
-            });
+            return Ok(resolved_existing);
         }
     }
 
-    let (alias, config) = if let Some(requested) = cli_model {
-        find_model_entry(&registry, requested).ok_or_else(|| {
-            CkError::Embedding(format!(
-                "Unknown model '{}'. Available models: {}",
-                requested,
-                registry
-                    .models
-                    .keys()
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ))
-        })?
-    } else {
-        let alias = registry.default_model.clone();
-        let config = registry.get_default_model().ok_or_else(|| {
-            CkError::Embedding("No default embedding model configured".to_string())
-        })?;
-        (alias, config)
-    };
+    let (alias, config) = registry
+        .resolve(cli_model)
+        .map_err(|e| CkError::Embedding(e.to_string()))?;
 
-    Ok(ResolvedModel {
-        canonical_name: config.name.clone(),
-        alias,
-        dimensions: config.dimensions,
-    })
+    Ok(ResolvedModel { alias, config })
 }
 
 pub fn resolve_model_for_path(path: &Path, cli_model: Option<&str>) -> Result<ResolvedModel> {

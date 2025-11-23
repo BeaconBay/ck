@@ -1,13 +1,20 @@
-use anyhow::Result;
-
-#[cfg(feature = "fastembed")]
+use anyhow::{Result, bail};
+use ck_models::{ModelConfig, ModelRegistry};
 use std::path::{Path, PathBuf};
 
 pub mod reranker;
 pub mod tokenizer;
 
-pub use reranker::{RerankResult, Reranker, create_reranker, create_reranker_with_progress};
+pub use reranker::{
+    RerankResult, Reranker, create_reranker, create_reranker_for_config,
+    create_reranker_with_progress,
+};
 pub use tokenizer::TokenEstimator;
+
+#[cfg(feature = "mixedbread")]
+mod mixedbread;
+#[cfg(feature = "mixedbread")]
+use mixedbread::MixedbreadEmbedder;
 
 pub trait Embedder: Send + Sync {
     fn id(&self) -> &'static str;
@@ -18,6 +25,20 @@ pub trait Embedder: Send + Sync {
 
 pub type ModelDownloadCallback = Box<dyn Fn(&str) + Send + Sync>;
 
+pub(crate) fn model_cache_root() -> Result<PathBuf> {
+    let base = if let Some(cache_home) = std::env::var_os("XDG_CACHE_HOME") {
+        PathBuf::from(cache_home).join("ck")
+    } else if let Some(home) = std::env::var_os("HOME") {
+        PathBuf::from(home).join(".cache").join("ck")
+    } else if let Some(appdata) = std::env::var_os("LOCALAPPDATA") {
+        PathBuf::from(appdata).join("ck").join("cache")
+    } else {
+        PathBuf::from(".ck_models")
+    };
+
+    Ok(base.join("models"))
+}
+
 pub fn create_embedder(model_name: Option<&str>) -> Result<Box<dyn Embedder>> {
     create_embedder_with_progress(model_name, None)
 }
@@ -26,22 +47,52 @@ pub fn create_embedder_with_progress(
     model_name: Option<&str>,
     progress_callback: Option<ModelDownloadCallback>,
 ) -> Result<Box<dyn Embedder>> {
-    let model = model_name.unwrap_or("BAAI/bge-small-en-v1.5");
+    let registry = ModelRegistry::default();
+    let (_, config) = registry.resolve(model_name)?;
+    create_embedder_for_config(&config, progress_callback)
+}
 
-    #[cfg(feature = "fastembed")]
-    {
-        Ok(Box::new(FastEmbedder::new_with_progress(
-            model,
-            progress_callback,
-        )?))
-    }
+pub fn create_embedder_for_config(
+    config: &ModelConfig,
+    progress_callback: Option<ModelDownloadCallback>,
+) -> Result<Box<dyn Embedder>> {
+    match config.provider.as_str() {
+        "fastembed" => {
+            #[cfg(feature = "fastembed")]
+            {
+                return Ok(Box::new(FastEmbedder::new_with_progress(
+                    config.name.as_str(),
+                    progress_callback,
+                )?));
+            }
 
-    #[cfg(not(feature = "fastembed"))]
-    {
-        if let Some(callback) = progress_callback {
-            callback("Using dummy embedder (no model download required)");
+            #[cfg(not(feature = "fastembed"))]
+            {
+                if let Some(callback) = progress_callback.as_ref() {
+                    callback("fastembed provider unavailable; using dummy embedder");
+                }
+                return Ok(Box::new(DummyEmbedder::new_with_model(
+                    config.name.as_str(),
+                )));
+            }
         }
-        Ok(Box::new(DummyEmbedder::new_with_model(model)))
+        "mixedbread" => {
+            #[cfg(feature = "mixedbread")]
+            {
+                return Ok(Box::new(MixedbreadEmbedder::new(
+                    config,
+                    progress_callback,
+                )?));
+            }
+            #[cfg(not(feature = "mixedbread"))]
+            {
+                bail!(
+                    "Model '{}' requires the `mixedbread` feature. Rebuild ck with Mixedbread support.",
+                    config.name
+                );
+            }
+        }
+        provider => bail!("Unsupported embedding provider '{}'", provider),
     }
 }
 
@@ -128,7 +179,7 @@ impl FastEmbedder {
         };
 
         // Configure permanent model cache directory
-        let model_cache_dir = Self::get_model_cache_dir()?;
+        let model_cache_dir = model_cache_root()?;
         std::fs::create_dir_all(&model_cache_dir)?;
 
         if let Some(ref callback) = progress_callback {
@@ -196,22 +247,6 @@ impl FastEmbedder {
             dim,
             model_name: model_name.to_string(),
         })
-    }
-
-    fn get_model_cache_dir() -> Result<PathBuf> {
-        // Use platform-appropriate cache directory
-        let cache_dir = if let Some(cache_home) = std::env::var_os("XDG_CACHE_HOME") {
-            PathBuf::from(cache_home).join("ck")
-        } else if let Some(home) = std::env::var_os("HOME") {
-            PathBuf::from(home).join(".cache").join("ck")
-        } else if let Some(appdata) = std::env::var_os("LOCALAPPDATA") {
-            PathBuf::from(appdata).join("ck").join("cache")
-        } else {
-            // Fallback to current directory if no home found
-            PathBuf::from(".ck_models")
-        };
-
-        Ok(cache_dir.join("models"))
     }
 
     fn check_model_exists(cache_dir: &Path, model_name: &str) -> bool {

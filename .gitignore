@@ -34,3 +34,4 @@ docs-site/.vitepress/.temp
 
 # Claude Code local settings
 .claude/
+docs/tasks

@@ -57,3 +57,9 @@ pdf-extract = "0.9"
 uuid = { version = "1.8", features = ["v4", "serde"] }
 base64 = "0.22"
 sha2 = "0.10"
+hf-hub = { version = "0.4.3", default-features = false, features = ["ureq"] }
+tokenizers = "0.20.1"
+ort = { version = "2.0.0-rc.10", default-features = false, features = ["download-binaries"] }
+once_cell = "1.19"
+ndarray = { version = "0.16", default-features = false, features = ["std"] }
+num_cpus = "1.16"
