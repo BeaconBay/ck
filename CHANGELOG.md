@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Mixedbread model support**: Added first-class support for Mixedbread embedding and reranking models
+  - Embedding model: `mxbai-xsmall` (`mixedbread-ai/mxbai-embed-xsmall-v1`) - 384 dimensions, 4K context window
+  - Reranker: `mxbai` (`mixedbread-ai/mxbai-rerank-xsmall-v1`) - Neural cross-encoder reranker
+  - Fully local inference using ONNX Runtime with quantized models
+  - Provider abstraction for clean model selection and routing
+  - Model registry integration with `mxbai-xsmall` alias
+  - CLI support: `--model mxbai-xsmall` and `--rerank-model mxbai`
+  - MCP server support for Mixedbread models in semantic/hybrid search tools
 - **VitePress documentation site**: Comprehensive documentation with improved navigation, search, and structure in `docs-site/` directory
 - **Documentation features**: Guide pages, feature documentation, CLI reference, embedding model guide, architecture docs, and contributing guides
 - **Local search**: Built-in search functionality in documentation site

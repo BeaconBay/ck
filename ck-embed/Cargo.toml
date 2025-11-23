@@ -12,13 +12,28 @@ categories = ["science"]
 
 [dependencies]
 ck-core = { version = "0.7.1", path = "../ck-core" }
+ck-models = { version = "0.7.1", path = "../ck-models" }
 
 anyhow = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true }
 
 fastembed = { workspace = true, optional = true }
+hf-hub = { workspace = true, optional = true }
+tokenizers = { workspace = true, optional = true }
+ort = { workspace = true, optional = true }
+once_cell = { workspace = true, optional = true }
+ndarray = { workspace = true, optional = true }
+num_cpus = { workspace = true, optional = true }
 
 [features]
-default = ["fastembed"]
+default = ["fastembed", "mixedbread"]
 fastembed = ["dep:fastembed"]
+mixedbread = [
+    "dep:hf-hub",
+    "dep:tokenizers",
+    "dep:ort",
+    "dep:once_cell",
+    "dep:ndarray",
+    "dep:num_cpus",
+]

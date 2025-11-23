@@ -1,6 +1,6 @@
 ---
 title: Embedding Models
-description: Compare BGE-Small, Nomic V1.5, and Jina Code embedding models for ck. Understand chunk sizes, context windows, and performance trade-offs.
+description: Compare BGE-Small, Mixedbread xsmall, Nomic V1.5, and Jina Code embedding models for ck. Understand chunk sizes, context windows, and performance trade-offs.
 ---
 
 # Embedding Models
@@ -95,18 +95,49 @@ ck --index --model jina-code .
 - Larger model download
 - May be overkill for simple searches
 
+### Mixedbread xsmall
+
+```bash
+ck --index --model mxbai-xsmall .
+```
+
+**Specifications:**
+- Chunk size: Variable (up to 4096 tokens)
+- Model capacity: 4096 tokens
+- Dimensions: 384
+- Size: ~150MB (quantized ONNX)
+- Provider: Mixedbread (ONNX Runtime)
+
+**Best for:**
+- Local semantic search
+- Code + natural language understanding
+- Balanced performance and quality
+- Optimized for local inference
+
+**Pros:**
+- Optimized for local inference
+- Good balance of speed and quality
+- 4K context window
+- Quantized model (smaller download)
+- Strong semantic understanding
+
+**Cons:**
+- Newer model (less field-tested than BGE)
+- Requires ONNX Runtime
+
 ## Comparison Table
 
-| Feature | BGE-Small | Nomic V1.5 | Jina Code |
-|---------|-----------|------------|-----------|
-| Chunk Size | 400 tokens | 1024 tokens | 1024 tokens |
-| Context Window | 512 tokens | 8K tokens | 8K tokens |
-| Dimensions | 384 | 768 | 768 |
-| Download Size | ~80MB | ~500MB | ~500MB |
-| Index Speed | ⚡⚡⚡ | ⚡⚡ | ⚡⚡ |
-| Memory Usage | Low | Medium | Medium |
-| Code Understanding | Good | Good | Excellent |
-| Large Functions | Fair | Excellent | Excellent |
+| Feature | BGE-Small | Mixedbread xsmall | Nomic V1.5 | Jina Code |
+|---------|-----------|-------------------|------------|-----------|
+| Chunk Size | 400 tokens | Up to 4096 tokens | 1024 tokens | 1024 tokens |
+| Context Window | 512 tokens | 4K tokens | 8K tokens | 8K tokens |
+| Dimensions | 384 | 384 | 768 | 768 |
+| Download Size | ~80MB | ~150MB | ~500MB | ~500MB |
+| Index Speed | ⚡⚡⚡ | ⚡⚡⚡ | ⚡⚡ | ⚡⚡ |
+| Memory Usage | Low | Low | Medium | Medium |
+| Code Understanding | Good | Excellent | Good | Excellent |
+| Large Functions | Fair | Good | Excellent | Excellent |
+| Provider | FastEmbed | Mixedbread | FastEmbed | FastEmbed |
 
 ## Model Selection Guide
 
@@ -121,6 +152,8 @@ ck --index --model bge-small .
 **Medium projects (10K-100K LOC):**
 ```bash
 ck --index --model bge-small .      # Fast iteration
+# or
+ck --index --model mxbai-xsmall .   # Balanced performance
 # or
 ck --index --model jina-code .      # Better understanding
 ```

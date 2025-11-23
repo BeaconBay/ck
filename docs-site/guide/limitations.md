@@ -135,19 +135,18 @@ Rebuilding takes time but is necessary when changing models.
 
 ### Limited Embedding Model Options
 
-**Issue**: Only models supported by fastembed-rs are available.
+**Issue**: Only models supported by the built-in providers are available.
 
 **Current models**:
-- `bge-small` (default)
-- `nomic-v1.5`
-- `jina-code`
+- **FastEmbed provider**: `bge-small` (default), `nomic-v1.5`, `jina-code`
+- **Mixedbread provider**: `mxbai-xsmall` (embedding), `mxbai` (reranker)
 
 **Not supported**:
-- Custom ONNX models
+- Custom ONNX models (beyond Mixedbread)
 - External API-based models (OpenAI, Anthropic, HuggingFace Inference API)
 - Proprietary embedding services
 
-**Why**: `ck` uses fastembed-rs for fast local inference, which limits options to its supported models.
+**Why**: `ck` uses fastembed-rs and Mixedbread ONNX Runtime for fast local inference, which limits options to supported models. The provider abstraction allows adding new providers in the future.
 
 **Future consideration**: External embedding API support is being considered for users who want to use specific models.
 

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
@@ -69,6 +69,17 @@ impl Default for ModelRegistry {
             },
         );
 
+        models.insert(
+            "mxbai-xsmall".to_string(),
+            ModelConfig {
+                name: "mixedbread-ai/mxbai-embed-xsmall-v1".to_string(),
+                provider: "mixedbread".to_string(),
+                dimensions: 384,
+                max_tokens: 4096,
+                description: "Mixedbread xsmall embedding model (4k context, 384 dims) optimized for local semantic search".to_string(),
+            },
+        );
+
         Self {
             models,
             default_model: "bge-small".to_string(), // Keep BGE as default for backward compatibility
@@ -77,6 +88,50 @@ impl Default for ModelRegistry {
 }
 
 impl ModelRegistry {
+    fn format_available_models(&self) -> String {
+        self.models.keys().cloned().collect::<Vec<_>>().join(", ")
+    }
+
+    fn resolve_alias_or_name(&self, key: &str) -> Option<(String, &ModelConfig)> {
+        if let Some(config) = self.models.get(key) {
+            return Some((key.to_string(), config));
+        }
+
+        self.models
+            .iter()
+            .find(|(_, config)| config.name == key)
+            .map(|(alias, config)| (alias.clone(), config))
+    }
+
+    pub fn resolve(&self, requested: Option<&str>) -> Result<(String, ModelConfig)> {
+        match requested {
+            Some(name) => {
+                let (alias, config) = self.resolve_alias_or_name(name).ok_or_else(|| {
+                    anyhow!(
+                        "Unknown model '{}'. Available models: {}",
+                        name,
+                        self.format_available_models()
+                    )
+                })?;
+                Ok((alias, config.clone()))
+            }
+            None => {
+                let alias = self.default_model.clone();
+                let config = self
+                    .get_default_model()
+                    .cloned()
+                    .ok_or_else(|| anyhow!("No default model configured in registry"))?;
+                Ok((alias, config))
+            }
+        }
+    }
+
+    pub fn aliases(&self) -> Vec<String> {
+        let mut keys = self.models.keys().cloned().collect::<Vec<_>>();
+        keys.sort();
+        keys
+    }
+
     pub fn load(path: &Path) -> Result<Self> {
         if path.exists() {
             let data = std::fs::read_to_string(path)?;
@@ -98,6 +153,107 @@ impl ModelRegistry {
 
     pub fn get_default_model(&self) -> Option<&ModelConfig> {
         self.models.get(&self.default_model)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RerankModelConfig {
+    pub name: String,
+    pub provider: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RerankModelRegistry {
+    pub models: HashMap<String, RerankModelConfig>,
+    pub default_model: String,
+}
+
+impl Default for RerankModelRegistry {
+    fn default() -> Self {
+        let mut models = HashMap::new();
+
+        models.insert(
+            "jina".to_string(),
+            RerankModelConfig {
+                name: "jina-reranker-v1-turbo-en".to_string(),
+                provider: "fastembed".to_string(),
+                description:
+                    "Jina Turbo reranker (default) tuned for English code + text relevance"
+                        .to_string(),
+            },
+        );
+
+        models.insert(
+            "bge".to_string(),
+            RerankModelConfig {
+                name: "BAAI/bge-reranker-base".to_string(),
+                provider: "fastembed".to_string(),
+                description: "BGE reranker base model for multilingual use cases".to_string(),
+            },
+        );
+
+        models.insert(
+            "mxbai".to_string(),
+            RerankModelConfig {
+                name: "mixedbread-ai/mxbai-rerank-xsmall-v1".to_string(),
+                provider: "mixedbread".to_string(),
+                description: "Mixedbread xsmall reranker (quantized) optimized for local inference"
+                    .to_string(),
+            },
+        );
+
+        Self {
+            models,
+            default_model: "jina".to_string(),
+        }
+    }
+}
+
+impl RerankModelRegistry {
+    fn format_available_models(&self) -> String {
+        self.models.keys().cloned().collect::<Vec<_>>().join(", ")
+    }
+
+    fn resolve_alias_or_name(&self, key: &str) -> Option<(String, &RerankModelConfig)> {
+        if let Some(config) = self.models.get(key) {
+            return Some((key.to_string(), config));
+        }
+
+        self.models
+            .iter()
+            .find(|(_, config)| config.name == key)
+            .map(|(alias, config)| (alias.clone(), config))
+    }
+
+    pub fn resolve(&self, requested: Option<&str>) -> Result<(String, RerankModelConfig)> {
+        match requested {
+            Some(name) => {
+                let (alias, config) = self.resolve_alias_or_name(name).ok_or_else(|| {
+                    anyhow!(
+                        "Unknown rerank model '{}'. Available models: {}",
+                        name,
+                        self.format_available_models()
+                    )
+                })?;
+                Ok((alias, config.clone()))
+            }
+            None => {
+                let alias = self.default_model.clone();
+                let config = self
+                    .models
+                    .get(&self.default_model)
+                    .cloned()
+                    .ok_or_else(|| anyhow!("No default reranking model configured"))?;
+                Ok((alias, config))
+            }
+        }
+    }
+
+    pub fn aliases(&self) -> Vec<String> {
+        let mut keys = self.models.keys().cloned().collect::<Vec<_>>();
+        keys.sort();
+        keys
     }
 }
 
