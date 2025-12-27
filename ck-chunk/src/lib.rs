@@ -995,7 +995,9 @@ fn should_attach_leading_trivia(language: ParseableLanguage, node: &tree_sitter:
     }
 
     match language {
-        ParseableLanguage::Rust => kind == "attribute_item",
+        ParseableLanguage::Rust => {
+            matches!(kind, "line_comment" | "block_comment" | "attribute_item")
+        }
         ParseableLanguage::Python => kind == "decorator",
         ParseableLanguage::TypeScript | ParseableLanguage::JavaScript => kind == "decorator",
         ParseableLanguage::CSharp => matches!(kind, "attribute_list" | "attribute"),
@@ -1540,6 +1542,17 @@ pub mod utils {
         assert!(chunk_types.contains(&&ChunkType::Class)); // struct
         assert!(chunk_types.contains(&&ChunkType::Module)); // impl and mod
         assert!(chunk_types.contains(&&ChunkType::Function)); // functions
+    }
+
+    #[test]
+    fn test_rust_doc_comments_attached() {
+        let rust_code = r#"
+/// Doc comment
+pub struct Foo {}
+"#;
+        let chunks = chunk_language(rust_code, ParseableLanguage::Rust).unwrap();
+        let struct_chunk = chunks.iter().find(|c| c.text.contains("struct Foo")).unwrap();
+        assert!(struct_chunk.text.contains("/// Doc comment"), "Doc comment should be attached");
     }
 
     #[test]
