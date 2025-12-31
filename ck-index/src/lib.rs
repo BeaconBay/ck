@@ -213,7 +213,11 @@ pub fn collect_files(
         let combined_overrides = build_overrides(path, &all_patterns)?;
 
         let mut walker_builder = WalkBuilder::new(path);
-        walker_builder.git_ignore(false).hidden(true);
+        walker_builder
+            .git_ignore(false)
+            .git_global(false)
+            .git_exclude(false)
+            .hidden(true);
 
         // Add .ckignore support even without gitignore
         if options.use_ckignore {
@@ -2013,6 +2017,55 @@ mod tests {
         assert!(!nested_dir.exists());
         assert!(!test_path.join("level1").join("level2").exists());
         assert!(!test_path.join("level1").exists());
+    }
+
+    /// Tests that respect_gitignore=false disables .git/info/exclude patterns.
+    #[test]
+    fn test_no_ignore_disables_git_exclude() {
+        let temp_dir = TempDir::new().unwrap();
+        let test_path = temp_dir.path();
+
+        // Create .git/info directory structure
+        fs::create_dir_all(test_path.join(".git/info")).unwrap();
+
+        // Create a visible file at root
+        fs::write(test_path.join("visible.txt"), "visible content").unwrap();
+
+        // Create a directory that will be excluded via .git/info/exclude
+        let excluded_dir = test_path.join("excluded_dir");
+        fs::create_dir(&excluded_dir).unwrap();
+        fs::write(excluded_dir.join("hidden.txt"), "hidden content").unwrap();
+
+        // Use .git/info/exclude (not .gitignore) to test git_exclude() behavior
+        fs::write(test_path.join(".git/info/exclude"), "/excluded_dir\n").unwrap();
+
+        // With respect_gitignore=true, .git/info/exclude should be honored
+        let options_respect = ck_core::FileCollectionOptions {
+            respect_gitignore: true,
+            use_ckignore: false,
+            exclude_patterns: vec![],
+        };
+        let files = collect_files(test_path, &options_respect).unwrap();
+        assert_eq!(
+            files.len(),
+            1,
+            "With respect_gitignore=true, .git/info/exclude should hide files, found: {:?}",
+            files
+        );
+
+        // With respect_gitignore=false, .git/info/exclude should be ignored
+        let options_no_ignore = ck_core::FileCollectionOptions {
+            respect_gitignore: false,
+            use_ckignore: false,
+            exclude_patterns: vec![],
+        };
+        let files = collect_files(test_path, &options_no_ignore).unwrap();
+        assert_eq!(
+            files.len(),
+            2,
+            "With respect_gitignore=false, .git/info/exclude should be ignored, found: {:?}",
+            files
+        );
     }
 }
 
