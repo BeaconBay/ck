@@ -136,6 +136,7 @@ pub enum ParseableLanguage {
     Go,
     CSharp,
     Zig,
+    Dart,
 }
 
 impl std::fmt::Display for ParseableLanguage {
@@ -150,6 +151,7 @@ impl std::fmt::Display for ParseableLanguage {
             ParseableLanguage::Go => "go",
             ParseableLanguage::CSharp => "csharp",
             ParseableLanguage::Zig => "zig",
+            ParseableLanguage::Dart => "dart",
         };
         write!(f, "{}", name)
     }
@@ -169,6 +171,7 @@ impl TryFrom<ck_core::Language> for ParseableLanguage {
             ck_core::Language::Go => Ok(ParseableLanguage::Go),
             ck_core::Language::CSharp => Ok(ParseableLanguage::CSharp),
             ck_core::Language::Zig => Ok(ParseableLanguage::Zig),
+            ck_core::Language::Dart => Ok(ParseableLanguage::Dart),
             _ => Err(anyhow::anyhow!(
                 "Language {:?} is not supported for parsing",
                 lang
@@ -347,6 +350,12 @@ fn chunk_generic_with_token_config(text: &str, model_name: Option<&str>) -> Resu
 }
 
 pub(crate) fn tree_sitter_language(language: ParseableLanguage) -> Result<tree_sitter::Language> {
+    // tree-sitter-dart v0.0.4 uses an older API that returns Language directly,
+    // while newer bindings (v0.24+) require calling .into() on a factory struct.
+    if language == ParseableLanguage::Dart {
+        return Ok(tree_sitter_dart::language());
+    }
+
     let ts_language = match language {
         ParseableLanguage::Python => tree_sitter_python::LANGUAGE,
         ParseableLanguage::TypeScript | ParseableLanguage::JavaScript => {
@@ -358,6 +367,7 @@ pub(crate) fn tree_sitter_language(language: ParseableLanguage) -> Result<tree_s
         ParseableLanguage::Go => tree_sitter_go::LANGUAGE,
         ParseableLanguage::CSharp => tree_sitter_c_sharp::LANGUAGE,
         ParseableLanguage::Zig => tree_sitter_zig::LANGUAGE,
+        ParseableLanguage::Dart => unreachable!("Handled above via early return"),
     };
 
     Ok(ts_language.into())
@@ -781,6 +791,20 @@ fn chunk_type_for_node(
                 | "interface_declaration"
                 | "variable_declaration"
         ),
+        ParseableLanguage::Dart => matches!(
+            kind,
+            "class_definition"
+                | "class_declaration"
+                | "mixin_declaration"
+                | "enum_declaration"
+                | "function_declaration"
+                | "method_declaration"
+                | "constructor_declaration"
+                | "variable_declaration"
+                | "local_variable_declaration"
+                | "lambda_expression"
+                | "class_member_definition"
+        ),
         ParseableLanguage::Zig => matches!(
             kind,
             "function_declaration"
@@ -1098,6 +1122,9 @@ fn display_name_for_node(
         ParseableLanguage::Go => find_identifier(node, source, &["identifier", "type_identifier"]),
         ParseableLanguage::CSharp => find_identifier(node, source, &["identifier"]),
         ParseableLanguage::Zig => find_identifier(node, source, &["identifier"]),
+        ParseableLanguage::Dart => {
+            find_identifier(node, source, &["identifier", "type_identifier"])
+        }
     }
 }
 
@@ -1195,6 +1222,12 @@ fn is_method_context(node: tree_sitter::Node<'_>, language: ParseableLanguage) -
     const TYPESCRIPT_CONTAINERS: &[&str] = &["class_body", "class_declaration"];
     const RUBY_CONTAINERS: &[&str] = &["class", "module"];
     const RUST_CONTAINERS: &[&str] = &["impl_item", "trait_item"];
+    const DART_CONTAINERS: &[&str] = &[
+        "class_definition",
+        "class_declaration",
+        "mixin_declaration",
+        "enum_declaration",
+    ];
 
     match language {
         ParseableLanguage::Python => ancestor_has_kind(node, PYTHON_CONTAINERS),
@@ -1207,6 +1240,7 @@ fn is_method_context(node: tree_sitter::Node<'_>, language: ParseableLanguage) -
         ParseableLanguage::CSharp => false,
         ParseableLanguage::Haskell => false,
         ParseableLanguage::Zig => false,
+        ParseableLanguage::Dart => ancestor_has_kind(node, DART_CONTAINERS),
     }
 }
 
