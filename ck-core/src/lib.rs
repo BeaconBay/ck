@@ -53,6 +53,7 @@ pub enum Language {
     Swift,
     Kotlin,
     Zig,
+    Dart,
     Pdf,
 }
 
@@ -76,6 +77,7 @@ impl Language {
             "swift" => Some(Language::Swift),
             "kt" | "kts" => Some(Language::Kotlin),
             "zig" => Some(Language::Zig),
+            "dart" => Some(Language::Dart),
             "pdf" => Some(Language::Pdf),
             _ => None,
         }
@@ -106,6 +108,7 @@ impl std::fmt::Display for Language {
             Language::Swift => "swift",
             Language::Kotlin => "kotlin",
             Language::Zig => "zig",
+            Language::Dart => "dart",
             Language::Pdf => "pdf",
         };
         write!(f, "{}", name)

@@ -90,6 +90,7 @@ fn builtin_query(language: ParseableLanguage) -> Option<&'static str> {
         ParseableLanguage::Go => Some(include_str!("../queries/go/tags.scm")),
         ParseableLanguage::CSharp => Some(include_str!("../queries/csharp/tags.scm")),
         ParseableLanguage::Zig => Some(include_str!("../queries/zig/tags.scm")),
+        ParseableLanguage::Dart => Some(include_str!("../queries/dart/tags.scm")),
     }
 }
 
@@ -313,5 +314,48 @@ const compute = (x: number) => x * 2;
                 .iter()
                 .any(|text| text.contains("Another comment"))
         );
+    }
+
+    #[test]
+    fn dart_queries_capture_core_constructs() {
+        let source = r#"
+class Helper {
+  Helper();
+  void help() {}
+}
+
+mixin MyMixin {}
+
+enum State { on, off }
+
+void globalFunc() {}
+
+const int MAX = 100;
+"#;
+
+        let mut parser = Parser::new();
+        let ts_language = tree_sitter_language(ParseableLanguage::Dart).expect("dart language");
+        parser
+            .set_language(&ts_language)
+            .expect("set dart language");
+        let tree = parser.parse(source, None).expect("parse dart source");
+        println!("Dart Tree: {}", tree.root_node().to_sexp());
+
+        let chunks = chunk_with_queries(ParseableLanguage::Dart, ts_language, &tree, source)
+            .expect("query execution") // This should fail if query is invalid
+            .expect("query should be available");
+
+        assert!(chunks.iter().any(|chunk| {
+            chunk.chunk_type == ChunkType::Class && chunk.text.contains("class Helper")
+        }));
+
+        // Check global function capture - note: name extraction might need work if it fails
+        let global_func = chunks
+            .iter()
+            .find(|chunk| chunk.text.contains("globalFunc"));
+        assert!(global_func.is_some(), "Should capture global function");
+        if let Some(func) = global_func {
+            println!("Global Func Metadata: {:?}", func.metadata);
+        }
     }
 }
