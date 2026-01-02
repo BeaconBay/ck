@@ -288,6 +288,7 @@ ck --inspect --model bge-small src/main.rs  # Test different models
 | Ruby | ✅ | ✅ | ✅ Classes, methods, modules |
 | Haskell | ✅ | ✅ | ✅ Functions, types, instances |
 | C# | ✅ | ✅ | ✅ Classes, interfaces, methods |
+| Dart | ✅ | ✅ | ✅ Classes, mixins, methods |
 
 **Text Formats:** Markdown, JSON, YAML, TOML, XML, HTML, CSS, shell scripts, SQL, log files, config files, and any other text format.
 
