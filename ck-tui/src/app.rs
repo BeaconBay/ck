@@ -577,6 +577,7 @@ impl TuiApp {
             respect_gitignore: true,
             use_ckignore: true,
             full_section: false,
+            hidden: false,
             rerank: false,
             rerank_model: None,
             embedding_model: None,

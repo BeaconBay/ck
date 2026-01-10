@@ -298,6 +298,19 @@ pub struct FileCollectionOptions {
     pub use_ckignore: bool,
     /// Patterns to exclude files/directories
     pub exclude_patterns: Vec<String>,
+    /// Whether to include hidden (dot-prefixed) files and directories
+    pub show_hidden: bool,
+}
+
+impl Default for FileCollectionOptions {
+    fn default() -> Self {
+        Self {
+            respect_gitignore: true,
+            use_ckignore: true,
+            exclude_patterns: Vec::new(),
+            show_hidden: false,
+        }
+    }
 }
 
 impl From<&SearchOptions> for FileCollectionOptions {
@@ -306,6 +319,7 @@ impl From<&SearchOptions> for FileCollectionOptions {
             respect_gitignore: opts.respect_gitignore,
             use_ckignore: true, // Always use .ckignore for hierarchical ignore support
             exclude_patterns: opts.exclude_patterns.clone(),
+            show_hidden: opts.hidden,
         }
     }
 }
@@ -338,6 +352,7 @@ pub struct SearchOptions {
     pub respect_gitignore: bool,
     pub use_ckignore: bool,
     pub full_section: bool,
+    pub hidden: bool,
     // Enhanced embedding options (search-time only)
     pub rerank: bool,
     pub rerank_model: Option<String>,
@@ -395,6 +410,7 @@ impl Default for SearchOptions {
             respect_gitignore: true,
             use_ckignore: true,
             full_section: false,
+            hidden: false,
             // Enhanced embedding options (search-time only)
             rerank: false,
             rerank_model: None,

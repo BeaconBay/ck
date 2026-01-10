@@ -191,7 +191,7 @@ pub fn collect_files(
             .git_ignore(true)
             .git_global(true)
             .git_exclude(true)
-            .hidden(true);
+            .hidden(!options.show_hidden);
 
         // Add .ckignore support (hierarchical, like .gitignore)
         if options.use_ckignore {
@@ -213,7 +213,7 @@ pub fn collect_files(
         let combined_overrides = build_overrides(path, &all_patterns)?;
 
         let mut walker_builder = WalkBuilder::new(path);
-        walker_builder.git_ignore(false).hidden(true);
+        walker_builder.git_ignore(false).hidden(!options.show_hidden);
 
         // Add .ckignore support even without gitignore
         if options.use_ckignore {
@@ -1830,6 +1830,7 @@ mod tests {
             respect_gitignore: true,
             use_ckignore: true,
             exclude_patterns: vec![],
+            show_hidden: false,
         };
 
         // First index
@@ -1892,6 +1893,7 @@ mod tests {
             respect_gitignore: true,
             use_ckignore: true,
             exclude_patterns: vec![],
+            show_hidden: false,
         };
         let stats = cleanup_index(test_path, &file_options).unwrap();
         assert_eq!(stats.orphaned_entries_removed, 1);

@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **`--hidden` flag**: Include hidden (dot-prefixed) files and directories in indexing and search operations
 - **VitePress documentation site**: Comprehensive documentation with improved navigation, search, and structure in `docs-site/` directory
 - **Documentation features**: Guide pages, feature documentation, CLI reference, embedding model guide, architecture docs, and contributing guides
 - **Local search**: Built-in search functionality in documentation site

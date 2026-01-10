@@ -432,6 +432,7 @@ fn regex_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
             respect_gitignore: options.respect_gitignore,
             use_ckignore: true,
             exclude_patterns: options.exclude_patterns.clone(),
+            show_hidden: options.hidden,
         };
         let collected = ck_index::collect_files(&options.path, &file_options)?;
         filter_files_by_include(collected, &options.include_patterns)

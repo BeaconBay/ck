@@ -821,3 +821,81 @@ fn test_add_file_with_relative_path() {
     let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(stdout.contains("Relative path content"));
 }
+
+#[test]
+#[serial]
+fn test_hidden_flag_includes_hidden_files() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // Create a regular file
+    fs::write(temp_dir.path().join("visible.txt"), "visible content").unwrap();
+
+    // Create a hidden directory with a file inside
+    let hidden_dir = temp_dir.path().join(".hidden-test");
+    fs::create_dir(&hidden_dir).unwrap();
+    fs::write(hidden_dir.join("secret.txt"), "hidden secret content").unwrap();
+
+    // Create a hidden file at root level
+    fs::write(temp_dir.path().join(".hidden-file.txt"), "hidden file content").unwrap();
+
+    // First, index WITHOUT --hidden flag
+    let output = Command::new(ck_binary())
+        .args(["--index", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck --index");
+
+    assert!(output.status.success());
+
+    // Search for "hidden" - should NOT find the hidden files
+    let output = Command::new(ck_binary())
+        .args(["hidden", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck search");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    // Should not contain hidden directory content
+    assert!(
+        !stdout.contains("hidden secret content"),
+        "Hidden directory content should NOT be indexed without --hidden flag"
+    );
+    assert!(
+        !stdout.contains("hidden file content"),
+        "Hidden file content should NOT be indexed without --hidden flag"
+    );
+
+    // Clean the index
+    let _ = Command::new(ck_binary())
+        .args(["--clean", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck --clean");
+
+    // Now index WITH --hidden flag
+    let output = Command::new(ck_binary())
+        .args(["--hidden", "--index", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck --hidden --index");
+
+    assert!(output.status.success());
+
+    // Search for "hidden" WITH --hidden flag - should now find the hidden files
+    let output = Command::new(ck_binary())
+        .args(["--hidden", "hidden", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck search");
+
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    // Should now contain hidden directory content
+    assert!(
+        stdout.contains("hidden secret content"),
+        "Hidden directory content should be indexed with --hidden flag"
+    );
+    assert!(
+        stdout.contains("hidden file content"),
+        "Hidden file content should be indexed with --hidden flag"
+    );
+}
