@@ -182,7 +182,8 @@ jobs:
       - name: Generate SHA256
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            certutil -hashfile ${{ env.ARCHIVE_NAME }}.zip SHA256 > ${{ env.ARCHIVE_NAME }}.zip.sha256
+            # Use PowerShell to generate GNU coreutils-compatible format
+            powershell -Command "(Get-FileHash -Algorithm SHA256 '${{ env.ARCHIVE_NAME }}.zip').Hash.ToLower() + '  ${{ env.ARCHIVE_NAME }}.zip'" > ${{ env.ARCHIVE_NAME }}.zip.sha256
           else
             if [ "${{ matrix.os }}" = "macos-latest" ]; then
               shasum -a 256 ${{ env.ARCHIVE_NAME }}.tar.gz > ${{ env.ARCHIVE_NAME }}.tar.gz.sha256
