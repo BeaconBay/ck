@@ -135,7 +135,9 @@ pub struct SemanticSearchRequest {
     pub path: String,
     pub top_k: Option<usize>,
     pub threshold: Option<f32>,
+    #[schemars(with = "Vec<String>")]
     pub include_patterns: Option<Vec<String>>,
+    #[schemars(with = "Vec<String>")]
     pub exclude_patterns: Option<Vec<String>>,
     pub respect_gitignore: Option<bool>,
     pub use_default_excludes: Option<bool>,
@@ -160,7 +162,9 @@ pub struct RegexSearchRequest {
     pub path: String,
     pub ignore_case: Option<bool>,
     pub context: Option<usize>,
+    #[schemars(with = "Vec<String>")]
     pub include_patterns: Option<Vec<String>>,
+    #[schemars(with = "Vec<String>")]
     pub exclude_patterns: Option<Vec<String>>,
     pub respect_gitignore: Option<bool>,
     pub use_default_excludes: Option<bool>,
@@ -179,7 +183,9 @@ pub struct HybridSearchRequest {
     pub path: String,
     pub top_k: Option<usize>,
     pub threshold: Option<f32>,
+    #[schemars(with = "Vec<String>")]
     pub include_patterns: Option<Vec<String>>,
+    #[schemars(with = "Vec<String>")]
     pub exclude_patterns: Option<Vec<String>>,
     pub respect_gitignore: Option<bool>,
     pub use_default_excludes: Option<bool>,
@@ -204,7 +210,9 @@ pub struct LexicalSearchRequest {
     pub path: String,
     pub top_k: Option<usize>,
     pub threshold: Option<f32>,
+    #[schemars(with = "Vec<String>")]
     pub include_patterns: Option<Vec<String>>,
+    #[schemars(with = "Vec<String>")]
     pub exclude_patterns: Option<Vec<String>>,
     pub respect_gitignore: Option<bool>,
     pub use_default_excludes: Option<bool>,
