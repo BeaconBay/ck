@@ -31,15 +31,16 @@ Always check existing tags first: `git tag --sort=-version:refname`
 
 ### Version Bump Process
 
-When bumping versions:
+All nine crates ship in lockstep. To bump from OLD to NEW:
 
-1. **Update workspace version**: `Cargo.toml` (workspace level)
-2. **Update ALL crate versions**: Use find/replace across all `Cargo.toml` files
-   ```bash
-   find . -name "Cargo.toml" -exec sed -i '' 's/version = "OLD"/version = "NEW"/g' {} \;
-   ```
-3. **Update documentation versions**: Check `PRD.txt` and other docs
-4. **Update CHANGELOG.md**: Add comprehensive release notes (see format below)
+1. **Workspace `Cargo.toml`** — update two places:
+   - `[workspace.package] version = "NEW"`
+   - The eight `ck-* = { path = "...", version = "NEW", ... }` lines under `[workspace.dependencies]`
+2. **Update `CHANGELOG.md`** with release notes (format below)
+3. **Tag** as `X.Y.Z` (no `v` prefix) — `release.yml` does the rest
+
+That's it. Individual crate `Cargo.toml` files inherit the workspace version
+via `version.workspace = true` and depend on siblings via `{ workspace = true }`.
 
 ### CHANGELOG.md Format
 
