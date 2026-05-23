@@ -11,8 +11,8 @@ keywords = ["embedding", "nlp", "semantic"]
 categories = ["science"]
 
 [dependencies]
-ck-core = { version = "0.7.4", path = "../ck-core" }
-ck-models = { version = "0.7.4", path = "../ck-models" }
+ck-core = { workspace = true }
+ck-models = { workspace = true }
 
 anyhow = { workspace = true }
 serde = { workspace = true }

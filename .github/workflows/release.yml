@@ -230,6 +230,17 @@ jobs:
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
+          set -euo pipefail
+
+          # Fail fast and loud if the secret isn't set — without this,
+          # cargo publish returns 403 but the `cargo ... | tee` pipeline
+          # used to mask that exit code, leading to a 10-minute false-
+          # success verify loop before the job finally aborted.
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "::error::CARGO_REGISTRY_TOKEN repo secret is not set"
+            exit 1
+          fi
+
           # Function to publish with retries and verification
           publish_crate() {
             local package=$1
@@ -241,7 +252,9 @@ jobs:
             for attempt in $(seq 1 $max_attempts); do
               echo "Attempt $attempt/$max_attempts for $package"
 
-              # Try to publish
+              # Capture cargo's real exit code — pipefail makes the
+              # pipeline reflect cargo, not tee. Without it, "tee"
+              # always returns 0 and would hide publish failures.
               if cargo publish -p "$package" --token "$CARGO_REGISTRY_TOKEN" 2>&1 | tee /tmp/publish_output.txt; then
                 echo "Successfully published $package"
                 return 0
@@ -273,17 +286,20 @@ jobs:
           }
 
           # Function to verify crate is available on crates.io
+          # crates.io API requires a User-Agent header; without it the
+          # request returns 403 and breaks the publish chain.
           verify_crate() {
             local package=$1
             local version=$2
             local max_attempts=20
             local wait_time=30
             local url="https://crates.io/api/v1/crates/${package}/${version}"
+            local ua="ck-release (github.com/BeaconBay/ck)"
 
             echo "Verifying $package v$version is available on crates.io..."
 
             for attempt in $(seq 1 $max_attempts); do
-              if curl --silent --show-error --fail "$url" >/dev/null; then
+              if curl --silent --show-error --fail -H "User-Agent: $ua" "$url" >/dev/null; then
                 echo "$package v$version verified on crates.io"
                 return 0
               fi
@@ -293,7 +309,7 @@ jobs:
             done
 
             echo "Failed to verify $package v$version on crates.io"
-            curl --silent --show-error "$url" || true
+            curl --silent --show-error -H "User-Agent: $ua" "$url" || true
             return 1
           }
 
@@ -310,6 +326,7 @@ jobs:
             "ck-ann"
             "ck-index"
             "ck-engine"
+            "ck-tui"
             "ck-search"
           )
 

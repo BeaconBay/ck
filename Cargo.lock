@@ -394,7 +394,7 @@ dependencies = [
 
 [[package]]
 name = "ck-ann"
-version = "0.7.4"
+version = "0.7.6"
 dependencies = [
  "anyhow",
  "bincode",
@@ -405,7 +405,7 @@ dependencies = [
 
 [[package]]
 name = "ck-chunk"
-version = "0.7.4"
+version = "0.7.6"
 dependencies = [
  "anyhow",
  "ck-core",
@@ -428,7 +428,7 @@ dependencies = [
 
 [[package]]
 name = "ck-core"
-version = "0.7.4"
+version = "0.7.6"
 dependencies = [
  "anyhow",
  "bincode",
@@ -442,7 +442,7 @@ dependencies = [
 
 [[package]]
 name = "ck-embed"
-version = "0.7.4"
+version = "0.7.6"
 dependencies = [
  "anyhow",
  "ck-core",
@@ -460,7 +460,7 @@ dependencies = [
 
 [[package]]
 name = "ck-engine"
-version = "0.7.4"
+version = "0.7.6"
 dependencies = [
  "anyhow",
  "ck-ann",
@@ -483,7 +483,7 @@ dependencies = [
 
 [[package]]
 name = "ck-index"
-version = "0.7.4"
+version = "0.7.6"
 dependencies = [
  "anyhow",
  "bincode",
@@ -507,7 +507,7 @@ dependencies = [
 
 [[package]]
 name = "ck-models"
-version = "0.7.4"
+version = "0.7.6"
 dependencies = [
  "anyhow",
  "ck-core",
@@ -517,7 +517,7 @@ dependencies = [
 
 [[package]]
 name = "ck-search"
-version = "0.7.4"
+version = "0.7.6"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -562,7 +562,7 @@ dependencies = [
 
 [[package]]
 name = "ck-tui"
-version = "0.7.4"
+version = "0.7.6"
 dependencies = [
  "anyhow",
  "ck-chunk",
@@ -2235,9 +2235,9 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "oneshot"
-version = "0.1.11"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4ce411919553d3f9fa53a0880544cda985a112117a0444d5ff1e870a893d6ea"
+checksum = "269bca4c2591a28585d6bf10d9ed0332b7d76900a1b02bec41bdc3a2cdcda107"
 
 [[package]]
 name = "onig"
