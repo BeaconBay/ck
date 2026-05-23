@@ -431,6 +431,12 @@ fn chunk_language(text: &str, language: ParseableLanguage) -> Result<Vec<Chunk>>
     // Fill gaps between chunks with remainder content
     chunks = fill_gaps(chunks, text);
 
+    // Merge small chunks if Markdown
+    if language == ParseableLanguage::Markdown {
+        let (target_tokens, _) = get_model_chunk_config(None);
+        chunks = merge_small_chunks(chunks, text, target_tokens);
+    }
+
     Ok(chunks)
 }
 
@@ -1613,6 +1619,97 @@ fn stride_large_chunk(chunk: Chunk, config: &ChunkConfig) -> Result<Vec<Chunk>> 
     );
 
     Ok(strided_chunks)
+}
+
+fn merge_small_chunks(chunks: Vec<Chunk>, text: &str, target_tokens: usize) -> Vec<Chunk> {
+    if chunks.is_empty() {
+        return chunks;
+    }
+
+    let mut result = Vec::new();
+    let mut current_group: Vec<Chunk> = Vec::new();
+    let mut current_tokens = 0;
+
+    for chunk in chunks {
+        let chunk_tokens = chunk.metadata.estimated_tokens;
+
+        if current_tokens + chunk_tokens > target_tokens {
+            // Flush
+            if !current_group.is_empty() {
+                result.push(merge_group(&current_group, text));
+                current_group.clear();
+                current_tokens = 0;
+            }
+        }
+
+        // If single chunk is huge
+        if chunk_tokens > target_tokens {
+            if !current_group.is_empty() {
+                result.push(merge_group(&current_group, text));
+                current_group.clear();
+                current_tokens = 0;
+            }
+            result.push(chunk);
+            continue;
+        }
+
+        current_group.push(chunk);
+        current_tokens += chunk_tokens;
+    }
+
+    // Flush remaining
+    if !current_group.is_empty() {
+        result.push(merge_group(&current_group, text));
+    }
+
+    result
+}
+
+fn merge_group(group: &[Chunk], text: &str) -> Chunk {
+    if group.len() == 1 {
+        return group[0].clone();
+    }
+
+    let first = &group[0];
+    let last = &group[group.len() - 1];
+
+    // Calculate new span
+    // Assuming sorted, which fill_gaps ensures
+    let byte_start = first.span.byte_start;
+    let byte_end = last.span.byte_end;
+    let line_start = first.span.line_start;
+    let line_end = last.span.line_end;
+
+    // Safely slice text
+    let chunk_text = if byte_end <= text.len() {
+        text[byte_start..byte_end].to_string()
+    } else {
+        // Fallback for safety, though existing chunks should be valid
+        text.get(byte_start..).unwrap_or("").to_string()
+    };
+
+    let metadata = ChunkMetadata::from_text(&chunk_text);
+
+    // If all chunks are the same semantic type, preserve it.
+    // Otherwise it's a mixed text block.
+    let chunk_type = if group.iter().all(|c| c.chunk_type == first.chunk_type) {
+        first.chunk_type.clone()
+    } else {
+        ChunkType::Text
+    };
+
+    Chunk {
+        span: Span {
+            byte_start,
+            byte_end,
+            line_start,
+            line_end,
+        },
+        text: chunk_text,
+        chunk_type,
+        stride_info: None,
+        metadata,
+    }
 }
 
 // Removed duplicate estimate_tokens function - using the one from ck-embed via TokenEstimator
