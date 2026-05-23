@@ -38,6 +38,14 @@ pub async fn semantic_search_v3_with_progress(
         callback("Loading embeddings from sidecar files...");
     }
 
+    // Build the path scope filter once, up front. Previously this was
+    // applied AFTER top_k inside the iteration loop, so a whole-codebase
+    // index plus a narrow `path=` query could return zero matches when
+    // the global top_k results all lived outside the requested scope.
+    // Filtering at collection time fixes that and skips embedding loads
+    // for chunks we'd discard anyway.
+    let scope = PathScope::new(&options.path);
+
     // Collect all sidecar files and their embeddings
     let mut file_chunks: Vec<(std::path::PathBuf, ck_index::ChunkEntry)> = Vec::new();
 
@@ -51,6 +59,9 @@ pub async fn semantic_search_v3_with_progress(
                     let original_file = reconstruct_original_path(path, &index_dir, &index_root);
                     if let Some(original_file) = original_file {
                         if !super::path_matches_include(&original_file, &options.include_patterns) {
+                            continue;
+                        }
+                        if !scope.contains(&original_file) {
                             continue;
                         }
                         for chunk in index_entry.chunks {
@@ -139,34 +150,6 @@ pub async fn semantic_search_v3_with_progress(
         let is_below_threshold = options
             .threshold
             .is_some_and(|threshold| similarity < threshold);
-
-        // Check if we're filtering by a specific file or directory (apply to both above/below threshold)
-        let passes_path_filter = if options.path.is_file() {
-            let target_file = options
-                .path
-                .canonicalize()
-                .unwrap_or_else(|_| options.path.clone());
-            let result_file = file_path
-                .canonicalize()
-                .unwrap_or_else(|_| file_path.clone());
-            result_file == target_file
-        } else if options.path != Path::new(".") {
-            // Filter by directory path - only include files within the specified directory
-            let target_dir = options
-                .path
-                .canonicalize()
-                .unwrap_or_else(|_| options.path.clone());
-            let result_file = file_path
-                .canonicalize()
-                .unwrap_or_else(|_| file_path.clone());
-            result_file.starts_with(&target_dir)
-        } else {
-            true
-        };
-
-        if !passes_path_filter {
-            continue;
-        }
 
         // Extract content from the file using the span, skip if file doesn't exist
         let content = if options.full_section {
@@ -282,6 +265,44 @@ pub async fn semantic_search_v3_with_progress(
     })
 }
 
+/// Scope a semantic query to a file, a directory, or the whole index.
+///
+/// Cached canonical form of `options.path` so per-chunk membership
+/// checks don't re-canonicalize on every iteration.
+enum PathScope {
+    All,
+    File(std::path::PathBuf),
+    Dir(std::path::PathBuf),
+}
+
+impl PathScope {
+    fn new(path: &Path) -> Self {
+        if path == Path::new(".") {
+            return Self::All;
+        }
+        let canonical = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        if path.is_file() {
+            Self::File(canonical)
+        } else {
+            Self::Dir(canonical)
+        }
+    }
+
+    fn contains(&self, file: &Path) -> bool {
+        match self {
+            Self::All => true,
+            Self::File(target) => {
+                let canonical = file.canonicalize().unwrap_or_else(|_| file.to_path_buf());
+                canonical == *target
+            }
+            Self::Dir(target) => {
+                let canonical = file.canonicalize().unwrap_or_else(|_| file.to_path_buf());
+                canonical.starts_with(target)
+            }
+        }
+    }
+}
+
 fn reconstruct_original_path(
     sidecar_path: &Path,
     index_dir: &Path,
@@ -317,5 +338,50 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
         0.0
     } else {
         dot_product / (norm_a * norm_b)
+    }
+}
+
+#[cfg(test)]
+mod path_scope_tests {
+    use super::PathScope;
+    use std::fs;
+    use std::path::Path;
+    use tempfile::TempDir;
+
+    #[test]
+    fn all_matches_anything() {
+        let scope = PathScope::new(Path::new("."));
+        assert!(scope.contains(Path::new("/tmp/whatever")));
+        assert!(scope.contains(Path::new("./relative")));
+    }
+
+    #[test]
+    fn dir_matches_descendants_only() {
+        let tmp = TempDir::new().unwrap();
+        let scoped = tmp.path().join("inside");
+        let outside = tmp.path().join("outside");
+        fs::create_dir(&scoped).unwrap();
+        fs::create_dir(&outside).unwrap();
+        let inside_file = scoped.join("a.txt");
+        let outside_file = outside.join("b.txt");
+        fs::write(&inside_file, "x").unwrap();
+        fs::write(&outside_file, "y").unwrap();
+
+        let scope = PathScope::new(&scoped);
+        assert!(scope.contains(&inside_file));
+        assert!(!scope.contains(&outside_file));
+    }
+
+    #[test]
+    fn file_matches_exactly_that_file() {
+        let tmp = TempDir::new().unwrap();
+        let target = tmp.path().join("target.txt");
+        let other = tmp.path().join("other.txt");
+        fs::write(&target, "x").unwrap();
+        fs::write(&other, "y").unwrap();
+
+        let scope = PathScope::new(&target);
+        assert!(scope.contains(&target));
+        assert!(!scope.contains(&other));
     }
 }
