@@ -4,9 +4,41 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+<<<<<<< HEAD
 ### Added
 - **C language support**: Full tree-sitter based semantic chunking for C files (.c, .h) - functions, structs, enums, unions, typedefs, macros
 - **C++ language support**: Full tree-sitter based semantic chunking for C++ files (.cpp, .cc, .cxx, .hpp, .h) - classes, structs, namespaces, templates, enums, unions
+=======
+## [0.7.6] - 2026-05-23
+
+### Fixed
+- **Scoped semantic search returned zero results** (#111). `semantic_search_v3` was computing the top-k from all chunks in the index *before* applying the requested path filter. With a whole-codebase index plus a narrow `path=` query, the global top-k could be entirely consumed by chunks outside the requested scope, leaving the path filter with nothing to keep. New `PathScope` enum filters at sidecar-collection time (also faster — no embedding loaded for out-of-scope chunks). Hoists the `canonicalize()` of the target path out of the per-result loop where it was running N times.
+- **`oneshot` use-after-free race in `Receiver` drop** (#100, dependabot bump 0.1.11 → 0.1.13). Affects the in-process control-flow channels used internally.
+
+### Security
+- **MCP tool handlers escaped their working directory** (#112). Every MCP tool handler (semantic, lexical, regex, hybrid, index_status, reindex) accepted `request.path` verbatim with only an existence check. An agent connected over MCP could ask ck to index or semantically search any path readable on the host — `/etc`, another user's home, anywhere. `McpContext` stored a `cwd` but nothing enforced it. New `allowed_roots: Vec<PathBuf>` (canonical), defaults to `[canonical(cwd)]`, extensible via `CK_MCP_ALLOWED_ROOTS` env var (colon-separated). All 6 handlers now route `request.path` through `McpContext::resolve_request_path`, which canonicalizes and rejects paths outside the sandbox. Symlink-based escape is rejected post-canonicalization.
+
+### Changed
+- **MCP tool schemas compatible with Google Gemini API** (#106 by @gabriel-ecegi). Gemini's strict JSON Schema validator rejects union types like `{"type":["array","null"]}` in tool function declarations. The four request structs' `Option<Vec<String>>` fields (`include_patterns`, `exclude_patterns`) now use `#[schemars(with = "Vec<String>")]` so the published schema emits `{"type":"array"}`. Runtime behavior unchanged — serde still accepts missing/null.
+
+### Technical
+- **Release pipeline made fail-loud** (in 0.7.5's tail commits but worth repeating). `publish_crate`'s `cargo publish ... | tee` previously masked cargo's exit code via the pipeline; auth failures printed "Successfully published" and burned 10 min on a verify loop for a crate that never uploaded. Now uses `set -o pipefail` + upfront `CARGO_REGISTRY_TOKEN` presence check. `verify_crate` sends a `User-Agent` header (crates.io requires one; absence returned 403 and silently broke every prior release).
+- **Dev-dep bumps** (#99): jws 3.2.2 → 3.2.3, qs 6.14.0 → 6.14.1, mdast-util-to-hast 13.2.0 → 13.2.1, preact (patch). Docs site + VSCode extension only.
+
+## [0.7.5] - 2026-05-23
+
+### Fixed
+- **CI Test job (broken since 0.7.3)**: `cargo hack test --each-feature --workspace` now passes. Two `ck-engine` semantic `.ckignore` tests (`test_subdirectory_search_uses_parent_ckignore`, `test_multiple_ckignore_files_merge_correctly`) assumed the `fastembed` embedder was compiled in. Under permutations that disabled `fastembed`, `ck-embed::create_embedder_for_config` silently returned `DummyEmbedder` (zero vectors), every cosine similarity fell below the 0.1 threshold, and the tests panicked. Tests are now `#[cfg(feature = "fastembed")]`-gated.
+
+### Technical
+- **Consolidated release plumbing**: removed the duplicated `publish-crates` job from `ci.yaml` so `release.yml` is the sole publisher on tag push (no more race between two workflows competing for `cargo publish`).
+- **Simplified version bumps**: intra-workspace dependencies (`ck-core`, `ck-models`, `ck-embed`, `ck-chunk`, `ck-ann`, `ck-index`, `ck-engine`, `ck-tui`) moved to `[workspace.dependencies]`. `ck-cli` now uses `version.workspace = true` like its peers. A version bump now touches one file (`Cargo.toml`) instead of nine.
+- **Restored full crate publish set**: `ck-tui` was missing from `release.yml`'s `CRATES` list and was never published as part of a tagged release. Added.
+- **CLAUDE.md**: updated release process docs to reflect the simpler bump workflow.
+
+### Notes
+- 0.7.3 and 0.7.4 are skipped on crates.io. 0.7.4 was partially published (only `ck-core` landed) due to the issues fixed here. 0.7.5 is the first clean release on top of the consolidated pipeline.
+>>>>>>> d94cf3f10842cf32d16e7ce8861d183d5890ea3a
 
 ## [0.7.2] - 2026-01-24
 

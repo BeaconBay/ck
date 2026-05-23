@@ -1682,6 +1682,10 @@ mod tests {
         assert_eq!(no_endings_vec, vec![0]);
     }
 
+    // Default model config is fastembed; without that feature ck-embed
+    // falls back to DummyEmbedder (zero vectors), so semantic search
+    // returns nothing and these tests have nothing to assert against.
+    #[cfg(feature = "fastembed")]
     #[tokio::test]
     async fn test_subdirectory_search_uses_parent_ckignore() {
         // Regression test for issue where searching in subdirectory doesn't use parent .ckignore
@@ -1760,6 +1764,10 @@ mod tests {
         );
     }
 
+    // Default model config is fastembed; without that feature ck-embed
+    // falls back to DummyEmbedder (zero vectors), so semantic search
+    // returns nothing and these tests have nothing to assert against.
+    #[cfg(feature = "fastembed")]
     #[tokio::test]
     async fn test_multiple_ckignore_files_merge_correctly() {
         // Test that multiple .ckignore files in the hierarchy are all applied
@@ -1845,5 +1853,98 @@ mod tests {
             .iter()
             .any(|r| r.file.to_string_lossy().ends_with(".txt"));
         assert!(has_txt, "Should find .txt files (not ignored)");
+    }
+
+    // Default model config is fastembed; without that feature ck-embed
+    // falls back to DummyEmbedder (zero vectors) and the assertions can't
+    // distinguish a scoped match from no match at all.
+    #[cfg(feature = "fastembed")]
+    #[tokio::test]
+    async fn test_scoped_search_does_not_lose_results_to_global_top_k() {
+        // Regression test for the bug where scoped semantic search applied
+        // top_k BEFORE the path filter, so a small top_k against a whole-
+        // codebase index could return zero matches when the global top
+        // results all lived outside the requested scope.
+        //
+        // Reproduction:
+        //   - Index a parent dir that contains many files about TOPIC_A
+        //     (so they dominate the global top_k for that query)
+        //   - Search inside a sibling subdir that contains a file about
+        //     TOPIC_A, with top_k smaller than the TOPIC_A file count
+        //   - Before the fix: zero results inside subdir
+        //   - After the fix:  the in-scope file is returned
+        use std::fs;
+        use tempfile::TempDir;
+
+        let temp_dir = TempDir::new().unwrap();
+        let parent = temp_dir.path();
+        let noisy = parent.join("noisy");
+        let scoped = parent.join("scoped");
+        fs::create_dir(&noisy).unwrap();
+        fs::create_dir(&scoped).unwrap();
+
+        // 8 files in noisy/ that all match the query "database connection".
+        // top_k=3 will be entirely consumed by these globally.
+        for i in 0..8 {
+            fs::write(
+                noisy.join(format!("noise_{i}.txt")),
+                format!(
+                    "function open_database_connection_{i}() {{\n    \
+                     // establish a database connection to postgres\n    \
+                     // handle database connection errors gracefully\n}}\n"
+                ),
+            )
+            .unwrap();
+        }
+
+        // One in-scope file that also matches the query
+        fs::write(
+            scoped.join("target.txt"),
+            "function connect() {\n    \
+             // open a database connection to the primary store\n    \
+             // database connection pool config goes here\n}\n",
+        )
+        .unwrap();
+
+        // Index from parent so .ck lives at parent root and covers both subdirs.
+        let index_options = SearchOptions {
+            mode: SearchMode::Semantic,
+            query: "database connection".to_string(),
+            path: parent.to_path_buf(),
+            top_k: Some(20),
+            threshold: Some(0.0),
+            ..Default::default()
+        };
+        let _ = search(&index_options).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+        // Now search scoped to `scoped/` with a small top_k. The bug:
+        // the 3 global top results all live in `noisy/`, so the path
+        // filter rejects all of them and we get [].
+        let scoped_options = SearchOptions {
+            mode: SearchMode::Semantic,
+            query: "database connection".to_string(),
+            path: scoped.clone(),
+            top_k: Some(3),
+            threshold: Some(0.0),
+            ..Default::default()
+        };
+
+        let results = search(&scoped_options).await.unwrap();
+
+        assert!(
+            !results.is_empty(),
+            "Scoped search returned zero results — top_k was applied \
+             before the path filter (the bug this test guards against)."
+        );
+        let all_in_scope = results.iter().all(|r| {
+            r.file.starts_with(&scoped)
+                || r.file.canonicalize().ok() == scoped.join("target.txt").canonicalize().ok()
+        });
+        assert!(
+            all_in_scope,
+            "Some results leaked out of the requested scope: {:?}",
+            results.iter().map(|r| &r.file).collect::<Vec<_>>()
+        );
     }
 }

@@ -135,7 +135,9 @@ pub struct SemanticSearchRequest {
     pub path: String,
     pub top_k: Option<usize>,
     pub threshold: Option<f32>,
+    #[schemars(with = "Vec<String>")]
     pub include_patterns: Option<Vec<String>>,
+    #[schemars(with = "Vec<String>")]
     pub exclude_patterns: Option<Vec<String>>,
     pub respect_gitignore: Option<bool>,
     pub use_default_excludes: Option<bool>,
@@ -160,7 +162,9 @@ pub struct RegexSearchRequest {
     pub path: String,
     pub ignore_case: Option<bool>,
     pub context: Option<usize>,
+    #[schemars(with = "Vec<String>")]
     pub include_patterns: Option<Vec<String>>,
+    #[schemars(with = "Vec<String>")]
     pub exclude_patterns: Option<Vec<String>>,
     pub respect_gitignore: Option<bool>,
     pub use_default_excludes: Option<bool>,
@@ -179,7 +183,9 @@ pub struct HybridSearchRequest {
     pub path: String,
     pub top_k: Option<usize>,
     pub threshold: Option<f32>,
+    #[schemars(with = "Vec<String>")]
     pub include_patterns: Option<Vec<String>>,
+    #[schemars(with = "Vec<String>")]
     pub exclude_patterns: Option<Vec<String>>,
     pub respect_gitignore: Option<bool>,
     pub use_default_excludes: Option<bool>,
@@ -204,7 +210,9 @@ pub struct LexicalSearchRequest {
     pub path: String,
     pub top_k: Option<usize>,
     pub threshold: Option<f32>,
+    #[schemars(with = "Vec<String>")]
     pub include_patterns: Option<Vec<String>>,
+    #[schemars(with = "Vec<String>")]
     pub exclude_patterns: Option<Vec<String>>,
     pub respect_gitignore: Option<bool>,
     pub use_default_excludes: Option<bool>,
@@ -987,7 +995,8 @@ impl CkMcpServer {
         let path = request.path;
         let top_k = request.top_k;
         let threshold = request.threshold;
-        let path_buf = PathBuf::from(path);
+        // Sandbox-enforced: rejects empty/non-existent/outside-roots paths.
+        let path_buf = self.context.resolve_request_path(&path)?;
         let search_root = if path_buf.is_dir() {
             path_buf.clone()
         } else {
@@ -1010,14 +1019,6 @@ impl CkMcpServer {
         // Clone values before they're moved into SearchOptions
         let query_clone = query.clone();
         let path_clone = path_buf.clone();
-
-        // Validate path exists
-        if !path_buf.exists() {
-            return Err(ErrorData::invalid_params(
-                format!("Path does not exist: {}", path_buf.display()),
-                None,
-            ));
-        }
 
         // Extract pagination config
         let config = Self::extract_pagination_config(
@@ -1226,7 +1227,8 @@ impl CkMcpServer {
         let path = request.path;
         let top_k = request.top_k;
         let threshold = request.threshold;
-        let path_buf = PathBuf::from(path);
+        // Sandbox-enforced: rejects empty/non-existent/outside-roots paths.
+        let path_buf = self.context.resolve_request_path(&path)?;
         let search_root = if path_buf.is_dir() {
             path_buf.clone()
         } else {
@@ -1248,13 +1250,6 @@ impl CkMcpServer {
 
         let query_clone = query.clone();
         let path_clone = path_buf.clone();
-
-        if !path_buf.exists() {
-            return Err(ErrorData::invalid_params(
-                format!("Path does not exist: {}", path_buf.display()),
-                None,
-            ));
-        }
 
         let config = Self::extract_pagination_config(
             request.page_size,
@@ -1359,7 +1354,8 @@ impl CkMcpServer {
         let path = request.path;
         let ignore_case = request.ignore_case;
         let context = request.context;
-        let path_buf = PathBuf::from(path);
+        // Sandbox-enforced: rejects empty/non-existent/outside-roots paths.
+        let path_buf = self.context.resolve_request_path(&path)?;
         let search_root = if path_buf.is_dir() {
             path_buf.clone()
         } else {
@@ -1382,14 +1378,6 @@ impl CkMcpServer {
         // Clone values before they're moved into SearchOptions
         let pattern_clone = pattern.clone();
         let path_clone = path_buf.clone();
-
-        // Validate path exists
-        if !path_buf.exists() {
-            return Err(ErrorData::invalid_params(
-                format!("Path does not exist: {}", path_buf.display()),
-                None,
-            ));
-        }
 
         let context_lines = context.unwrap_or(0);
 
@@ -1493,7 +1481,8 @@ impl CkMcpServer {
         let path = request.path;
         let top_k = request.top_k;
         let threshold = request.threshold;
-        let path_buf = PathBuf::from(path);
+        // Sandbox-enforced: rejects empty/non-existent/outside-roots paths.
+        let path_buf = self.context.resolve_request_path(&path)?;
         let search_root = if path_buf.is_dir() {
             path_buf.clone()
         } else {
@@ -1516,14 +1505,6 @@ impl CkMcpServer {
         // Clone values before they're moved into SearchOptions
         let query_clone = query.clone();
         let path_clone = path_buf.clone();
-
-        // Validate path exists
-        if !path_buf.exists() {
-            return Err(ErrorData::invalid_params(
-                format!("Path does not exist: {}", path_buf.display()),
-                None,
-            ));
-        }
 
         // Extract pagination config
         let config = Self::extract_pagination_config(
@@ -1625,15 +1606,8 @@ impl CkMcpServer {
         _peer: Option<Peer<RoleServer>>,
     ) -> Result<(String, Value), ErrorData> {
         let path = request.path;
-        let path_buf = PathBuf::from(path);
-
-        // Validate path exists
-        if !path_buf.exists() {
-            return Err(ErrorData::invalid_params(
-                format!("Path does not exist: {}", path_buf.display()),
-                None,
-            ));
-        }
+        // Sandbox-enforced: rejects empty/non-existent/outside-roots paths.
+        let path_buf = self.context.resolve_request_path(&path)?;
 
         // Use concurrency lock for this directory
         let lock = self.context.get_index_lock(&path_buf).await;
@@ -1782,15 +1756,8 @@ impl CkMcpServer {
     ) -> Result<(String, Value), ErrorData> {
         let path = request.path;
         let force = request.force.unwrap_or(false);
-        let path_buf = PathBuf::from(path);
-
-        // Validate path exists
-        if !path_buf.exists() {
-            return Err(ErrorData::invalid_params(
-                format!("Path does not exist: {}", path_buf.display()),
-                None,
-            ));
-        }
+        // Sandbox-enforced: rejects empty/non-existent/outside-roots paths.
+        let path_buf = self.context.resolve_request_path(&path)?;
 
         // Use concurrency lock for this directory
         let lock = self.context.get_index_lock(&path_buf).await;

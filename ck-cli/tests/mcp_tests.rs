@@ -192,7 +192,11 @@ async fn test_mcp_nonexistent_path() {
     assert!(result.is_err());
 
     if let Err(error) = result {
-        assert!(error.to_string().contains("Path does not exist"));
+        let msg = error.to_string();
+        assert!(
+            msg.contains("does not exist"),
+            "expected 'does not exist' in error, got: {msg}"
+        );
     }
 }
 
