@@ -4,11 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-<<<<<<< HEAD
 ### Added
 - **C language support**: Full tree-sitter based semantic chunking for C files (.c, .h) - functions, structs, enums, unions, typedefs, macros
 - **C++ language support**: Full tree-sitter based semantic chunking for C++ files (.cpp, .cc, .cxx, .hpp, .h) - classes, structs, namespaces, templates, enums, unions
-=======
 ## [0.7.6] - 2026-05-23
 
 ### Fixed
@@ -38,7 +36,6 @@ All notable changes to this project will be documented in this file.
 
 ### Notes
 - 0.7.3 and 0.7.4 are skipped on crates.io. 0.7.4 was partially published (only `ck-core` landed) due to the issues fixed here. 0.7.5 is the first clean release on top of the consolidated pipeline.
->>>>>>> d94cf3f10842cf32d16e7ce8861d183d5890ea3a
 
 ## [0.7.2] - 2026-01-24
 
