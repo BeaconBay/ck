@@ -310,6 +310,7 @@ jobs:
             "ck-ann"
             "ck-index"
             "ck-engine"
+            "ck-tui"
             "ck-search"
           )
 
