@@ -1682,6 +1682,7 @@ mod tests {
         assert_eq!(no_endings_vec, vec![0]);
     }
 
+    #[cfg(any(feature = "fastembed", feature = "mixedbread"))]
     #[tokio::test]
     async fn test_subdirectory_search_uses_parent_ckignore() {
         // Regression test for issue where searching in subdirectory doesn't use parent .ckignore
@@ -1760,6 +1761,7 @@ mod tests {
         );
     }
 
+    #[cfg(any(feature = "fastembed", feature = "mixedbread"))]
     #[tokio::test]
     async fn test_multiple_ckignore_files_merge_correctly() {
         // Test that multiple .ckignore files in the hierarchy are all applied
