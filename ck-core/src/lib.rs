@@ -54,6 +54,7 @@ pub enum Language {
     Kotlin,
     Zig,
     Dart,
+    Elixir,
     Pdf,
 }
 
@@ -78,6 +79,7 @@ impl Language {
             "kt" | "kts" => Some(Language::Kotlin),
             "zig" => Some(Language::Zig),
             "dart" => Some(Language::Dart),
+            "ex" | "exs" => Some(Language::Elixir),
             "pdf" => Some(Language::Pdf),
             _ => None,
         }
@@ -109,6 +111,7 @@ impl std::fmt::Display for Language {
             Language::Kotlin => "kotlin",
             Language::Zig => "zig",
             Language::Dart => "dart",
+            Language::Elixir => "elixir",
             Language::Pdf => "pdf",
         };
         write!(f, "{}", name)
@@ -1110,6 +1113,8 @@ mod tests {
         assert_eq!(Language::from_extension("swift"), Some(Language::Swift));
         assert_eq!(Language::from_extension("kt"), Some(Language::Kotlin));
         assert_eq!(Language::from_extension("kts"), Some(Language::Kotlin));
+        assert_eq!(Language::from_extension("ex"), Some(Language::Elixir));
+        assert_eq!(Language::from_extension("exs"), Some(Language::Elixir));
         assert_eq!(Language::from_extension("unknown"), None);
     }
 
@@ -1137,6 +1142,8 @@ mod tests {
         assert_eq!(Language::from_extension("SWIFT"), Some(Language::Swift));
         assert_eq!(Language::from_extension("KT"), Some(Language::Kotlin));
         assert_eq!(Language::from_extension("KTS"), Some(Language::Kotlin));
+        assert_eq!(Language::from_extension("EX"), Some(Language::Elixir));
+        assert_eq!(Language::from_extension("EXS"), Some(Language::Elixir));
         assert_eq!(Language::from_extension("PDF"), Some(Language::Pdf));
 
         // Test mixed case extensions
@@ -1153,6 +1160,7 @@ mod tests {
         assert_eq!(Language::from_extension("Php"), Some(Language::Php));
         assert_eq!(Language::from_extension("Swift"), Some(Language::Swift));
         assert_eq!(Language::from_extension("Kt"), Some(Language::Kotlin));
+        assert_eq!(Language::from_extension("Ex"), Some(Language::Elixir));
         assert_eq!(Language::from_extension("Pdf"), Some(Language::Pdf));
 
         // Unknown extensions should still return None

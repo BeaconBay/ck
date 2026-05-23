@@ -4,15 +4,70 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-### Added
-- **VitePress documentation site**: Comprehensive documentation with improved navigation, search, and structure in `docs-site/` directory
-- **Documentation features**: Guide pages, feature documentation, CLI reference, embedding model guide, architecture docs, and contributing guides
-- **Local search**: Built-in search functionality in documentation site
+## [0.7.5] - 2026-05-23
+
+### Fixed
+- **CI Test job (broken since 0.7.3)**: `cargo hack test --each-feature --workspace` now passes. Two `ck-engine` semantic `.ckignore` tests (`test_subdirectory_search_uses_parent_ckignore`, `test_multiple_ckignore_files_merge_correctly`) assumed the `fastembed` embedder was compiled in. Under permutations that disabled `fastembed`, `ck-embed::create_embedder_for_config` silently returned `DummyEmbedder` (zero vectors), every cosine similarity fell below the 0.1 threshold, and the tests panicked. Tests are now `#[cfg(feature = "fastembed")]`-gated.
 
 ### Technical
-- **Self-contained docs**: All documentation tooling isolated in docs-site/ with independent build process using pnpm and VitePress
-- **Node.js integration**: Documentation site uses Node.js 18+, pnpm 10+, and VitePress 1.6+ for modern documentation experience
-- **GitHub integration**: Edit links and social links configured for easy contribution
+- **Consolidated release plumbing**: removed the duplicated `publish-crates` job from `ci.yaml` so `release.yml` is the sole publisher on tag push (no more race between two workflows competing for `cargo publish`).
+- **Simplified version bumps**: intra-workspace dependencies (`ck-core`, `ck-models`, `ck-embed`, `ck-chunk`, `ck-ann`, `ck-index`, `ck-engine`, `ck-tui`) moved to `[workspace.dependencies]`. `ck-cli` now uses `version.workspace = true` like its peers. A version bump now touches one file (`Cargo.toml`) instead of nine.
+- **Restored full crate publish set**: `ck-tui` was missing from `release.yml`'s `CRATES` list and was never published as part of a tagged release. Added.
+- **CLAUDE.md**: updated release process docs to reflect the simpler bump workflow.
+
+### Notes
+- 0.7.3 and 0.7.4 are skipped on crates.io. 0.7.4 was partially published (only `ck-core` landed) due to the issues fixed here. 0.7.5 is the first clean release on top of the consolidated pipeline.
+
+## [0.7.2] - 2026-01-24
+
+### Added
+- **Mixedbread model support**: First-class support for Mixedbread embedding and reranking models (PR #89 by @regenrek)
+  - Embedding model: `mxbai-xsmall` (`mixedbread-ai/mxbai-embed-xsmall-v1`) - 384 dimensions, 4K context window
+  - Reranker: `mxbai` (`mixedbread-ai/mxbai-rerank-xsmall-v1`) - Neural cross-encoder reranker
+  - Fully local inference using ONNX Runtime with quantized models
+  - Provider abstraction for clean model selection and routing
+  - CLI support: `--model mxbai-xsmall` and `--rerank-model mxbai`
+  - MCP server support for Mixedbread models in semantic/hybrid search tools
+- **Dart language support**: Full tree-sitter based parsing for Dart files (PR #96 by @aboo)
+  - Classes, methods, functions, getters/setters, constructors
+  - Extension methods and mixins
+- **Elixir language support**: Comprehensive Elixir/OTP parsing (PR #91 by @CamonZ)
+  - Modules (`defmodule`), functions (`def`, `defp`), macros (`defmacro`, `defmacrop`)
+  - Protocols, implementations, structs, exceptions
+  - Module attributes (`@moduledoc`, `@doc`, `@spec`, `@type`, `@behaviour`)
+  - Guards (`defguard`, `defguardp`)
+- **VSCode extension improvements**: Better robustness and error handling (PR #74 by @runonthespot)
+  - `--status-json` flag for structured CLI status output
+  - `--` separator to prevent dash-prefixed queries from being parsed as flags
+  - Dynamic .ckignore template fetched from backend
+- **VitePress documentation site**: Comprehensive docs with navigation, search, and structure
+
+### Fixed
+- **Rust doc comments**: Doc comments (`///` and `/** */`) now correctly attach to their associated items instead of being separate chunks (PR #92 by @EduBalbino)
+- **--no-ignore flag**: Now properly disables `.git/info/exclude` and global gitignore in addition to `.gitignore` (PR #93 by @lukeod)
+- **regex_search ckignore**: `regex_search` now respects the `use_ckignore` option instead of always using .ckignore (PR #86 by @RX14)
+- **Documentation link**: Fixed broken link to query-based chunking documentation (PR #78 by @transitive-bullshit)
+- **Windows checksum format**: Fixed checksum file format for package manager compatibility on Windows (PR #98 by @fdr)
+
+### Security
+- **js-yaml update**: Bumped js-yaml from 4.1.0 to 4.1.1 to fix prototype pollution vulnerability (PR #88)
+
+### Technical
+- **ort 2.0.0-rc.11 compatibility**: Updated Mixedbread implementation for latest ONNX Runtime API
+- **ndarray 0.17**: Upgraded ndarray for ort compatibility
+- **SWE-bench framework**: Added benchmarks directory with SWE-bench evaluation framework
+
+### Contributors
+Thanks to the following contributors for this release:
+- @regenrek (Kevin Kern) - Mixedbread model support
+- @CamonZ (Rafael Simon Garcia) - Elixir language support
+- @aboo - Dart language support
+- @runonthespot - VSCode extension improvements
+- @EduBalbino - Rust doc comments fix
+- @lukeod - --no-ignore fix
+- @RX14 (Stephanie Wilde-Hobbs) - regex_search ckignore fix
+- @transitive-bullshit - Documentation link fix
+- @fdr - Windows checksum fix
 
 ## [0.7.1] - 2025-11-05
 

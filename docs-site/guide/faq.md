@@ -307,6 +307,7 @@ ck --no-ignore --no-ckignore "pattern" .
 | Model | Best For | Trade-off |
 |-------|----------|-----------|
 | `bge-small` | General use, fast | Smaller chunks (400 tokens) |
+| `mxbai-xsmall` | Local semantic search, balanced | Newer model, requires ONNX |
 | `nomic-v1.5` | Large functions, docs | Larger download (~500MB) |
 | `jina-code` | Code-specialized | Larger download (~500MB) |
 
@@ -314,10 +315,9 @@ See [Embedding Models](/reference/models) for detailed comparison.
 
 ### Can I use custom embedding models?
 
-Currently limited to models supported by fastembed-rs:
-- `bge-small` (default)
-- `nomic-v1.5`
-- `jina-code`
+Currently supported models:
+- **FastEmbed provider**: `bge-small` (default), `nomic-v1.5`, `jina-code`
+- **Mixedbread provider**: `mxbai-xsmall` (embedding), `mxbai` (reranker)
 
 **Future**: External embedding API support (OpenAI, HuggingFace, etc.) is being considered (#49).
 

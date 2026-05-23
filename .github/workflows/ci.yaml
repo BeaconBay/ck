@@ -36,7 +36,9 @@ jobs:
     name: Test
     strategy:
       matrix:
-        os: ["ubuntu-latest", "windows-latest", "macos-latest"]
+        # Windows tests disabled due to esaxx-rs/ort runtime library mismatch (MT vs MD)
+        # See: https://github.com/huggingface/tokenizers/issues/1482
+        os: ["ubuntu-latest", "macos-latest"]
         rust: ["stable"]
     continue-on-error: ${{ matrix.rust != 'stable' }}
     runs-on: ${{ matrix.os }}
@@ -49,14 +51,8 @@ jobs:
         toolchain: ${{ matrix.rust }}
     - uses: Swatinem/rust-cache@v2
     - uses: taiki-e/install-action@cargo-hack
-    - name: Build
-      run: cargo test --workspace --no-run
-    - name: Test (non-Windows)
-      if: matrix.os != 'windows-latest'
+    - name: Build and Test
       run: cargo hack test --each-feature --workspace
-    - name: Test (Windows - skip fastembed features)
-      if: matrix.os == 'windows-latest'
-      run: cargo hack test --each-feature --workspace --exclude-features fastembed
   msrv:
     name: "Check MSRV"
     runs-on: ubuntu-latest
@@ -149,106 +145,3 @@ jobs:
         wait-for-processing: true
     - name: Report status
       run: cargo clippy --workspace --all-features --all-targets --keep-going -- -D warnings
-  publish-crates:
-    name: Publish crates.io packages
-    needs: [test, msrv, lockfile, rustfmt, clippy]
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-    - name: Publish crates
-      env:
-        CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-      run: |
-        set -euo pipefail
-
-        publish_crate() {
-          local package=$1
-          local max_attempts=5
-          local wait_time=30
-
-          echo "Publishing $package..."
-
-          for attempt in $(seq 1 $max_attempts); do
-            echo "Attempt $attempt/$max_attempts for $package"
-
-            if cargo publish -p "$package" --token "$CARGO_REGISTRY_TOKEN" 2>&1 | tee /tmp/publish_output.txt; then
-              echo "Successfully published $package"
-              return 0
-            fi
-
-            if grep -q "already uploaded" /tmp/publish_output.txt || \
-               grep -q "already exists" /tmp/publish_output.txt; then
-              echo "$package is already published, continuing..."
-              return 0
-            fi
-
-            if grep -q "failed to select a version" /tmp/publish_output.txt; then
-              echo "Dependency not yet available, waiting ${wait_time}s before retry..."
-              sleep $wait_time
-              wait_time=$((wait_time * 2))
-            else
-              echo "Publishing $package failed with unexpected error"
-              cat /tmp/publish_output.txt
-              return 1
-            fi
-          done
-
-          echo "Failed to publish $package after $max_attempts attempts"
-          return 1
-        }
-
-        verify_crate() {
-          local package=$1
-          local version=$2
-          local max_attempts=20
-          local wait_time=30
-          local url="https://crates.io/api/v1/crates/${package}/${version}"
-
-          echo "Verifying $package v$version is available on crates.io..."
-
-          for attempt in $(seq 1 $max_attempts); do
-            if curl --silent --show-error --fail "$url" >/dev/null; then
-              echo "$package v$version verified on crates.io"
-              return 0
-            fi
-
-            echo "Waiting for $package v$version to be available (attempt $attempt/$max_attempts)..."
-            sleep $wait_time
-          done
-
-          echo "Failed to verify $package v$version on crates.io"
-          curl --silent --show-error "$url" || true
-          return 1
-        }
-
-        VERSION=$(grep -m1 '^version = ' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
-        echo "Publishing version $VERSION"
-
-        CRATES=(
-          "ck-core"
-          "ck-models"
-          "ck-embed"
-          "ck-chunk"
-          "ck-ann"
-          "ck-index"
-          "ck-engine"
-          "ck-search"
-        )
-
-        for crate in "${CRATES[@]}"; do
-          if ! publish_crate "$crate"; then
-            echo "Failed to publish $crate, aborting..."
-            exit 1
-          fi
-
-          if ! verify_crate "$crate" "$VERSION"; then
-            echo "Failed to verify $crate, aborting..."
-            exit 1
-          fi
-        done
-
-        echo "All crates published successfully!"

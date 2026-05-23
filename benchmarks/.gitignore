@@ -1,0 +1,24 @@
+# Ignore large data files
+*/data/*
+!*/data/.gitkeep
+
+# Ignore detailed results but keep summaries
+*/results/*.json
+*/results/*.csv
+!*/results/summary.md
+!*/results/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+
+# Temporary files
+*.tmp
+*.log
+.DS_Store

@@ -244,6 +244,9 @@ Choose the right embedding model for your needs:
 # Default: BGE-Small (fast, precise chunking)
 ck --index .
 
+# Mixedbread xsmall: Optimized for local semantic search (4K context, 384 dims)
+ck --index --model mxbai-xsmall .
+
 # Enhanced: Nomic V1.5 (8K context, optimal for large functions)
 ck --index --model nomic-v1.5 .
 
@@ -253,6 +256,7 @@ ck --index --model jina-code .
 
 **Model Comparison:**
 - **`bge-small`** (default): 400-token chunks, fast indexing, good for most code
+- **`mxbai-xsmall`**: 4K context window, 384 dimensions, optimized for local inference (Mixedbread)
 - **`nomic-v1.5`**: 1024-token chunks with 8K model capacity, better for large functions
 - **`jina-code`**: 1024-token chunks with 8K model capacity, specialized for code understanding
 
@@ -264,6 +268,7 @@ ck --status .
 
 # Clean up and rebuild / switch models
 ck --clean .
+ck --switch-model mxbai-xsmall .
 ck --switch-model nomic-v1.5 .
 ck --switch-model nomic-v1.5 --force .     # Force rebuild
 

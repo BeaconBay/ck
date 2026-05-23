@@ -90,7 +90,10 @@ fn builtin_query(language: ParseableLanguage) -> Option<&'static str> {
         ParseableLanguage::Go => Some(include_str!("../queries/go/tags.scm")),
         ParseableLanguage::CSharp => Some(include_str!("../queries/csharp/tags.scm")),
         ParseableLanguage::Zig => Some(include_str!("../queries/zig/tags.scm")),
+
         ParseableLanguage::Dart => Some(include_str!("../queries/dart/tags.scm")),
+
+        ParseableLanguage::Elixir => Some(include_str!("../queries/elixir/tags.scm")),
     }
 }
 
@@ -102,6 +105,8 @@ fn chunk_type_from_capture(name: &str) -> Option<ChunkType> {
         "method" => Some(ChunkType::Method),
         "class" | "struct" | "enum" | "trait" => Some(ChunkType::Class),
         "module" | "namespace" | "impl" | "mod" => Some(ChunkType::Module),
+        // Module attributes (Elixir @spec, @type, @callback, @behaviour)
+        "spec" | "type" | "callback" | "behaviour" => Some(ChunkType::Text),
         "text" | "import" => Some(ChunkType::Text),
         _ => None,
     }

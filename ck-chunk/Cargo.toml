@@ -11,8 +11,8 @@ keywords = ["parsing", "chunking", "tree-sitter"]
 categories = ["parsing"]
 
 [dependencies]
-ck-core = { version = "0.7.1", path = "../ck-core" }
-ck-embed = { version = "0.7.1", path = "../ck-embed" }
+ck-core = { workspace = true }
+ck-embed = { workspace = true }
 
 anyhow = { workspace = true }
 serde = { workspace = true }
@@ -26,6 +26,10 @@ tree-sitter-go = { workspace = true }
 tree-sitter-c-sharp = { workspace = true }
 tree-sitter-zig = { workspace = true }
 tree-sitter-dart = { workspace = true }
+tree-sitter-elixir = { workspace = true }
 tracing = { workspace = true }
-hf-hub = "0.3"
-tokenizers = { version = "0.22", default-features = false, features = ["onig", "progressbar"] }
+
+[features]
+default = ["fastembed", "mixedbread"]
+fastembed = ["ck-embed/fastembed"]
+mixedbread = ["ck-embed/mixedbread"]

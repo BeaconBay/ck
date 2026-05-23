@@ -11,10 +11,10 @@ keywords = ["indexing", "search", "storage"]
 categories = ["database-implementations"]
 
 [dependencies]
-ck-core = { version = "0.7.1", path = "../ck-core" }
-ck-chunk = { version = "0.7.1", path = "../ck-chunk" }
-ck-embed = { version = "0.7.1", path = "../ck-embed" }
-ck-models = { version = "0.7.1", path = "../ck-models" }
+ck-core = { workspace = true }
+ck-chunk = { workspace = true }
+ck-embed = { workspace = true }
+ck-models = { workspace = true }
 
 anyhow = { workspace = true }
 serde = { workspace = true }
@@ -30,5 +30,10 @@ ignore = { workspace = true }
 ctrlc = { workspace = true }
 pdf-extract = { workspace = true }
 tempfile = { workspace = true }
+
+[features]
+default = ["fastembed", "mixedbread"]
+fastembed = ["ck-embed/fastembed", "ck-chunk/fastembed"]
+mixedbread = ["ck-embed/mixedbread", "ck-chunk/mixedbread"]
 
 [dev-dependencies]

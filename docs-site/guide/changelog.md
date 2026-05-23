@@ -9,15 +9,27 @@ All notable changes to ck are documented here following [Semantic Versioning](ht
 
 ## [Unreleased]
 
-### Added
-- **VitePress documentation site**: Comprehensive documentation with improved navigation, search, and structure in `docs-site/` directory
-- **Documentation features**: Guide pages, feature documentation, CLI reference, embedding model guide, architecture docs, and contributing guides
-- **Local search**: Built-in search functionality in documentation site
+## [0.7.2] - 2026-01-24
 
-### Technical
-- **Self-contained docs**: All documentation tooling isolated in docs-site/ with independent build process using pnpm and VitePress
-- **Node.js integration**: Documentation site uses Node.js 18+, pnpm 10+, and VitePress 1.6+ for modern documentation experience
-- **GitHub integration**: Edit links and social links configured for easy contribution
+### Added
+- **Mixedbread model support**: First-class support for Mixedbread embedding and reranking models ([#89](https://github.com/BeaconBay/ck/pull/89) by @regenrek)
+  - Embedding: `mxbai-xsmall` (384 dimensions, 4K context window)
+  - Reranker: `mxbai` (neural cross-encoder)
+  - CLI: `--model mxbai-xsmall` and `--rerank-model mxbai`
+- **Dart language support**: Full tree-sitter parsing for Dart ([#96](https://github.com/BeaconBay/ck/pull/96) by @aboo)
+- **Elixir language support**: Comprehensive Elixir/OTP parsing ([#91](https://github.com/BeaconBay/ck/pull/91) by @CamonZ)
+- **VSCode extension improvements**: Better robustness and error handling ([#74](https://github.com/BeaconBay/ck/pull/74) by @runonthespot)
+- **VitePress documentation site**: Comprehensive docs with navigation, search, and structure
+
+### Fixed
+- **Rust doc comments**: Doc comments now correctly attach to their items ([#92](https://github.com/BeaconBay/ck/pull/92) by @EduBalbino)
+- **--no-ignore flag**: Properly disables `.git/info/exclude` and global gitignore ([#93](https://github.com/BeaconBay/ck/pull/93) by @lukeod)
+- **regex_search ckignore**: Now respects the `use_ckignore` option ([#86](https://github.com/BeaconBay/ck/pull/86) by @RX14)
+- **Documentation link**: Fixed broken link to query-based chunking docs ([#78](https://github.com/BeaconBay/ck/pull/78) by @transitive-bullshit)
+- **Windows checksum format**: Fixed for package manager compatibility ([#98](https://github.com/BeaconBay/ck/pull/98) by @fdr)
+
+### Security
+- **js-yaml update**: Fixed prototype pollution vulnerability ([#88](https://github.com/BeaconBay/ck/pull/88))
 
 ## [0.7.1] - 2025-11-05
 
@@ -343,7 +355,8 @@ All notable changes to ck are documented here following [Semantic Versioning](ht
 | 0.5.x | .ckignore support | 2025-09-29 | ✅ Released |
 | 0.6.0 | MCP Server, pagination | 2025-10-12 | ✅ Released |
 | 0.7.0 | Chunk-level indexing | 2025-10-13 | ✅ Released |
-| 0.7.1 | .ckignore fixes | 2025-11-05 | ✅ Released (current) |
+| 0.7.1 | .ckignore fixes | 2025-11-05 | ✅ Released |
+| 0.7.2 | Mixedbread, Dart, Elixir | 2026-01-24 | ✅ Released (current) |
 | 0.8.0 | Editor integrations | TBD | 🚧 Planned |
 | 0.9.0 | Advanced features | TBD | 💭 Conceptual |
 | 1.0.0 | Stability | TBD | 🎯 Goal |

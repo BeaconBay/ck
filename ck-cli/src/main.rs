@@ -331,7 +331,7 @@ struct Cli {
     #[arg(
         long = "model",
         value_name = "MODEL",
-        help = "Embedding model to use for indexing (bge-small, nomic-v1.5, jina-code) [default: bge-small]. Only used with --index."
+        help = "Embedding model to use for indexing (bge-small, nomic-v1.5, jina-code, mxbai-xsmall) [default: bge-small]. Only used with --index."
     )]
     model: Option<String>,
 
@@ -345,7 +345,7 @@ struct Cli {
     #[arg(
         long = "rerank-model",
         value_name = "MODEL",
-        help = "Reranking model to use (jina, bge) [default: jina]"
+        help = "Reranking model to use (jina, bge, mxbai) [default: jina]"
     )]
     rerank_model: Option<String>,
 
@@ -452,46 +452,6 @@ fn build_exclude_patterns(cli: &Cli) -> Vec<String> {
     // Use the centralized pattern builder from ck-core
     // Note: .ckignore handling is now done by WalkBuilder via the use_ckignore parameter
     ck_core::build_exclude_patterns(&cli.exclude, !cli.no_default_excludes)
-}
-
-fn resolve_model_selection(
-    registry: &ck_models::ModelRegistry,
-    requested: Option<&str>,
-) -> Result<(String, ck_models::ModelConfig)> {
-    match requested {
-        Some(name) => {
-            if let Some(config) = registry.get_model(name) {
-                return Ok((name.to_string(), config.clone()));
-            }
-
-            if let Some((alias, config)) = registry
-                .models
-                .iter()
-                .find(|(_, config)| config.name == name)
-            {
-                return Ok((alias.clone(), config.clone()));
-            }
-
-            anyhow::bail!(
-                "Unknown model '{}'. Available models: {}",
-                name,
-                registry
-                    .models
-                    .keys()
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-        }
-        None => {
-            let alias = registry.default_model.clone();
-            let config = registry
-                .get_default_model()
-                .ok_or_else(|| anyhow::anyhow!("No default model configured"))?
-                .clone();
-            Ok((alias, config))
-        }
-    }
 }
 
 async fn run_index_workflow(
@@ -986,7 +946,9 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
             .unwrap_or_else(|| PathBuf::from("."));
 
         let registry = ck_models::ModelRegistry::default();
-        let (model_alias, model_config) = resolve_model_selection(&registry, Some(model_name))?;
+        let (model_alias, model_config) = registry
+            .resolve(Some(model_name))
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
         if !cli.force {
             let manifest_path = path.join(".ck").join("manifest.json");
@@ -995,7 +957,7 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
                 && let Ok(manifest) = serde_json::from_slice::<ck_index::IndexManifest>(&data)
                 && let Some(existing_model) = manifest.embedding_model.clone()
                 && let Ok((existing_alias, existing_config)) =
-                    resolve_model_selection(&registry, Some(existing_model.as_str()))
+                    registry.resolve(Some(existing_model.as_str()))
                 && existing_config.name == model_config.name
             {
                 status.section_header("Switching Embedding Model");
@@ -1045,7 +1007,9 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
             .unwrap_or_else(|| PathBuf::from("."));
 
         let registry = ck_models::ModelRegistry::default();
-        let (model_alias, model_config) = resolve_model_selection(&registry, cli.model.as_deref())?;
+        let (model_alias, model_config) = registry
+            .resolve(cli.model.as_deref())
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
         run_index_workflow(
             &status,
@@ -1651,22 +1615,24 @@ async fn run_search(
         let resolved_model =
             ck_engine::resolve_model_for_path(&options.path, options.embedding_model.as_deref())?;
 
-        if resolved_model.alias == resolved_model.canonical_name {
+        if resolved_model.alias == resolved_model.canonical_name() {
             eprintln!(
                 "🤖 Model: {} ({} dims)",
-                resolved_model.canonical_name, resolved_model.dimensions
+                resolved_model.canonical_name(),
+                resolved_model.dimensions()
             );
         } else {
             eprintln!(
                 "🤖 Model: {} (alias '{}', {} dims)",
-                resolved_model.canonical_name, resolved_model.alias, resolved_model.dimensions
+                resolved_model.canonical_name(),
+                resolved_model.alias,
+                resolved_model.dimensions()
             );
         }
 
-        let max_tokens =
-            ck_chunk::TokenEstimator::get_model_limit(resolved_model.canonical_name.as_str());
+        let max_tokens = ck_chunk::TokenEstimator::get_model_limit(resolved_model.canonical_name());
         let (chunk_tokens, overlap_tokens) =
-            ck_chunk::get_model_chunk_config(Some(resolved_model.canonical_name.as_str()));
+            ck_chunk::get_model_chunk_config(Some(resolved_model.canonical_name()));
 
         eprintln!("📏 FastEmbed Config: {} token limit", max_tokens);
         eprintln!(

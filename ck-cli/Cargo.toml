@@ -1,10 +1,10 @@
 [package]
 name = "ck-search"
-version = "0.7.1"
-edition = "2024"
-authors = ["Mike Renwick"]
-license = "MIT OR Apache-2.0"
-rust-version = "1.88.0"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
 description = "Semantic grep by embedding - find code by meaning, not just keywords"
 repository = "https://github.com/BeaconBay/ck"
 homepage = "https://github.com/BeaconBay/ck"
@@ -21,14 +21,14 @@ name = "ck_search"
 path = "src/lib.rs"
 
 [dependencies]
-ck-core = { version = "0.7.1", path = "../ck-core" }
-ck-index = { version = "0.7.1", path = "../ck-index" }
-ck-engine = { version = "0.7.1", path = "../ck-engine" }
-ck-chunk = { version = "0.7.1", path = "../ck-chunk" }
-ck-embed = { version = "0.7.1", path = "../ck-embed" }
-ck-ann = { version = "0.7.1", path = "../ck-ann" }
-ck-models = { version = "0.7.1", path = "../ck-models" }
-ck-tui = { version = "0.7.1", path = "../ck-tui" }
+ck-core = { workspace = true }
+ck-index = { workspace = true }
+ck-engine = { workspace = true }
+ck-chunk = { workspace = true }
+ck-embed = { workspace = true }
+ck-ann = { workspace = true }
+ck-models = { workspace = true }
+ck-tui = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true }
@@ -61,6 +61,9 @@ sha2 = { workspace = true }
 dirs = "5.0"
 
 [features]
+default = ["fastembed", "mixedbread"]
+fastembed = ["ck-embed/fastembed", "ck-index/fastembed", "ck-engine/fastembed", "ck-chunk/fastembed", "ck-tui/fastembed"]
+mixedbread = ["ck-embed/mixedbread", "ck-index/mixedbread", "ck-engine/mixedbread", "ck-chunk/mixedbread", "ck-tui/mixedbread"]
 vendored-openssl = ["openssl?/vendored"]
 
 [dev-dependencies]

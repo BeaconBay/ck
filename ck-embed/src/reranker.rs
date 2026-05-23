@@ -1,4 +1,8 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
+use ck_models::{RerankModelConfig, RerankModelRegistry};
+
+#[cfg(feature = "mixedbread")]
+use crate::mixedbread::MixedbreadReranker;
 
 #[cfg(feature = "fastembed")]
 use std::path::PathBuf;
@@ -25,23 +29,51 @@ pub fn create_reranker_with_progress(
     model_name: Option<&str>,
     progress_callback: Option<RerankModelDownloadCallback>,
 ) -> Result<Box<dyn Reranker>> {
-    let model = model_name.unwrap_or("jina-reranker-v1-turbo-en");
+    let registry = RerankModelRegistry::default();
+    let (_, config) = registry.resolve(model_name)?;
+    create_reranker_for_config(&config, progress_callback)
+}
 
-    #[cfg(feature = "fastembed")]
-    {
-        Ok(Box::new(FastReranker::new_with_progress(
-            model,
-            progress_callback,
-        )?))
-    }
+#[allow(clippy::needless_return)]
+pub fn create_reranker_for_config(
+    config: &RerankModelConfig,
+    progress_callback: Option<RerankModelDownloadCallback>,
+) -> Result<Box<dyn Reranker>> {
+    match config.provider.as_str() {
+        "fastembed" => {
+            #[cfg(feature = "fastembed")]
+            {
+                return Ok(Box::new(FastReranker::new_with_progress(
+                    config.name.as_str(),
+                    progress_callback,
+                )?));
+            }
 
-    #[cfg(not(feature = "fastembed"))]
-    {
-        let _ = model; // Suppress unused variable warning
-        if let Some(callback) = progress_callback {
-            callback("Using dummy reranker (no model download required)");
+            #[cfg(not(feature = "fastembed"))]
+            {
+                if let Some(callback) = progress_callback.as_ref() {
+                    callback("fastembed reranker unavailable; using dummy reranker");
+                }
+                return Ok(Box::new(DummyReranker::new()));
+            }
         }
-        Ok(Box::new(DummyReranker::new()))
+        "mixedbread" => {
+            #[cfg(feature = "mixedbread")]
+            {
+                return Ok(Box::new(MixedbreadReranker::new(
+                    config,
+                    progress_callback,
+                )?));
+            }
+            #[cfg(not(feature = "mixedbread"))]
+            {
+                bail!(
+                    "Reranking model '{}' requires the `mixedbread` feature. Rebuild ck with Mixedbread support.",
+                    config.name
+                );
+            }
+        }
+        provider => bail!("Unsupported reranker provider '{}'", provider),
     }
 }
 

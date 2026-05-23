@@ -85,13 +85,23 @@ pub async fn semantic_search_v3_with_progress(
 
     let resolved_model = resolve_model_from_root(&index_root, options.embedding_model.as_deref())?;
     if let Some(ref callback) = progress_callback {
-        callback(&format!(
-            "Using embedding model {} ({} dims)",
-            resolved_model.alias, resolved_model.dimensions
-        ));
+        if resolved_model.alias == resolved_model.canonical_name() {
+            callback(&format!(
+                "Using embedding model {} ({} dims)",
+                resolved_model.canonical_name(),
+                resolved_model.dimensions()
+            ));
+        } else {
+            callback(&format!(
+                "Using embedding model {} (alias '{}', {} dims)",
+                resolved_model.canonical_name(),
+                resolved_model.alias,
+                resolved_model.dimensions()
+            ));
+        }
     }
 
-    let mut embedder = ck_embed::create_embedder(Some(resolved_model.canonical_name.as_str()))?;
+    let mut embedder = ck_embed::create_embedder_for_config(&resolved_model.config, None)?;
     let query_embeddings = embedder.embed(std::slice::from_ref(&options.query))?;
 
     if query_embeddings.is_empty() {
@@ -208,15 +218,17 @@ pub async fn semantic_search_v3_with_progress(
             callback("Reranking results for improved relevance...");
         }
 
-        let rerank_model_name = match options.rerank_model.as_deref() {
-            Some("jina") => Some("jina-reranker-v1-base-en"),
-            Some("bge") => Some("BAAI/bge-reranker-base"),
-            Some(name) => Some(name), // Pass through custom model names
-            None => Some("jina-reranker-v1-base-en"), // Default to jina
-        };
+        let rerank_registry = ck_models::RerankModelRegistry::default();
+        let (rerank_alias, rerank_config) = rerank_registry
+            .resolve(options.rerank_model.as_deref())
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
-        match ck_embed::create_reranker(rerank_model_name) {
+        match ck_embed::create_reranker_for_config(&rerank_config, None) {
             Ok(mut reranker) => {
+                if let Some(ref callback) = progress_callback {
+                    callback(&format!("Reranking results with model {}", rerank_alias));
+                }
+
                 let documents: Vec<String> = results.iter().map(|r| r.preview.clone()).collect();
 
                 match reranker.rerank(&options.query, &documents) {

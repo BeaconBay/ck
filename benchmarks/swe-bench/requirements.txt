@@ -1,0 +1,6 @@
+# SWE-bench benchmark dependencies
+datasets>=2.14.0
+huggingface-hub>=0.16.0
+gitpython>=3.1.40
+tqdm>=4.66.0
+pandas>=2.0.0
