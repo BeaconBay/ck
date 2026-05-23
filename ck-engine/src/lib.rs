@@ -1682,6 +1682,10 @@ mod tests {
         assert_eq!(no_endings_vec, vec![0]);
     }
 
+    // Default model config is fastembed; without that feature ck-embed
+    // falls back to DummyEmbedder (zero vectors), so semantic search
+    // returns nothing and these tests have nothing to assert against.
+    #[cfg(feature = "fastembed")]
     #[tokio::test]
     async fn test_subdirectory_search_uses_parent_ckignore() {
         // Regression test for issue where searching in subdirectory doesn't use parent .ckignore
@@ -1760,6 +1764,10 @@ mod tests {
         );
     }
 
+    // Default model config is fastembed; without that feature ck-embed
+    // falls back to DummyEmbedder (zero vectors), so semantic search
+    // returns nothing and these tests have nothing to assert against.
+    #[cfg(feature = "fastembed")]
     #[tokio::test]
     async fn test_multiple_ckignore_files_merge_correctly() {
         // Test that multiple .ckignore files in the hierarchy are all applied

@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-05-23
+
+### Fixed
+- **CI Test job (broken since 0.7.3)**: `cargo hack test --each-feature --workspace` now passes. Two `ck-engine` semantic `.ckignore` tests (`test_subdirectory_search_uses_parent_ckignore`, `test_multiple_ckignore_files_merge_correctly`) assumed the `fastembed` embedder was compiled in. Under permutations that disabled `fastembed`, `ck-embed::create_embedder_for_config` silently returned `DummyEmbedder` (zero vectors), every cosine similarity fell below the 0.1 threshold, and the tests panicked. Tests are now `#[cfg(feature = "fastembed")]`-gated.
+
+### Technical
+- **Consolidated release plumbing**: removed the duplicated `publish-crates` job from `ci.yaml` so `release.yml` is the sole publisher on tag push (no more race between two workflows competing for `cargo publish`).
+- **Simplified version bumps**: intra-workspace dependencies (`ck-core`, `ck-models`, `ck-embed`, `ck-chunk`, `ck-ann`, `ck-index`, `ck-engine`, `ck-tui`) moved to `[workspace.dependencies]`. `ck-cli` now uses `version.workspace = true` like its peers. A version bump now touches one file (`Cargo.toml`) instead of nine.
+- **Restored full crate publish set**: `ck-tui` was missing from `release.yml`'s `CRATES` list and was never published as part of a tagged release. Added.
+- **CLAUDE.md**: updated release process docs to reflect the simpler bump workflow.
+
+### Notes
+- 0.7.3 and 0.7.4 are skipped on crates.io. 0.7.4 was partially published (only `ck-core` landed) due to the issues fixed here. 0.7.5 is the first clean release on top of the consolidated pipeline.
+
 ## [0.7.2] - 2026-01-24
 
 ### Added
