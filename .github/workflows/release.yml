@@ -273,17 +273,20 @@ jobs:
           }
 
           # Function to verify crate is available on crates.io
+          # crates.io API requires a User-Agent header; without it the
+          # request returns 403 and breaks the publish chain.
           verify_crate() {
             local package=$1
             local version=$2
             local max_attempts=20
             local wait_time=30
             local url="https://crates.io/api/v1/crates/${package}/${version}"
+            local ua="ck-release (github.com/BeaconBay/ck)"
 
             echo "Verifying $package v$version is available on crates.io..."
 
             for attempt in $(seq 1 $max_attempts); do
-              if curl --silent --show-error --fail "$url" >/dev/null; then
+              if curl --silent --show-error --fail -H "User-Agent: $ua" "$url" >/dev/null; then
                 echo "$package v$version verified on crates.io"
                 return 0
               fi
@@ -293,7 +296,7 @@ jobs:
             done
 
             echo "Failed to verify $package v$version on crates.io"
-            curl --silent --show-error "$url" || true
+            curl --silent --show-error -H "User-Agent: $ua" "$url" || true
             return 1
           }
 
