@@ -42,6 +42,24 @@ All nine crates ship in lockstep. To bump from OLD to NEW:
 That's it. Individual crate `Cargo.toml` files inherit the workspace version
 via `version.workspace = true` and depend on siblings via `{ workspace = true }`.
 
+**You do NOT need to bump `package.json`.** The `publish-npm` job in
+`release.yml` reads `Cargo.toml`'s `[workspace.package] version` at publish
+time and stamps `package.json` to match before `npm publish`. The committed
+`package.json` version is informational — only the tag + Cargo.toml are
+the gate.
+
+### What `release.yml` does on tag push
+
+When tag `X.Y.Z` is pushed:
+
+1. **Create GitHub release** (draft) and verify tag matches `Cargo.toml`
+2. **Build binaries** for 5 targets (linux x86_64, macos x86_64+arm64, windows x86_64+arm64), upload as `.tar.gz`/`.zip` assets
+3. **Publish 9 crates to crates.io** in dep order, with retry-on-"already-published" and verify-via-API (User-Agent required)
+4. **Publish to npm as `@beaconbay/ck-search`** — postinstall script downloads the platform binary from the GitHub release at user install time
+5. **Finalize GitHub release** (out of draft)
+
+Required repo secrets: `CARGO_REGISTRY_TOKEN`, `NPM_TOKEN`, `GITHUB_TOKEN` (auto).
+
 ### CHANGELOG.md Format
 
 Always update CHANGELOG.md with new releases. Follow this structure:
