@@ -79,7 +79,18 @@ pub(crate) fn chunk_with_queries(
                         continue;
                     }
 
-                    // Skip C/C++ function/method declarations without bodies (defaulted/deleted)
+                    // Drop C/C++ function/method nodes that have no body block.
+                    // tree-sitter-cpp emits `function_definition` for both real
+                    // bodied functions AND for special forms like
+                    //   Foo() = default;
+                    //   Foo(const Foo&) = delete;
+                    //   void foo() = 0;   // pure virtual
+                    // Distinguish via presence of a `compound_statement` child:
+                    // a real definition has one, the special forms don't.
+                    // (Note: regression test
+                    // `cpp_queries_skip_defaulted_deleted_ctors` proves this
+                    // filter is load-bearing — removing it lets the ctors leak
+                    // back in as Method chunks. Issue #136.)
                     if matches!(chunk_type, ChunkType::Function | ChunkType::Method)
                         && capture.node.kind() == "function_definition"
                         && !has_compound_statement(capture.node)

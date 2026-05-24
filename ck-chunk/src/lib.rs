@@ -433,17 +433,21 @@ fn chunk_language(text: &str, language: ParseableLanguage) -> Result<Vec<Chunk>>
         chunks = merge_haskell_functions(chunks, text);
     }
 
-    // Suppress text chunks fully contained by class/method/function chunks for C/C++
-    if matches!(language, ParseableLanguage::C | ParseableLanguage::Cpp) {
-        chunks = suppress_contained_text_chunks(chunks);
-    }
-
-    // Fill gaps between chunks with remainder content
+    // Fill gaps between chunks with remainder content. This must happen
+    // BEFORE suppress_contained_text_chunks so that gap-produced Text
+    // chunks (e.g., the run of field declarations and access specifiers
+    // inside a class body) are also subject to suppression — otherwise
+    // they leak through as standalone Text chunks (issue #136).
     chunks = fill_gaps(chunks, text);
 
     // Merge template-prefix gap chunks into the following C++ definition chunk
     if language == ParseableLanguage::Cpp {
         chunks = merge_cpp_template_prefix_chunks(chunks, text);
+    }
+
+    // Suppress text chunks fully contained by class/method/function chunks for C/C++
+    if matches!(language, ParseableLanguage::C | ParseableLanguage::Cpp) {
+        chunks = suppress_contained_text_chunks(chunks);
     }
 
     // Merge small chunks if Markdown
@@ -506,7 +510,16 @@ fn merge_cpp_template_prefix_chunks(chunks: Vec<Chunk>, text: &str) -> Vec<Chunk
             let template_chunk = &chunks[idx];
             let mut next_chunk = chunks[idx + 1].clone();
 
-            if template_chunk.span.byte_end == next_chunk.span.byte_start
+            // Adjacency: byte_end may be <= next.byte_start, with only
+            // whitespace in between. Previously required strict equality
+            // which missed multiline templates and blank lines between
+            // the template clause and the definition (issue #136).
+            let gap_is_whitespace = template_chunk.span.byte_end <= next_chunk.span.byte_start
+                && text
+                    .get(template_chunk.span.byte_end..next_chunk.span.byte_start)
+                    .is_some_and(|gap| gap.chars().all(char::is_whitespace));
+
+            if gap_is_whitespace
                 && template_chunk.span.byte_start < next_chunk.span.byte_end
                 && next_chunk.span.byte_end <= text.len()
             {
@@ -3068,6 +3081,147 @@ Trailing paragraph.
         assert!(
             all_text.contains("Setext Section"),
             "expected markdown to include Setext heading text"
+        );
+    }
+
+    // ----- Regression tests for issue #136 (C/C++ edge cases) -----
+    //
+    // These tests intentionally use the full `chunk_text` entry point so
+    // they exercise the post-processing pipeline (fill_gaps, suppression,
+    // template merge) — not just the raw query layer like the existing
+    // C/C++ tests in `query_chunker.rs`.
+
+    /// Issue #136 #1: gap-produced Text chunks inside a class body must
+    /// be suppressed too. Previously `suppress_contained_text_chunks`
+    /// ran *before* `fill_gaps`, so field declarations and access
+    /// specifiers between methods leaked through as a standalone Text
+    /// chunk. Now suppression runs after fill_gaps.
+    #[test]
+    fn cpp_class_body_gap_text_is_suppressed() {
+        let source = r"
+class Counter {
+public:
+    int value;
+    int spare;
+
+    void inc() { value++; }
+    void dec() { value--; }
+};
+";
+        let chunks = chunk_text(source, Some(ck_core::Language::Cpp)).expect("chunk cpp");
+
+        // The class itself + the two methods should be present.
+        assert!(
+            chunks
+                .iter()
+                .any(|c| c.chunk_type == ChunkType::Class && c.text.contains("class Counter")),
+            "expected Class chunk for Counter"
+        );
+
+        // Critical: no Text chunk should contain `int value` or
+        // `public:` — those bytes live inside the class span and would
+        // be a redundant duplicate of content already in the Class chunk.
+        let leaked_field = chunks.iter().any(|c| {
+            c.chunk_type == ChunkType::Text
+                && (c.text.contains("int value") || c.text.contains("int spare"))
+        });
+        let leaked_access = chunks
+            .iter()
+            .any(|c| c.chunk_type == ChunkType::Text && c.text.trim() == "public:");
+        assert!(
+            !leaked_field,
+            "field declarations leaked as standalone Text chunks: {:?}",
+            chunks
+                .iter()
+                .filter(|c| c.chunk_type == ChunkType::Text)
+                .map(|c| &c.text)
+                .collect::<Vec<_>>()
+        );
+        assert!(!leaked_access, "access specifier leaked as Text chunk");
+    }
+
+    /// Issue #136 #3: `template<...>` clauses that aren't byte-adjacent
+    /// to their definition (multiline template clause, blank line
+    /// between) still merge into a single Cpp definition chunk. The
+    /// previous strict-adjacency check missed these.
+    #[test]
+    fn cpp_multiline_template_prefix_merges_with_definition() {
+        // Multiline template clause AND a blank line before the function.
+        let source = r"
+template <
+    typename T,
+    typename U
+>
+
+T identity(T value, U /*ignored*/) {
+    return value;
+}
+";
+        let chunks = chunk_text(source, Some(ck_core::Language::Cpp)).expect("chunk cpp");
+
+        // After merge: one chunk that contains BOTH the template clause
+        // and the definition. There should not be a separate Text chunk
+        // that's just the template prefix.
+        let combined = chunks.iter().find(|c| {
+            matches!(c.chunk_type, ChunkType::Function | ChunkType::Method)
+                && c.text.contains("template")
+                && c.text.contains("T identity")
+        });
+        assert!(
+            combined.is_some(),
+            "expected one Function chunk combining the multiline template clause with its definition; got {:?}",
+            chunks
+                .iter()
+                .map(|c| (&c.chunk_type, c.text.lines().next().unwrap_or("")))
+                .collect::<Vec<_>>()
+        );
+
+        // And we shouldn't have a separate standalone Text chunk that's
+        // only the template clause without the body.
+        let orphan_template = chunks.iter().any(|c| {
+            c.chunk_type == ChunkType::Text
+                && c.text.contains("template")
+                && !c.text.contains("identity")
+        });
+        assert!(
+            !orphan_template,
+            "template clause was emitted as a standalone Text chunk instead of merging"
+        );
+    }
+
+    /// Coverage gap from issue #136: an `extern \"C\" { ... }` linkage
+    /// specification should not lose its inner functions. We don't
+    /// assert breadcrumb shape here — just that the functions are
+    /// captured at all and aren't suppressed by the linkage wrapper.
+    #[test]
+    fn cpp_extern_c_block_functions_are_captured() {
+        let source = r#"
+extern "C" {
+    int add(int a, int b) {
+        return a + b;
+    }
+    int sub(int a, int b) {
+        return a - b;
+    }
+}
+"#;
+        let chunks = chunk_text(source, Some(ck_core::Language::Cpp)).expect("chunk cpp");
+
+        let has_add = chunks.iter().any(|c| {
+            matches!(c.chunk_type, ChunkType::Function | ChunkType::Method)
+                && c.text.contains("int add")
+        });
+        let has_sub = chunks.iter().any(|c| {
+            matches!(c.chunk_type, ChunkType::Function | ChunkType::Method)
+                && c.text.contains("int sub")
+        });
+        assert!(
+            has_add && has_sub,
+            "expected both `add` and `sub` to be captured inside extern \"C\"; got {:?}",
+            chunks
+                .iter()
+                .map(|c| (&c.chunk_type, c.text.lines().next().unwrap_or("")))
+                .collect::<Vec<_>>()
         );
     }
 
