@@ -27,7 +27,7 @@
     "test": "node scripts/test.js"
   },
   "engines": {
-    "node": ">=16"
+    "node": ">=18"
   },
   "files": [
     "cli/",
