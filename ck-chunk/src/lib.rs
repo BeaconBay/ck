@@ -392,7 +392,6 @@ pub(crate) fn tree_sitter_language(language: ParseableLanguage) -> Result<tree_s
         ParseableLanguage::Elixir => tree_sitter_elixir::LANGUAGE,
 
         ParseableLanguage::Markdown => unreachable!("Handled above via early return"),
-
     };
 
     Ok(ts_language.into())
@@ -1076,9 +1075,7 @@ fn should_attach_leading_trivia(language: ParseableLanguage, node: &tree_sitter:
         }
         ParseableLanguage::Python => kind == "decorator",
         ParseableLanguage::TypeScript | ParseableLanguage::JavaScript => kind == "decorator",
-        ParseableLanguage::Markdown => {
-            kind == "comment"
-        }
+        ParseableLanguage::Markdown => kind == "comment",
         ParseableLanguage::CSharp => matches!(kind, "attribute_list" | "attribute"),
         _ => false,
     }
@@ -1274,11 +1271,7 @@ fn markdown_heading_ancestry(node: tree_sitter::Node<'_>, source: &str) -> Vec<S
             if let Some(level) = parse_setext_level(underline) {
                 let heading_text = line.trim();
                 if !heading_text.is_empty() {
-                    update_markdown_heading_stack(
-                        &mut stack,
-                        level,
-                        heading_text.to_string(),
-                    );
+                    update_markdown_heading_stack(&mut stack, level, heading_text.to_string());
                 }
                 i += 2;
                 continue;
@@ -2224,8 +2217,8 @@ shapeDescription (Square s) = "square of side " ++ show s
             .join("tests/fixtures/markdown_breadcrumbs.md");
         let source = std::fs::read_to_string(&path).expect("read markdown file");
 
-        let chunks = chunk_text(&source, Some(ck_core::Language::Markdown))
-            .expect("chunk markdown");
+        let chunks =
+            chunk_text(&source, Some(ck_core::Language::Markdown)).expect("chunk markdown");
 
         // The fixture is a small document (well under the token target), so
         // merge_small_chunks collapses all individual heading / paragraph chunks
@@ -2280,8 +2273,8 @@ Setext Section
 Trailing paragraph.
 "#;
 
-        let chunks = chunk_text(&source, Some(ck_core::Language::Markdown))
-            .expect("chunk markdown");
+        let chunks =
+            chunk_text(&source, Some(ck_core::Language::Markdown)).expect("chunk markdown");
 
         // This source is a small synthetic document.  merge_small_chunks will
         // collapse all individual heading / paragraph / code-block chunks into
@@ -2300,9 +2293,18 @@ Trailing paragraph.
             all_text.contains("# Title") || all_text.contains("## Usage"),
             "expected heading text to be present after merging"
         );
-        assert!(all_text.contains("```rust"), "expected markdown to include fenced code block");
-        assert!(all_text.contains("> Blockquote"), "expected markdown to include blockquote text");
-        assert!(all_text.contains("Setext Section"), "expected markdown to include Setext heading text");
+        assert!(
+            all_text.contains("```rust"),
+            "expected markdown to include fenced code block"
+        );
+        assert!(
+            all_text.contains("> Blockquote"),
+            "expected markdown to include blockquote text"
+        );
+        assert!(
+            all_text.contains("Setext Section"),
+            "expected markdown to include Setext heading text"
+        );
     }
 
     #[test]

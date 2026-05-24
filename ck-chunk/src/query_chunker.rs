@@ -276,8 +276,8 @@ fn main() {
 "#;
 
         let mut parser = Parser::new();
-        let ts_language = tree_sitter_language(ParseableLanguage::Markdown)
-            .expect("markdown language");
+        let ts_language =
+            tree_sitter_language(ParseableLanguage::Markdown).expect("markdown language");
         parser
             .set_language(&ts_language)
             .expect("set markdown language");
