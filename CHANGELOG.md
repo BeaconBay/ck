@@ -4,10 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.11] - 2026-05-24
+
 ### Added
-- **C language support**: Full tree-sitter based semantic chunking for C files (.c, .h) - functions, structs, enums, unions, typedefs, macros
-- **C++ language support**: Full tree-sitter based semantic chunking for C++ files (.cpp, .cc, .cxx, .hpp, .h) - classes, structs, namespaces, templates, enums, unions
-- **Markdown language support**: Structure-aware chunking for Markdown files - headings, sections, code blocks
+- **C language support** (#102 by @szavadsky): Full tree-sitter based semantic chunking for C files (.c, .h) — functions, structs, enums, unions, typedefs, macros. Includes C-specific post-processing: `suppress_contained_text_chunks` (removes redundant text chunks fully contained inside Class/Method/Function chunks) and namespace/breadcrumb-aware extraction.
+- **C++ language support** (#102 by @szavadsky): Full tree-sitter based semantic chunking for .cpp/.cc/.cxx/.hpp/.h files — classes, structs, namespaces, templates, enums, unions. C++-specific `merge_cpp_template_prefix_chunks` joins the `template<...>` clause to the following definition. Namespace breadcrumb logic qualifies methods as `Namespace::Class::method` correctly. 7 dedicated unit tests for corner cases.
+- **Markdown language support** (#104 by @szavadsky): Structure-aware chunking for Markdown files — headings, sections, fenced code blocks, lists, paragraphs. Markdown-specific `merge_small_chunks` post-processing avoids polluting the embedding index with near-empty atomic chunks (a Markdown file is often many tiny logical units).
+
+### Fixed
+- **Deploy Documentation to GitHub Pages workflow** (#135): the unbounded `vite: ">=6.4.2"` pnpm override added in 0.7.10's security fix pulled vite 8, which made esbuild an optional/separate install and broke vitepress 1.6.4's `transformWithEsbuild` call. Constrained to `^6.4.2` (stay in vite 6.x major). Same treatment for esbuild (`^0.25.0`). Docs deploy was failing on every push since 0.7.10.
 
 ## [0.7.10] - 2026-05-24
 
