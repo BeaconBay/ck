@@ -42,17 +42,17 @@ rmcp-macros = "0.6"
 tokio-util = { version = "0.7", features = ["rt", "full"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = { workspace = true }
-schemars = "1.0"
+schemars = "1.2"
 glob = { workspace = true }
 globset = { workspace = true }
 regex = { workspace = true }
 indicatif = "0.17"
 console = "0.15"
-owo-colors = "4.0"
+owo-colors = "4.3"
 walkdir = "2.3"
 ratatui = "0.26"
 crossterm = "0.27"
-shlex = "1.3"
+shlex = "2.0"
 syntect = "5.2"
 openssl = { workspace = true, optional = true }
 uuid = { workspace = true }

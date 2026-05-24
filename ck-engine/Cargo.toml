@@ -35,4 +35,4 @@ fastembed = ["ck-embed/fastembed", "ck-index/fastembed", "ck-chunk/fastembed"]
 mixedbread = ["ck-embed/mixedbread", "ck-index/mixedbread", "ck-chunk/mixedbread"]
 
 [dev-dependencies]
-tempfile = "3.8"
+tempfile = "3.27"
