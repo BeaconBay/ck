@@ -1116,7 +1116,8 @@ pub(crate) fn build_chunk(
     let ancestry = collect_ancestry(target_node, language, source);
     let leading_trivia = segments_to_strings(&leading_segments, source);
     let trailing_trivia = segments_to_strings(&trailing_segments, source);
-    let mut metadata = ChunkMetadata::from_context(&text, ancestry, leading_trivia, trailing_trivia);
+    let mut metadata =
+        ChunkMetadata::from_context(&text, ancestry, leading_trivia, trailing_trivia);
     if matches!(language, ParseableLanguage::C | ParseableLanguage::Cpp)
         && matches!(chunk_type, ChunkType::Function | ChunkType::Method)
     {
@@ -1300,7 +1301,6 @@ fn find_method_body_node(node: tree_sitter::Node<'_>) -> Option<tree_sitter::Nod
 fn method_body_placeholder(_body: tree_sitter::Node<'_>, _source: &str) -> String {
     ";".to_string()
 }
-
 
 fn adjust_node_for_language(
     node: tree_sitter::Node<'_>,
@@ -2396,27 +2396,39 @@ int main(void) {
         let chunks = chunk_language(c_code, ParseableLanguage::C).unwrap();
         assert!(!chunks.is_empty());
 
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Function && c.text.contains("#define MAX")
-        }));
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Text && c.text.contains("#define VERSION")
-        }));
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Class && c.text.contains("struct Node")
-        }));
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Class && c.text.contains("union Payload")
-        }));
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Class && c.text.contains("enum Color")
-        }));
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Function && c.text.contains("#define MAX") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Text && c.text.contains("#define VERSION") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Class && c.text.contains("struct Node") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Class && c.text.contains("union Payload") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Class && c.text.contains("enum Color") })
+        );
         assert!(chunks.iter().any(|c| {
             c.chunk_type == ChunkType::Function && c.text.contains("static inline int add")
         }));
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Function && c.text.contains("int main")
-        }));
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Function && c.text.contains("int main") })
+        );
     }
 
     #[test]
@@ -2430,11 +2442,21 @@ struct foo forward;
 
         let chunks = chunk_language(c_code, ParseableLanguage::C).unwrap();
 
-        assert!(chunks.iter().any(|c| {
-            c.text.contains("struct mtd_info_user meminfo;")
-        }));
-        assert!(chunks.iter().any(|c| c.text.contains("struct foo forward;")));
-        assert!(!chunks.iter().any(|c| c.text.trim() == "struct mtd_info_user"));
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.text.contains("struct mtd_info_user meminfo;") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| c.text.contains("struct foo forward;"))
+        );
+        assert!(
+            !chunks
+                .iter()
+                .any(|c| c.text.trim() == "struct mtd_info_user")
+        );
         assert!(!chunks.iter().any(|c| c.text.trim() == "struct foo"));
     }
 
@@ -2474,36 +2496,52 @@ int main() {
         let chunks = chunk_language(cpp_code, ParseableLanguage::Cpp).unwrap();
         assert!(!chunks.is_empty());
 
-        assert!(chunks.iter().any(|c| c.text.contains("template <typename T>")));
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Text && c.text.contains("using Vec")
-        }));
+        assert!(
+            chunks
+                .iter()
+                .any(|c| c.text.contains("template <typename T>"))
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Text && c.text.contains("using Vec") })
+        );
         assert!(chunks.iter().any(|c| {
             c.chunk_type == ChunkType::Text && c.text.contains("typedef unsigned long")
         }));
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Function && c.text.contains("#define SQUARE")
-        }));
-        let calculator_chunk = chunks.iter().find(|c| {
-            c.chunk_type == ChunkType::Class && c.text.contains("class Calculator")
-        });
+        assert!(
+            chunks.iter().any(|c| {
+                c.chunk_type == ChunkType::Function && c.text.contains("#define SQUARE")
+            })
+        );
+        let calculator_chunk = chunks
+            .iter()
+            .find(|c| c.chunk_type == ChunkType::Class && c.text.contains("class Calculator"));
         assert!(calculator_chunk.is_some());
         let calculator_chunk = calculator_chunk.unwrap();
         assert!(calculator_chunk.text.contains("int add"));
         assert!(!calculator_chunk.text.contains("return a + b"));
 
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Class && c.text.contains("struct Point")
-        }));
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Class && c.text.contains("enum class Color")
-        }));
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Function && c.text.contains("int main")
-        }));
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Function && c.text.contains("T add")
-        }));
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Class && c.text.contains("struct Point") })
+        );
+        assert!(
+            chunks.iter().any(|c| {
+                c.chunk_type == ChunkType::Class && c.text.contains("enum class Color")
+            })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Function && c.text.contains("int main") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Function && c.text.contains("T add") })
+        );
         assert!(chunks.iter().any(|c| {
             c.chunk_type == ChunkType::Method && c.text.contains("int add(int a, int b)")
         }));
@@ -2523,18 +2561,26 @@ using TopLevel = double;
 
         let chunks = chunk_language(cpp_code, ParseableLanguage::Cpp).unwrap();
 
-        assert!(!chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Text && c.text.contains("using Alias")
-        }));
-        assert!(!chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Text && c.text.contains("int local")
-        }));
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Text && c.text.contains("using TopLevel")
-        }));
-        assert!(chunks.iter().any(|c| {
-            c.chunk_type == ChunkType::Method && c.text.contains("int calc")
-        }));
+        assert!(
+            !chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Text && c.text.contains("using Alias") })
+        );
+        assert!(
+            !chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Text && c.text.contains("int local") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Text && c.text.contains("using TopLevel") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Method && c.text.contains("int calc") })
+        );
     }
 
     #[test]
@@ -2612,7 +2658,10 @@ void outer::A::m() {
             .iter()
             .find(|c| c.chunk_type == ChunkType::Function && c.text.contains("outer::A::m"))
             .expect("method chunk should exist");
-        assert_eq!(method_chunk.metadata.breadcrumb.as_deref(), Some("outer::A::m"));
+        assert_eq!(
+            method_chunk.metadata.breadcrumb.as_deref(),
+            Some("outer::A::m")
+        );
     }
 
     #[test]

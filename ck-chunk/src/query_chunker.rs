@@ -34,7 +34,10 @@ pub(crate) fn chunk_with_queries(
                 if matches!(language, ParseableLanguage::C | ParseableLanguage::Cpp) {
                     if let Some(parent) = capture.node.parent() {
                         if parent.kind() == "template_declaration"
-                            && matches!(chunk_type, ChunkType::Class | ChunkType::Function | ChunkType::Method)
+                            && matches!(
+                                chunk_type,
+                                ChunkType::Class | ChunkType::Function | ChunkType::Method
+                            )
                         {
                             continue;
                         }
@@ -65,7 +68,8 @@ pub(crate) fn chunk_with_queries(
                     }
 
                     // Skip local class/struct/enum/union chunks inside functions
-                    if chunk_type == ChunkType::Class && is_inside_function_or_method(capture.node) {
+                    if chunk_type == ChunkType::Class && is_inside_function_or_method(capture.node)
+                    {
                         continue;
                     }
 
@@ -831,7 +835,9 @@ public:
 
         let class_chunk = chunks
             .iter()
-            .find(|chunk| chunk.chunk_type == ChunkType::Class && chunk.text.contains("class Widget"))
+            .find(|chunk| {
+                chunk.chunk_type == ChunkType::Class && chunk.text.contains("class Widget")
+            })
             .expect("class chunk present");
         assert_eq!(
             class_chunk.metadata.ancestry,
