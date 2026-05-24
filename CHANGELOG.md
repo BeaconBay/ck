@@ -7,6 +7,11 @@ All notable changes to this project will be documented in this file.
 ### Added
 - **C language support**: Full tree-sitter based semantic chunking for C files (.c, .h) - functions, structs, enums, unions, typedefs, macros
 - **C++ language support**: Full tree-sitter based semantic chunking for C++ files (.cpp, .cc, .cxx, .hpp, .h) - classes, structs, namespaces, templates, enums, unions
+## [0.7.7] - 2026-05-23
+
+### Fixed
+- **`cargo install ck-search` failed with 36 errors out of `ck-embed::mixedbread`** (#116, reported by @gianpaj). `cargo install` (without `--locked`) ignores `Cargo.lock` and re-solves from scratch; the workspace's `ort = "2.0.0-rc.11"` was a caret range that let cargo pick the newer `2.0.0-rc.12`. rc.12 made `SessionOptionsPointer: !Sync`, which removed `Send + Sync` from `ort::Error<SessionBuilder>` and broke every `?`-conversion into `anyhow::Error`. Pinned to `=2.0.0-rc.11` so any resolution path (locked or not) lands on the tested version. Upgrade to rc.12 will be evaluated in a follow-up.
+
 ## [0.7.6] - 2026-05-23
 
 ### Fixed
