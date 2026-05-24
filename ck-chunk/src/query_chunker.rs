@@ -18,7 +18,7 @@ pub(crate) fn chunk_with_queries(
     };
 
     let query = Query::new(&ts_language, &query_source)
-        .with_context(|| format!("Failed to compile query for {}", language))?;
+        .with_context(|| format!("Failed to compile query for {language}"))?;
 
     let capture_names = query.capture_names();
     let mut cursor = QueryCursor::new();
@@ -265,7 +265,7 @@ mod tests {
 
     #[test]
     fn rust_queries_capture_core_constructs() {
-        let source = r#"
+        let source = r"
             mod sample {
                 pub struct Thing;
 
@@ -280,7 +280,7 @@ mod tests {
             trait Runner {
                 fn run(&self);
             }
-        "#;
+        ";
 
         let mut parser = Parser::new();
         let ts_language = tree_sitter_language(ParseableLanguage::Rust).expect("rust language");
@@ -399,7 +399,7 @@ def top_level():
     #[test]
     #[ignore] // TODO: Update test expectations to match actual query behavior
     fn typescript_queries_capture_core_constructs() {
-        let source = r#"
+        let source = r"
 // Utility function
 export const util = () => {
     // comment about util
@@ -417,7 +417,7 @@ export class Example {
 }
 
 const compute = (x: number) => x * 2;
-"#;
+";
 
         let mut parser = Parser::new();
         let ts_language = tree_sitter_language(ParseableLanguage::TypeScript).expect("ts language");
@@ -468,7 +468,7 @@ const compute = (x: number) => x * 2;
 
     #[test]
     fn dart_queries_capture_core_constructs() {
-        let source = r#"
+        let source = r"
 class Helper {
   Helper();
   void help() {}
@@ -481,7 +481,7 @@ enum State { on, off }
 void globalFunc() {}
 
 const int MAX = 100;
-"#;
+";
 
         let mut parser = Parser::new();
         let ts_language = tree_sitter_language(ParseableLanguage::Dart).expect("dart language");

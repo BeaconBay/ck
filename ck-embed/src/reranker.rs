@@ -73,7 +73,7 @@ pub fn create_reranker_for_config(
                 );
             }
         }
-        provider => bail!("Unsupported reranker provider '{}'", provider),
+        provider => bail!("Unsupported reranker provider '{provider}'"),
     }
 }
 
@@ -144,7 +144,7 @@ impl FastReranker {
         std::fs::create_dir_all(&model_cache_dir)?;
 
         if let Some(ref callback) = progress_callback {
-            callback(&format!("Initializing reranker model: {}", model_name));
+            callback(&format!("Initializing reranker model: {model_name}"));
 
             // Check if model already exists
             let model_exists = Self::check_model_exists(&model_cache_dir, model_name);
@@ -155,7 +155,7 @@ impl FastReranker {
                     model_cache_dir.display()
                 ));
             } else {
-                callback(&format!("Using cached reranker model: {}", model_name));
+                callback(&format!("Using cached reranker model: {model_name}"));
             }
         }
 
@@ -206,7 +206,7 @@ impl Reranker for FastReranker {
 
     fn rerank(&mut self, query: &str, documents: &[String]) -> Result<Vec<RerankResult>> {
         // Convert documents to string references
-        let docs: Vec<&str> = documents.iter().map(|s| s.as_str()).collect();
+        let docs: Vec<&str> = documents.iter().map(std::string::String::as_str).collect();
 
         // Get reranking scores - fastembed rerank takes (query, documents)
         let results = self.model.rerank(query, docs, true, None)?;

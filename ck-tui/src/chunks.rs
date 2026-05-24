@@ -187,7 +187,7 @@ pub fn collect_chunk_display_lines(
                 .breadcrumb
                 .as_deref()
                 .filter(|crumb| !crumb.is_empty())
-                .map(|crumb| format!(" ({})", crumb))
+                .map(|crumb| format!(" ({crumb})"))
                 .unwrap_or_else(|| {
                     if !meta.ancestry.is_empty() {
                         format!(" ({})", meta.ancestry.join("::"))
@@ -197,11 +197,11 @@ pub fn collect_chunk_display_lines(
                 });
             let token_hint = meta
                 .estimated_tokens
-                .map(|tokens| format!(" • {} tokens", tokens))
+                .map(|tokens| format!(" • {tokens} tokens"))
                 .unwrap_or_default();
 
             // Create a more bar-like header design with better spacing
-            let bar_text = format!("{} {}{}", chunk_kind, breadcrumb_text, token_hint);
+            let bar_text = format!("{chunk_kind} {breadcrumb_text}{token_hint}");
             rows.push(ChunkDisplayLine::Label {
                 prefix: max_depth,
                 text: bar_text,
@@ -250,7 +250,7 @@ pub fn collect_chunk_display_lines(
             .iter()
             .find(|meta| line_num >= meta.span.line_start && line_num <= meta.span.line_end);
 
-        let has_any_structural = depth_slots.iter().any(|slot| slot.is_some());
+        let has_any_structural = depth_slots.iter().any(std::option::Option::is_some);
         let has_any_chunk = has_any_structural || text_chunk_here.is_some();
         let in_matched_chunk = chunk_meta
             .map(|meta| line_num >= meta.span.line_start && line_num <= meta.span.line_end)
@@ -364,7 +364,7 @@ pub fn chunk_display_line_to_string(line: &ChunkDisplayLine) -> String {
             output.push(' ');
 
             // Add line number with fixed width (at least 4 chars)
-            output.push_str(&format!("{:4} | ", line_num));
+            output.push_str(&format!("{line_num:4} | "));
 
             // Add line text
             output.push_str(text);
@@ -414,7 +414,7 @@ pub fn chunk_file_live(file_path: &Path) -> Result<(Vec<String>, Vec<IndexedChun
     // Use model-aware chunking (same approach as --dump-chunks)
     let default_model = "nomic-embed-text-v1.5";
     let chunks = ck_chunk::chunk_text_with_model(&content, detected_lang, Some(default_model))
-        .map_err(|err| format!("Failed to chunk file: {}", err))?;
+        .map_err(|err| format!("Failed to chunk file: {err}"))?;
 
     // Convert chunks to IndexedChunkMeta format
     let chunk_metas = convert_chunks_to_meta(chunks);

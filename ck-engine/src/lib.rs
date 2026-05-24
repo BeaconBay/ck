@@ -753,20 +753,20 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
     let _schema = schema_builder.build();
 
     let index = Index::open_in_dir(&tantivy_index_path)
-        .map_err(|e| CkError::Index(format!("Failed to open tantivy index: {}", e)))?;
+        .map_err(|e| CkError::Index(format!("Failed to open tantivy index: {e}")))?;
 
     let reader = index
         .reader_builder()
         .reload_policy(ReloadPolicy::OnCommitWithDelay)
         .try_into()
-        .map_err(|e| CkError::Index(format!("Failed to create index reader: {}", e)))?;
+        .map_err(|e| CkError::Index(format!("Failed to create index reader: {e}")))?;
 
     let searcher = reader.searcher();
     let query_parser = QueryParser::for_index(&index, vec![content_field]);
 
     let query = query_parser
         .parse_query(&options.query)
-        .map_err(|e| CkError::Search(format!("Failed to parse query: {}", e)))?;
+        .map_err(|e| CkError::Search(format!("Failed to parse query: {e}")))?;
 
     let top_docs = if let Some(top_k) = options.top_k {
         searcher.search(&query, &TopDocs::with_limit(top_k))?
@@ -863,11 +863,11 @@ async fn build_tantivy_index(options: &SearchOptions) -> Result<Vec<SearchResult
     let schema = schema_builder.build();
 
     let index = Index::create_in_dir(&tantivy_index_path, schema.clone())
-        .map_err(|e| CkError::Index(format!("Failed to create tantivy index: {}", e)))?;
+        .map_err(|e| CkError::Index(format!("Failed to create tantivy index: {e}")))?;
 
     let mut index_writer = index
         .writer(50_000_000)
-        .map_err(|e| CkError::Index(format!("Failed to create index writer: {}", e)))?;
+        .map_err(|e| CkError::Index(format!("Failed to create index writer: {e}")))?;
 
     let files = filter_files_by_include(
         collect_files(index_root, true, &options.exclude_patterns)?,
@@ -886,7 +886,7 @@ async fn build_tantivy_index(options: &SearchOptions) -> Result<Vec<SearchResult
 
     index_writer
         .commit()
-        .map_err(|e| CkError::Index(format!("Failed to commit index: {}", e)))?;
+        .map_err(|e| CkError::Index(format!("Failed to commit index: {e}")))?;
 
     // After building, search again with the same options
     let tantivy_index_path = index_root.join(".ck").join("tantivy_index");
@@ -896,20 +896,20 @@ async fn build_tantivy_index(options: &SearchOptions) -> Result<Vec<SearchResult
     let _schema = schema_builder.build();
 
     let index = Index::open_in_dir(&tantivy_index_path)
-        .map_err(|e| CkError::Index(format!("Failed to open tantivy index: {}", e)))?;
+        .map_err(|e| CkError::Index(format!("Failed to open tantivy index: {e}")))?;
 
     let reader = index
         .reader_builder()
         .reload_policy(ReloadPolicy::OnCommitWithDelay)
         .try_into()
-        .map_err(|e| CkError::Index(format!("Failed to create index reader: {}", e)))?;
+        .map_err(|e| CkError::Index(format!("Failed to create index reader: {e}")))?;
 
     let searcher = reader.searcher();
     let query_parser = QueryParser::for_index(&index, vec![content_field]);
 
     let query = query_parser
         .parse_query(&options.query)
-        .map_err(|e| CkError::Search(format!("Failed to parse query: {}", e)))?;
+        .map_err(|e| CkError::Search(format!("Failed to parse query: {e}")))?;
 
     let top_docs = if let Some(top_k) = options.top_k {
         searcher.search(&query, &TopDocs::with_limit(top_k))?
@@ -1468,11 +1468,7 @@ mod tests {
 
         // Create multiple files with matches
         for i in 0..10 {
-            fs::write(
-                temp_dir.path().join(format!("file{}.txt", i)),
-                "test content",
-            )
-            .unwrap();
+            fs::write(temp_dir.path().join(format!("file{i}.txt")), "test content").unwrap();
         }
 
         let options = SearchOptions {

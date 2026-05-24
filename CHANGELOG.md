@@ -7,6 +7,46 @@ All notable changes to this project will be documented in this file.
 ### Added
 - **C language support**: Full tree-sitter based semantic chunking for C files (.c, .h) - functions, structs, enums, unions, typedefs, macros
 - **C++ language support**: Full tree-sitter based semantic chunking for C++ files (.cpp, .cc, .cxx, .hpp, .h) - classes, structs, namespaces, templates, enums, unions
+## [0.7.10] - 2026-05-24
+
+### Security
+- **11 CodeQL alerts in ck-vscode/webview/main.js** (#133):
+  - **XSS** in `updateResultCount` — was building HTML via template-literal interpolation + `innerHTML`. Rewritten with `createElement` + `textContent` + `appendChild`. Not exploitable in practice (inputs were typed numeric/boolean from JSON-RPC), but the safer construction removes any class of future regression.
+  - **10× ReDoS** in the syntax-highlighter regexes (Python/Ruby/Shell/JSON/YAML quoted-string matchers). Classic `(?:\\.|[^"])*` overlap on long backslash runs. Fixed by changing `[^"]` to `[^"\\]` so backslash must lead an escape sequence.
+- **4 npm transitive Dependabot alerts** (#133):
+  - **ck-vscode**: `npm audit fix` cleared brace-expansion + underscore.
+  - **docs-site**: vitepress 1.6.4 (latest stable) pins old vite/esbuild/rollup. Added pnpm overrides for `vite >=6.4.2` and `esbuild >=0.25.0`; `rollup >=4.59.0` resolved naturally via `pnpm update`.
+- **4 Rust Dependabot alerts dismissed via API** with rationale:
+  - rmcp DNS rebinding × 2 — we only compile `transport-io` (stdio), not the HTTP server transport.
+  - rand custom-logger unsoundness — already on rand 0.8.6 (patched), no custom logger.
+  - lru `IterMut` stacked borrows — we don't use `IterMut` anywhere.
+
+### Technical
+- **Pedantic clippy auto-fix cleanup** (#134): 27 files, mechanical `cargo clippy --fix` for `uninlined_format_args` (`format!("{}", x)` → `format!("{x}")`), `redundant_closure_for_method_calls`, `needless_raw_string_hashes`. No logic changes. Reduces incidental fmt drift on future PRs.
+
+## [0.7.9] - 2026-05-24
+
+### Changed
+- **npm publish now uses Trusted Publishing (OIDC)** (#131). 0.7.8 failed to publish to npm because the classic token we'd issued didn't bypass 2FA. Switched to npm's recommended OIDC flow — GitHub mints a short-lived id-token per release run, npm validates it against the trusted-publisher config on the package. No long-lived secret stored anywhere. The tarball is now published with an SLSA provenance attestation that cryptographically ties it to this workflow run + commit. This is the first release where \`@beaconbay/ck-search\` actually lands on npm.
+
+## [0.7.8] - 2026-05-24
+
+### Added
+- **npm distribution as `@beaconbay/ck-search`** (#117). Users without Rust installed can now `npm install -g @beaconbay/ck-search`. The postinstall script downloads the matching platform binary from the corresponding GitHub release (`ck-X.Y.Z-<target>.{tar.gz|zip}`) and a thin `cli/ck.js` wrapper spawns it with inherited stdio. `publish-npm` job added to release.yml; auto-stamps `package.json` version from `Cargo.toml` at publish time so maintainers only ever bump one file.
+
+### Security
+- **openssl 0.10.75 → 0.10.80** (#118). Picks up a buffer-overflow fix in `cipher_update_inplace` for AES key-wrap-with-padding (CVE-class).
+
+### Changed
+- **`@beaconbay/ck-search` requires Node.js ≥ 18** (#119). Bumped alongside the `tar` 6 → 7 upgrade (tar v7 dropped Node ≤ 17 support).
+- **Cargo dependency-bump policy** (#118): `.github/dependabot.yml` now groups patch/minor cargo bumps into a single `cargo-safe` PR while routing `rmcp` and `ort` to their own `cargo-flagged` PRs. Stops repeats of the #115 situation where a major rmcp bump blocked a batch of safe patches from landing.
+
+### Technical
+- **Bulk dependency refresh** (#125 + #118): patch/minor bumps for anyhow, serde_json, tokio, clap, regex, blake3, memmap2, tracing-subscriber, rayon, tree-sitter-{rust,c-sharp,elixir}, fastembed 5.8 → 5.13, tempfile, ctrlc, uuid, once_cell, chrono, schemars, owo-colors, bytes, lz4_flex, openssl, quinn-proto, rand, rustls-webpki, time.
+- **shlex 1.3 → 2.0** (#127). API-compatible for our usage; transitive deps still pull 1.3 via `cc`.
+- **GitHub Actions**: `actions/checkout` v4 → v6, `github/codeql-action/upload-sarif` v3 → v4 (#120).
+- **Dev deps**: `@types/vscode` 1.93 → 1.120 (#121), `vue` 3.5.22 → 3.5.34 in docs-site (#122).
+
 ## [0.7.7] - 2026-05-23
 
 ### Fixed

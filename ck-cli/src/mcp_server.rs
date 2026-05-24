@@ -112,7 +112,7 @@ fn resolve_include_patterns(
 
     let expanded = expand_glob_patterns_with_base(base_path, &prepared_patterns, exclude_patterns)
         .map_err(|e| {
-            ErrorData::invalid_params(format!("Failed to expand include patterns: {}", e), None)
+            ErrorData::invalid_params(format!("Failed to expand include patterns: {e}"), None)
         })?;
 
     Ok(build_include_patterns(&expanded))
@@ -525,11 +525,11 @@ impl CkMcpServer {
         search_time_ms: u64,
     ) -> serde_json::Value {
         let results: Vec<serde_json::Value> = page.matches.iter().map(|result| {
-            let match_type = format!("{}_match", mode);
+            let match_type = format!("{mode}_match");
             let mut match_obj = json!({
                 "file": {
                     "path": result.file.to_string_lossy(),
-                    "language": result.lang.as_ref().map(|l| l.to_string()).unwrap_or("unknown".to_string())
+                    "language": result.lang.as_ref().map(std::string::ToString::to_string).unwrap_or("unknown".to_string())
                 },
                 "match": {
                     "span": {
@@ -738,7 +738,7 @@ impl CkMcpServer {
                 let arguments = context.arguments.clone().unwrap_or_default();
                 let request: SemanticSearchRequest =
                     serde_json::from_value(serde_json::Value::Object(arguments)).map_err(|e| {
-                        rmcp::ErrorData::invalid_params(format!("Invalid parameters: {}", e), None)
+                        rmcp::ErrorData::invalid_params(format!("Invalid parameters: {e}"), None)
                     })?;
 
                 let service: &CkMcpServer = context.service;
@@ -782,7 +782,7 @@ impl CkMcpServer {
                 let arguments = context.arguments.clone().unwrap_or_default();
                 let request: RegexSearchRequest =
                     serde_json::from_value(serde_json::Value::Object(arguments)).map_err(|e| {
-                        rmcp::ErrorData::invalid_params(format!("Invalid parameters: {}", e), None)
+                        rmcp::ErrorData::invalid_params(format!("Invalid parameters: {e}"), None)
                     })?;
 
                 let service: &CkMcpServer = context.service;
@@ -821,7 +821,7 @@ impl CkMcpServer {
                 let arguments = context.arguments.clone().unwrap_or_default();
                 let request: LexicalSearchRequest =
                     serde_json::from_value(serde_json::Value::Object(arguments)).map_err(|e| {
-                        rmcp::ErrorData::invalid_params(format!("Invalid parameters: {}", e), None)
+                        rmcp::ErrorData::invalid_params(format!("Invalid parameters: {e}"), None)
                     })?;
 
                 let service: &CkMcpServer = context.service;
@@ -862,7 +862,7 @@ impl CkMcpServer {
                 let arguments = context.arguments.clone().unwrap_or_default();
                 let request: HybridSearchRequest =
                     serde_json::from_value(serde_json::Value::Object(arguments)).map_err(|e| {
-                        rmcp::ErrorData::invalid_params(format!("Invalid parameters: {}", e), None)
+                        rmcp::ErrorData::invalid_params(format!("Invalid parameters: {e}"), None)
                     })?;
 
                 let service: &CkMcpServer = context.service;
@@ -901,7 +901,7 @@ impl CkMcpServer {
                 let arguments = context.arguments.clone().unwrap_or_default();
                 let request: IndexStatusRequest =
                     serde_json::from_value(serde_json::Value::Object(arguments)).map_err(|e| {
-                        rmcp::ErrorData::invalid_params(format!("Invalid parameters: {}", e), None)
+                        rmcp::ErrorData::invalid_params(format!("Invalid parameters: {e}"), None)
                     })?;
 
                 let service: &CkMcpServer = context.service;
@@ -945,7 +945,7 @@ impl CkMcpServer {
                 let arguments = context.arguments.clone().unwrap_or_default();
                 let request: ReindexRequest =
                     serde_json::from_value(serde_json::Value::Object(arguments)).map_err(|e| {
-                        rmcp::ErrorData::invalid_params(format!("Invalid parameters: {}", e), None)
+                        rmcp::ErrorData::invalid_params(format!("Invalid parameters: {e}"), None)
                     })?;
 
                 let service: &CkMcpServer = context.service;
@@ -1002,7 +1002,7 @@ impl CkMcpServer {
         } else {
             path_buf
                 .parent()
-                .map(|p| p.to_path_buf())
+                .map(std::path::Path::to_path_buf)
                 .unwrap_or_else(|| PathBuf::from("."))
         };
 
@@ -1198,7 +1198,7 @@ impl CkMcpServer {
 
         let summary_suffix = effective_mode
             .as_ref()
-            .map(|s| format!(" [{}]", s))
+            .map(|s| format!(" [{s}]"))
             .unwrap_or_default();
 
         let summary = format!(
@@ -1234,7 +1234,7 @@ impl CkMcpServer {
         } else {
             path_buf
                 .parent()
-                .map(|p| p.to_path_buf())
+                .map(std::path::Path::to_path_buf)
                 .unwrap_or_else(|| PathBuf::from("."))
         };
 
@@ -1334,7 +1334,7 @@ impl CkMcpServer {
                 .map(|v| v.to_string())
                 .unwrap_or_else(|| "unbounded".to_string()),
             threshold
-                .map(|v| format!("{:.3}", v))
+                .map(|v| format!("{v:.3}"))
                 .unwrap_or_else(|| "n/a".into()),
             current_page
         );
@@ -1361,7 +1361,7 @@ impl CkMcpServer {
         } else {
             path_buf
                 .parent()
-                .map(|p| p.to_path_buf())
+                .map(std::path::Path::to_path_buf)
                 .unwrap_or_else(|| PathBuf::from("."))
         };
 
@@ -1488,7 +1488,7 @@ impl CkMcpServer {
         } else {
             path_buf
                 .parent()
-                .map(|p| p.to_path_buf())
+                .map(std::path::Path::to_path_buf)
                 .unwrap_or_else(|| PathBuf::from("."))
         };
 
@@ -1697,7 +1697,7 @@ impl CkMcpServer {
                 // Fallback: Count files in directory for estimation
                 let file_count = WalkDir::new(&path_buf)
                     .into_iter()
-                    .filter_map(|e| e.ok())
+                    .filter_map(std::result::Result::ok)
                     .filter(|e| e.file_type().is_file())
                     .count();
 
@@ -1717,11 +1717,11 @@ impl CkMcpServer {
             let file_count = index_info
                 .get("total_files")
                 .or_else(|| index_info.get("estimated_file_count"))
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
             let chunk_count = index_info
                 .get("total_chunks")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
 
             if chunk_count > 0 {
@@ -1850,7 +1850,7 @@ impl CkMcpServer {
             }
             Err(e) => {
                 return Err(ErrorData::internal_error(
-                    format!("Reindexing failed: {}", e),
+                    format!("Reindexing failed: {e}"),
                     None,
                 ));
             }

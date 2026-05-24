@@ -140,15 +140,11 @@
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile",
-    "lint": "eslint src --ext ts",
     "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.x",
-    "@types/vscode": "^1.93.0",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
-    "eslint": "^8.57.0",
+    "@types/vscode": "^1.120.0",
     "typescript": "^5.4.0",
     "@vscode/vsce": "^2.24.0"
   },

@@ -112,7 +112,7 @@ mod tests {
         let text = "Hello, world!";
         let tokens = TokenEstimator::estimate_tokens(text);
         // Should be around 3 tokens, estimation might vary
-        assert!((2..=4).contains(&tokens), "Got {} tokens", tokens);
+        assert!((2..=4).contains(&tokens), "Got {tokens} tokens");
     }
 
     #[test]
@@ -126,7 +126,7 @@ fn main() {
 "#;
         let tokens = TokenEstimator::estimate_tokens(code);
         // Code typically has more tokens due to symbols
-        assert!((15..=25).contains(&tokens), "Got {} tokens", tokens);
+        assert!((15..=25).contains(&tokens), "Got {tokens} tokens");
     }
 
     #[test]
@@ -152,19 +152,19 @@ fn main() {
 
     #[test]
     fn test_code_detection() {
-        let code = r#"
+        let code = r"
 pub fn calculate(x: i32) -> i32 {
     let result = x * 2;
     return result;
 }
-"#;
+";
         let tokens = TokenEstimator::estimate_tokens(code);
 
-        let text = r#"
+        let text = r"
 This is a paragraph about programming.
 It contains some discussion of functions and variables.
 But it's written in natural language.
-"#;
+";
         let text_tokens = TokenEstimator::estimate_tokens(text);
 
         // Code should generally have slightly more tokens per character
@@ -174,9 +174,7 @@ But it's written in natural language.
 
         assert!(
             code_ratio >= text_ratio * 0.8,
-            "Code ratio {} should be similar to or higher than text ratio {}",
-            code_ratio,
-            text_ratio
+            "Code ratio {code_ratio} should be similar to or higher than text ratio {text_ratio}"
         );
     }
 }

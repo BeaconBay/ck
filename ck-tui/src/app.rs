@@ -294,7 +294,7 @@ impl TuiApp {
         } else {
             "Snippet"
         };
-        self.state.status_message = format!("View: {}", mode_text);
+        self.state.status_message = format!("View: {mode_text}");
         self.save_config();
     }
 
@@ -458,7 +458,7 @@ impl TuiApp {
                 self.state.indexing_progress = None;
                 self.state.indexing_started_at = None;
                 self.state.last_indexing_update = None;
-                self.state.status_message = format!("Search error: {}", error);
+                self.state.status_message = format!("Search error: {error}");
             }
         }
     }
@@ -650,7 +650,7 @@ impl TuiApp {
                 Ok(search_results) => {
                     let elapsed_ms = started_at.elapsed().as_millis();
                     let summary = if search_results.matches.is_empty() {
-                        format!("No results ({} ms)", elapsed_ms)
+                        format!("No results ({elapsed_ms} ms)")
                     } else {
                         format!(
                             "Found {} results ({} ms)",
@@ -957,21 +957,21 @@ impl TuiApp {
             // Emacs: open first file only (multi-file is complex)
             let (file, line) = &files_to_open[0];
             command
-                .arg(format!("+{}", line))
+                .arg(format!("+{line}"))
                 .arg(file.display().to_string())
                 .status()?
         } else if editor_basename.contains("nano") {
             // Nano: open first file only
             let (file, line) = &files_to_open[0];
             command
-                .arg(format!("+{}", line))
+                .arg(format!("+{line}"))
                 .arg(file.display().to_string())
                 .status()?
         } else {
             // Vim/Neovim: can open multiple files with -p (tabs)
             for (file, line) in &files_to_open {
                 command
-                    .arg(format!("+{}", line))
+                    .arg(format!("+{line}"))
                     .arg(file.display().to_string());
             }
             if files_to_open.len() > 1 {

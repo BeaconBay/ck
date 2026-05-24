@@ -14,6 +14,12 @@
   "packageManager": "pnpm@10.12.4",
   "devDependencies": {
     "vitepress": "^1.6.4",
-    "vue": "^3.5.22"
+    "vue": "^3.5.34"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite": ">=6.4.2",
+      "esbuild": ">=0.25.0"
+    }
   }
 }

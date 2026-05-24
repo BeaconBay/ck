@@ -97,7 +97,7 @@ pub fn create_embedder_for_config(
                 );
             }
         }
-        provider => bail!("Unsupported embedding provider '{}'", provider),
+        provider => bail!("Unsupported embedding provider '{provider}'"),
     }
 }
 
@@ -188,7 +188,7 @@ impl FastEmbedder {
         std::fs::create_dir_all(&model_cache_dir)?;
 
         if let Some(ref callback) = progress_callback {
-            callback(&format!("Initializing model: {}", model_name));
+            callback(&format!("Initializing model: {model_name}"));
 
             // Check if model already exists
             let model_exists = Self::check_model_exists(&model_cache_dir, model_name);
@@ -199,7 +199,7 @@ impl FastEmbedder {
                     model_cache_dir.display()
                 ));
             } else {
-                callback(&format!("Using cached model: {}", model_name));
+                callback(&format!("Using cached model: {model_name}"));
             }
         }
 
@@ -276,7 +276,7 @@ impl Embedder for FastEmbedder {
     }
 
     fn embed(&mut self, texts: &[String]) -> Result<Vec<Vec<f32>>> {
-        let text_refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+        let text_refs: Vec<&str> = texts.iter().map(std::string::String::as_str).collect();
         let embeddings = self.model.embed(text_refs, None)?;
         Ok(embeddings)
     }

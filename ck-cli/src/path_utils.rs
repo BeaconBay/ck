@@ -95,9 +95,9 @@ fn expand_glob_patterns_internal(
 
             if is_simple {
                 let fallback_path = if let Some(base) = base_dir {
-                    base.join(format!("**/{}", pattern))
+                    base.join(format!("**/{pattern}"))
                 } else {
-                    PathBuf::from(format!("**/{}", pattern))
+                    PathBuf::from(format!("**/{pattern}"))
                 };
                 let fallback_str = fallback_path.to_string_lossy().to_string();
                 matched |= run_glob(&fallback_str, &globset, base_dir, &mut expanded)?;
@@ -131,13 +131,13 @@ fn run_glob(
                         push_if_new(expanded, matched_path);
                     }
                     Err(e) => {
-                        eprintln!("Warning: glob error for pattern '{}': {}", pattern, e);
+                        eprintln!("Warning: glob error for pattern '{pattern}': {e}");
                     }
                 }
             }
         }
         Err(e) => {
-            eprintln!("Warning: invalid glob pattern '{}': {}", pattern, e);
+            eprintln!("Warning: invalid glob pattern '{pattern}': {e}");
         }
     }
     Ok(matched)
