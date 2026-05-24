@@ -134,6 +134,8 @@ pub enum ParseableLanguage {
     Rust,
     Ruby,
     Go,
+    C,
+    Cpp,
     CSharp,
     Zig,
 
@@ -152,6 +154,8 @@ impl std::fmt::Display for ParseableLanguage {
             ParseableLanguage::Rust => "rust",
             ParseableLanguage::Ruby => "ruby",
             ParseableLanguage::Go => "go",
+            ParseableLanguage::C => "c",
+            ParseableLanguage::Cpp => "cpp",
             ParseableLanguage::CSharp => "csharp",
             ParseableLanguage::Zig => "zig",
 
@@ -175,6 +179,8 @@ impl TryFrom<ck_core::Language> for ParseableLanguage {
             ck_core::Language::Rust => Ok(ParseableLanguage::Rust),
             ck_core::Language::Ruby => Ok(ParseableLanguage::Ruby),
             ck_core::Language::Go => Ok(ParseableLanguage::Go),
+            ck_core::Language::C => Ok(ParseableLanguage::C),
+            ck_core::Language::Cpp => Ok(ParseableLanguage::Cpp),
             ck_core::Language::CSharp => Ok(ParseableLanguage::CSharp),
             ck_core::Language::Zig => Ok(ParseableLanguage::Zig),
 
@@ -374,6 +380,8 @@ pub(crate) fn tree_sitter_language(language: ParseableLanguage) -> Result<tree_s
         ParseableLanguage::Rust => tree_sitter_rust::LANGUAGE,
         ParseableLanguage::Ruby => tree_sitter_ruby::LANGUAGE,
         ParseableLanguage::Go => tree_sitter_go::LANGUAGE,
+        ParseableLanguage::C => tree_sitter_c::LANGUAGE,
+        ParseableLanguage::Cpp => tree_sitter_cpp::LANGUAGE,
         ParseableLanguage::CSharp => tree_sitter_c_sharp::LANGUAGE,
         ParseableLanguage::Zig => tree_sitter_zig::LANGUAGE,
 
@@ -413,10 +421,134 @@ fn chunk_language(text: &str, language: ParseableLanguage) -> Result<Vec<Chunk>>
         chunks = merge_haskell_functions(chunks, text);
     }
 
+    // Suppress text chunks fully contained by class/method/function chunks for C/C++
+    if matches!(language, ParseableLanguage::C | ParseableLanguage::Cpp) {
+        chunks = suppress_contained_text_chunks(chunks);
+    }
+
     // Fill gaps between chunks with remainder content
     chunks = fill_gaps(chunks, text);
 
+    // Merge template-prefix gap chunks into the following C++ definition chunk
+    if language == ParseableLanguage::Cpp {
+        chunks = merge_cpp_template_prefix_chunks(chunks, text);
+    }
+
     Ok(chunks)
+}
+
+fn suppress_contained_text_chunks(chunks: Vec<Chunk>) -> Vec<Chunk> {
+    if chunks.is_empty() {
+        return chunks;
+    }
+
+    let mut containers: Vec<(usize, usize)> = chunks
+        .iter()
+        .filter(|chunk| {
+            matches!(
+                chunk.chunk_type,
+                ChunkType::Class | ChunkType::Method | ChunkType::Function
+            )
+        })
+        .map(|chunk| (chunk.span.byte_start, chunk.span.byte_end))
+        .collect();
+
+    if containers.is_empty() {
+        return chunks;
+    }
+
+    containers.sort_by_key(|(start, _)| *start);
+
+    chunks
+        .into_iter()
+        .filter(|chunk| {
+            if chunk.chunk_type != ChunkType::Text {
+                return true;
+            }
+
+            let start = chunk.span.byte_start;
+            let end = chunk.span.byte_end;
+            !containers
+                .iter()
+                .any(|(c_start, c_end)| *c_start <= start && end <= *c_end)
+        })
+        .collect()
+}
+
+fn merge_cpp_template_prefix_chunks(chunks: Vec<Chunk>, text: &str) -> Vec<Chunk> {
+    if chunks.len() < 2 {
+        return chunks;
+    }
+
+    let mut merged = Vec::with_capacity(chunks.len());
+    let mut idx = 0;
+
+    while idx < chunks.len() {
+        if idx + 1 < chunks.len() && is_template_prefix_chunk(&chunks[idx]) {
+            let template_chunk = &chunks[idx];
+            let mut next_chunk = chunks[idx + 1].clone();
+
+            if template_chunk.span.byte_end == next_chunk.span.byte_start
+                && template_chunk.span.byte_start < next_chunk.span.byte_end
+                && next_chunk.span.byte_end <= text.len()
+            {
+                let new_start = template_chunk.span.byte_start;
+                let new_end = next_chunk.span.byte_end;
+
+                if let Some(new_text) = text.get(new_start..new_end) {
+                    let (line_start, line_end) = line_range_for_span(text, new_start, new_end);
+
+                    next_chunk.span.byte_start = new_start;
+                    next_chunk.span.line_start = line_start;
+                    next_chunk.span.line_end = line_end;
+                    next_chunk.text = new_text.to_string();
+                    next_chunk.metadata = next_chunk.metadata.with_updated_text(new_text);
+
+                    merged.push(next_chunk);
+                    idx += 2;
+                    continue;
+                }
+            }
+        }
+
+        merged.push(chunks[idx].clone());
+        idx += 1;
+    }
+
+    merged
+}
+
+fn is_template_prefix_chunk(chunk: &Chunk) -> bool {
+    if chunk.chunk_type != ChunkType::Text {
+        return false;
+    }
+
+    let mut has_template = false;
+    for line in chunk.text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if trimmed.starts_with("template <") || trimmed.starts_with("template<") {
+            has_template = true;
+            continue;
+        }
+        return false;
+    }
+
+    has_template
+}
+
+fn line_range_for_span(text: &str, byte_start: usize, byte_end: usize) -> (usize, usize) {
+    let line_start = text[..byte_start].matches('\n').count() + 1;
+    let newlines_up_to_end = text[..byte_end].matches('\n').count();
+    let line_end = if newlines_up_to_end >= line_start - 1 {
+        newlines_up_to_end.max(line_start)
+    } else {
+        line_start
+    };
+
+    (line_start, line_end)
 }
 
 /// Fill gaps between chunks with remainder content
@@ -473,7 +605,7 @@ fn fill_gaps(mut chunks: Vec<Chunk>, text: &str) -> Vec<Chunk> {
                 }
             }
         }
-        last_end = chunk.span.byte_end;
+        last_end = last_end.max(chunk.span.byte_end);
     }
 
     // Handle trailing content
@@ -796,6 +928,32 @@ fn chunk_type_for_node(
                 | "var_declaration"
                 | "const_declaration"
         ),
+        ParseableLanguage::C => matches!(
+            kind,
+            "function_definition"
+                | "struct_specifier"
+                | "enum_specifier"
+                | "union_specifier"
+                | "type_definition"
+                | "declaration"
+                | "preproc_function_def"
+                | "preproc_def"
+        ),
+        ParseableLanguage::Cpp => matches!(
+            kind,
+            "function_definition"
+                | "class_specifier"
+                | "struct_specifier"
+                | "enum_specifier"
+                | "union_specifier"
+                | "namespace_definition"
+                | "template_declaration"
+                | "type_definition"
+                | "alias_declaration"
+                | "declaration"
+                | "preproc_function_def"
+                | "preproc_def"
+        ),
         ParseableLanguage::CSharp => matches!(
             kind,
             "method_declaration"
@@ -868,7 +1026,8 @@ fn classify_chunk_kind(kind: &str) -> ChunkType {
         | "defn"
         | "defn-"
         | "method"
-        | "singleton_method" => ChunkType::Function,
+        | "singleton_method"
+        | "preproc_function_def" => ChunkType::Function,
         "signature" => ChunkType::Function, // Haskell type signatures will be merged with functions
         "class_definition"
         | "class_declaration"
@@ -877,6 +1036,10 @@ fn classify_chunk_kind(kind: &str) -> ChunkType {
         | "instance"
         | "struct_item"
         | "enum_item"
+        | "class_specifier"
+        | "struct_specifier"
+        | "enum_specifier"
+        | "union_specifier"
         | "defstruct"
         | "defrecord"
         | "deftype"
@@ -894,6 +1057,7 @@ fn classify_chunk_kind(kind: &str) -> ChunkType {
         | "impl_item"
         | "trait_item"
         | "mod_item"
+        | "namespace_definition"
         | "defmodule"
         | "module"
         | "defprotocol"
@@ -915,6 +1079,17 @@ pub(crate) fn build_chunk(
     language: ParseableLanguage,
 ) -> Option<Chunk> {
     let target_node = adjust_node_for_language(node, language);
+
+    if matches!(language, ParseableLanguage::C | ParseableLanguage::Cpp)
+        && matches!(initial_type, ChunkType::Class)
+        && matches!(
+            target_node.kind(),
+            "struct_specifier" | "union_specifier" | "enum_specifier"
+        )
+        && !c_cpp_type_has_body_node(target_node)
+    {
+        return None;
+    }
     let (byte_start, start_row, leading_segments) =
         extend_with_leading_trivia(target_node, language, source);
     let trailing_segments = collect_trailing_trivia(target_node, language, source);
@@ -926,17 +1101,28 @@ pub(crate) fn build_chunk(
         return None;
     }
 
-    let text = source.get(byte_start..byte_end)?.to_string();
+    let chunk_type = adjust_chunk_type_for_context(target_node, initial_type, language);
+    let mut text = source.get(byte_start..byte_end)?.to_string();
+    if matches!(language, ParseableLanguage::C | ParseableLanguage::Cpp)
+        && chunk_type == ChunkType::Class
+    {
+        text = strip_method_bodies_in_class_text(target_node, source, byte_start, byte_end);
+    }
 
     if text.trim().is_empty() {
         return None;
     }
-
-    let chunk_type = adjust_chunk_type_for_context(target_node, initial_type, language);
     let ancestry = collect_ancestry(target_node, language, source);
     let leading_trivia = segments_to_strings(&leading_segments, source);
     let trailing_trivia = segments_to_strings(&trailing_segments, source);
-    let metadata = ChunkMetadata::from_context(&text, ancestry, leading_trivia, trailing_trivia);
+    let mut metadata =
+        ChunkMetadata::from_context(&text, ancestry, leading_trivia, trailing_trivia);
+    if matches!(language, ParseableLanguage::C | ParseableLanguage::Cpp)
+        && matches!(chunk_type, ChunkType::Function | ChunkType::Method)
+        && let Some(full_name) = c_cpp_function_breadcrumb(target_node, language, source)
+    {
+        metadata.breadcrumb = Some(full_name);
+    }
 
     Some(Chunk {
         span: Span {
@@ -950,6 +1136,168 @@ pub(crate) fn build_chunk(
         stride_info: None,
         metadata,
     })
+}
+
+fn c_cpp_type_has_body_node(node: tree_sitter::Node<'_>) -> bool {
+    let mut cursor = node.walk();
+
+    match node.kind() {
+        "struct_specifier" | "union_specifier" => node
+            .children(&mut cursor)
+            .any(|child| child.kind() == "field_declaration_list"),
+        "enum_specifier" => node
+            .children(&mut cursor)
+            .any(|child| child.kind() == "enumerator_list"),
+        _ => false,
+    }
+}
+
+fn c_cpp_function_breadcrumb(
+    node: tree_sitter::Node<'_>,
+    language: ParseableLanguage,
+    source: &str,
+) -> Option<String> {
+    let name = display_name_for_node(node, language, source, ChunkType::Function)?;
+    let context = collect_c_cpp_context_names(node, language, source);
+    let context_path = context.join("::");
+
+    if name.contains("::") {
+        if context_path.is_empty() || name.starts_with(&format!("{}::", context_path)) {
+            Some(name)
+        } else {
+            Some(format!("{}::{}", context_path, name))
+        }
+    } else if context_path.is_empty() {
+        Some(name)
+    } else {
+        Some(format!("{}::{}", context_path, name))
+    }
+}
+
+fn collect_c_cpp_context_names(
+    mut node: tree_sitter::Node<'_>,
+    language: ParseableLanguage,
+    source: &str,
+) -> Vec<String> {
+    let mut parts = Vec::new();
+
+    while let Some(parent) = node.parent() {
+        let kind = parent.kind();
+        let include = match language {
+            ParseableLanguage::Cpp => matches!(
+                kind,
+                "namespace_definition" | "class_specifier" | "struct_specifier"
+            ),
+            ParseableLanguage::C => matches!(kind, "struct_specifier"),
+            _ => false,
+        };
+
+        if include
+            && let Some(name) = display_name_for_node(parent, language, source, ChunkType::Class)
+        {
+            parts.push(name);
+        }
+
+        node = parent;
+    }
+
+    parts.reverse();
+    parts
+}
+
+fn strip_method_bodies_in_class_text(
+    class_node: tree_sitter::Node<'_>,
+    source: &str,
+    byte_start: usize,
+    byte_end: usize,
+) -> String {
+    let mut replacements: Vec<(usize, usize, String)> = Vec::new();
+    let mut stack = vec![class_node];
+
+    while let Some(node) = stack.pop() {
+        if is_method_like_node(node.kind())
+            && let Some(body) = find_method_body_node(node)
+        {
+            let start = body.start_byte();
+            let end = body.end_byte();
+            if start >= byte_start && end <= byte_end && start < end {
+                let replacement = method_body_placeholder(body, source);
+                replacements.push((start, end, replacement));
+            }
+        }
+
+        let child_count = node.child_count();
+        for idx in (0..child_count).rev() {
+            if let Some(child) = node.child(idx) {
+                stack.push(child);
+            }
+        }
+    }
+
+    if replacements.is_empty() {
+        return source
+            .get(byte_start..byte_end)
+            .unwrap_or_default()
+            .to_string();
+    }
+
+    replacements.sort_by(|a, b| b.0.cmp(&a.0));
+    let mut text = source
+        .get(byte_start..byte_end)
+        .unwrap_or_default()
+        .to_string();
+
+    for (start, end, replacement) in replacements {
+        if start < byte_start || end > byte_end || end <= start {
+            continue;
+        }
+        let local_start = start - byte_start;
+        let local_end = end - byte_start;
+        if local_end <= text.len() {
+            text.replace_range(local_start..local_end, &replacement);
+        }
+    }
+
+    text
+}
+
+fn is_method_like_node(kind: &str) -> bool {
+    matches!(
+        kind,
+        "function_definition"
+            | "method_definition"
+            | "method_declaration"
+            | "constructor_declaration"
+            | "destructor_declaration"
+            | "function_item"
+            | "method"
+            | "singleton_method"
+    )
+}
+
+fn find_method_body_node(node: tree_sitter::Node<'_>) -> Option<tree_sitter::Node<'_>> {
+    let body_kinds = [
+        "compound_statement",
+        "statement_block",
+        "block",
+        "body",
+        "body_statement",
+        "declaration_list",
+    ];
+
+    for idx in 0..node.child_count() {
+        if let Some(child) = node.child(idx)
+            && body_kinds.contains(&child.kind())
+        {
+            return Some(child);
+        }
+    }
+
+    None
+}
+
+fn method_body_placeholder(_body: tree_sitter::Node<'_>, _source: &str) -> String {
+    ";".to_string()
 }
 
 fn adjust_node_for_language(
@@ -1039,6 +1387,7 @@ fn should_attach_leading_trivia(language: ParseableLanguage, node: &tree_sitter:
         }
         ParseableLanguage::Python => kind == "decorator",
         ParseableLanguage::TypeScript | ParseableLanguage::JavaScript => kind == "decorator",
+        ParseableLanguage::C | ParseableLanguage::Cpp => kind == "comment",
         ParseableLanguage::CSharp => matches!(kind, "attribute_list" | "attribute"),
         _ => false,
     }
@@ -1137,6 +1486,8 @@ fn display_name_for_node(
         }
         ParseableLanguage::Ruby => find_identifier(node, source, &["identifier"]),
         ParseableLanguage::Go => find_identifier(node, source, &["identifier", "type_identifier"]),
+        ParseableLanguage::C => c_display_name(node, source, chunk_type),
+        ParseableLanguage::Cpp => cpp_display_name(node, source, chunk_type),
         ParseableLanguage::CSharp => find_identifier(node, source, &["identifier"]),
         ParseableLanguage::Zig => find_identifier(node, source, &["identifier"]),
 
@@ -1183,6 +1534,115 @@ fn rust_display_name(
         }
         _ => find_identifier(node, source, &["identifier", "type_identifier"]),
     }
+}
+
+fn c_display_name(
+    node: tree_sitter::Node<'_>,
+    source: &str,
+    _chunk_type: ChunkType,
+) -> Option<String> {
+    match node.kind() {
+        "function_definition" => {
+            // C function: look for the declarator, then the identifier inside it
+            if let Some(declarator) = node.child_by_field_name("declarator") {
+                return find_identifier_recursive(declarator, source, &["identifier"]);
+            }
+            None
+        }
+        "struct_specifier" | "enum_specifier" | "union_specifier" => {
+            find_identifier(node, source, &["type_identifier", "identifier"])
+        }
+        "type_definition" => find_identifier(node, source, &["type_identifier", "identifier"]),
+        "preproc_function_def" | "preproc_def" => find_identifier(node, source, &["identifier"]),
+        _ => find_identifier(node, source, &["identifier", "type_identifier"]),
+    }
+}
+
+fn cpp_display_name(
+    node: tree_sitter::Node<'_>,
+    source: &str,
+    _chunk_type: ChunkType,
+) -> Option<String> {
+    match node.kind() {
+        "function_definition" => {
+            if let Some(declarator) = node.child_by_field_name("declarator") {
+                return find_identifier_recursive(
+                    declarator,
+                    source,
+                    &[
+                        "identifier",
+                        "field_identifier",
+                        "destructor_name",
+                        "qualified_identifier",
+                    ],
+                );
+            }
+            None
+        }
+        "declaration" => {
+            if let Some(declarator) = node.child_by_field_name("declarator") {
+                return find_identifier_recursive(
+                    declarator,
+                    source,
+                    &[
+                        "identifier",
+                        "field_identifier",
+                        "destructor_name",
+                        "qualified_identifier",
+                    ],
+                );
+            }
+            find_identifier(node, source, &["identifier", "type_identifier"])
+        }
+        "class_specifier" | "struct_specifier" | "enum_specifier" | "union_specifier" => {
+            find_identifier(node, source, &["type_identifier", "identifier"])
+        }
+        "namespace_definition" => {
+            find_identifier(node, source, &["identifier", "namespace_identifier"])
+        }
+        "alias_declaration" | "type_definition" => {
+            find_identifier(node, source, &["type_identifier", "identifier"])
+        }
+        "template_declaration" => {
+            let mut cursor = node.walk();
+            for child in node.children(&mut cursor) {
+                if matches!(
+                    child.kind(),
+                    "class_specifier"
+                        | "struct_specifier"
+                        | "enum_specifier"
+                        | "union_specifier"
+                        | "function_definition"
+                        | "declaration"
+                        | "alias_declaration"
+                        | "type_definition"
+                        | "concept_definition"
+                ) {
+                    return cpp_display_name(child, source, _chunk_type);
+                }
+            }
+            find_identifier(node, source, &["type_identifier", "identifier"])
+        }
+        _ => find_identifier(node, source, &["identifier", "type_identifier"]),
+    }
+}
+
+/// Recursively search for an identifier in nested declarators (e.g., C function declarators)
+fn find_identifier_recursive(
+    node: tree_sitter::Node<'_>,
+    source: &str,
+    candidate_kinds: &[&str],
+) -> Option<String> {
+    if candidate_kinds.contains(&node.kind()) {
+        return text_for_node(node, source).map(|s| s.trim().to_string());
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if let Some(result) = find_identifier_recursive(child, source, candidate_kinds) {
+            return Some(result);
+        }
+    }
+    None
 }
 
 fn find_identifier(
@@ -1259,6 +1719,8 @@ fn is_method_context(node: tree_sitter::Node<'_>, language: ParseableLanguage) -
         ParseableLanguage::Ruby => ancestor_has_kind(node, RUBY_CONTAINERS),
         ParseableLanguage::Rust => ancestor_has_kind(node, RUST_CONTAINERS),
         ParseableLanguage::Go => false,
+        ParseableLanguage::C => ancestor_has_kind(node, &["struct_specifier"]),
+        ParseableLanguage::Cpp => ancestor_has_kind(node, &["class_specifier", "struct_specifier"]),
         ParseableLanguage::CSharp => false,
         ParseableLanguage::Haskell => false,
         ParseableLanguage::Zig => false,
@@ -1575,7 +2037,7 @@ impl Calculator {
     pub fn new() -> Self {
         Calculator { memory: 0.0 }
     }
-    
+
     pub fn add(&mut self, a: f64, b: f64) -> f64 {
         a + b
     }
@@ -1899,6 +2361,308 @@ func Helper() {}
     }
 
     #[test]
+    fn test_chunk_c_corner_cases() {
+        let c_code = r#"
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+#define VERSION 3
+
+typedef struct Node {
+    int value;
+    struct Node* next;
+} Node;
+
+union Payload {
+    int i;
+    float f;
+};
+
+enum Color {
+    Red,
+    Green,
+    Blue,
+};
+
+static inline int add(int a, int b) {
+    return a + b;
+}
+
+int main(void) {
+    return MAX(add(1, 2), VERSION);
+}
+"#;
+
+        let chunks = chunk_language(c_code, ParseableLanguage::C).unwrap();
+        assert!(!chunks.is_empty());
+
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Function && c.text.contains("#define MAX") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Text && c.text.contains("#define VERSION") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Class && c.text.contains("struct Node") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Class && c.text.contains("union Payload") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Class && c.text.contains("enum Color") })
+        );
+        assert!(chunks.iter().any(|c| {
+            c.chunk_type == ChunkType::Function && c.text.contains("static inline int add")
+        }));
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Function && c.text.contains("int main") })
+        );
+    }
+
+    #[test]
+    fn test_chunk_c_struct_declaration_without_body_stays_intact() {
+        let c_code = r#"
+#include <stdint.h>
+
+struct mtd_info_user meminfo;
+struct foo forward;
+"#;
+
+        let chunks = chunk_language(c_code, ParseableLanguage::C).unwrap();
+
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.text.contains("struct mtd_info_user meminfo;") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| c.text.contains("struct foo forward;"))
+        );
+        assert!(
+            !chunks
+                .iter()
+                .any(|c| c.text.trim() == "struct mtd_info_user")
+        );
+        assert!(!chunks.iter().any(|c| c.text.trim() == "struct foo"));
+    }
+
+    #[test]
+    fn test_chunk_cpp_corner_cases() {
+        let cpp_code = r#"
+#include <vector>
+#define SQUARE(x) ((x) * (x))
+
+namespace math {
+template <typename T>
+T add(T a, T b) {
+    return a + b;
+}
+
+using Vec = std::vector<int>;
+typedef unsigned long ulong_t;
+
+struct Point {
+    int x;
+    int y;
+};
+
+class Calculator {
+public:
+    int add(int a, int b) { return a + b; }
+};
+
+enum class Color { Red, Green, Blue };
+} // namespace math
+
+int main() {
+    return math::add(1, 2);
+}
+"#;
+
+        let chunks = chunk_language(cpp_code, ParseableLanguage::Cpp).unwrap();
+        assert!(!chunks.is_empty());
+
+        assert!(
+            chunks
+                .iter()
+                .any(|c| c.text.contains("template <typename T>"))
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Text && c.text.contains("using Vec") })
+        );
+        assert!(chunks.iter().any(|c| {
+            c.chunk_type == ChunkType::Text && c.text.contains("typedef unsigned long")
+        }));
+        assert!(
+            chunks.iter().any(|c| {
+                c.chunk_type == ChunkType::Function && c.text.contains("#define SQUARE")
+            })
+        );
+        let calculator_chunk = chunks
+            .iter()
+            .find(|c| c.chunk_type == ChunkType::Class && c.text.contains("class Calculator"));
+        assert!(calculator_chunk.is_some());
+        let calculator_chunk = calculator_chunk.unwrap();
+        assert!(calculator_chunk.text.contains("int add"));
+        assert!(!calculator_chunk.text.contains("return a + b"));
+
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Class && c.text.contains("struct Point") })
+        );
+        assert!(
+            chunks.iter().any(|c| {
+                c.chunk_type == ChunkType::Class && c.text.contains("enum class Color")
+            })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Function && c.text.contains("int main") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Function && c.text.contains("T add") })
+        );
+        assert!(chunks.iter().any(|c| {
+            c.chunk_type == ChunkType::Method && c.text.contains("int add(int a, int b)")
+        }));
+    }
+
+    #[test]
+    fn test_cpp_suppresses_contained_text_chunks() {
+        let cpp_code = r#"
+class Widget {
+public:
+    using Alias = int;
+    int calc() { int local = 1; return local; }
+};
+
+using TopLevel = double;
+"#;
+
+        let chunks = chunk_language(cpp_code, ParseableLanguage::Cpp).unwrap();
+
+        assert!(
+            !chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Text && c.text.contains("using Alias") })
+        );
+        assert!(
+            !chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Text && c.text.contains("int local") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Text && c.text.contains("using TopLevel") })
+        );
+        assert!(
+            chunks
+                .iter()
+                .any(|c| { c.chunk_type == ChunkType::Method && c.text.contains("int calc") })
+        );
+    }
+
+    #[test]
+    fn test_cpp_template_prefix_merges_with_definition() {
+        let cpp_code = r#"
+template <typename T>
+struct Box {
+    static int value;
+};
+
+template <typename T>
+int Box<T>::value = 0;
+"#;
+
+        let chunks = chunk_language(cpp_code, ParseableLanguage::Cpp).unwrap();
+
+        let def_chunk = chunks
+            .iter()
+            .find(|c| c.text.contains("int Box<T>::value = 0;"))
+            .expect("static member definition chunk present");
+
+        assert!(def_chunk.text.contains("template <typename T>"));
+
+        assert!(!chunks.iter().any(|c| {
+            c.chunk_type == ChunkType::Text && c.text.trim() == "template <typename T>"
+        }));
+    }
+
+    #[test]
+    fn test_cpp_template_method_breadcrumb_in_namespaces() {
+        let cpp_code = r#"
+namespace com {
+namespace ford {
+
+template <typename T>
+class Wrapper {
+public:
+    template <typename U>
+    U convert(U value) { return value; }
+};
+
+} // namespace ford
+} // namespace com
+"#;
+
+        let chunks = chunk_language(cpp_code, ParseableLanguage::Cpp).unwrap();
+        let method_chunk = chunks
+            .iter()
+            .find(|c| c.chunk_type == ChunkType::Method && c.text.contains("convert"))
+            .expect("convert method chunk present");
+
+        assert_eq!(
+            method_chunk.metadata.breadcrumb.as_deref(),
+            Some("com::ford::Wrapper::convert")
+        );
+    }
+
+    #[test]
+    fn test_cpp_function_breadcrumb_qualification() {
+        let cpp_code = r#"
+namespace outer {
+class A {
+public:
+    void m();
+};
+}
+
+void outer::A::m() {
+    // body
+}
+"#;
+
+        let chunks = chunk_language(cpp_code, ParseableLanguage::Cpp).unwrap();
+        let method_chunk = chunks
+            .iter()
+            .find(|c| c.chunk_type == ChunkType::Function && c.text.contains("outer::A::m"))
+            .expect("method chunk should exist");
+        assert_eq!(
+            method_chunk.metadata.breadcrumb.as_deref(),
+            Some("outer::A::m")
+        );
+    }
+
+    #[test]
     fn test_haskell_query_matches_legacy() {
         let source = r#"
 module Example where
@@ -1929,22 +2693,22 @@ shapeDescription (Square s) = "square of side " ++ show s
         let source = r"
 namespace Calculator;
 
-public interface ICalculator 
+public interface ICalculator
 {
     double Add(double x, double y);
 }
 
-public class Calculator 
+public class Calculator
 {
     public static double PI = 3.14159;
     private double _memory;
 
-    public Calculator() 
+    public Calculator()
     {
         _memory = 0.0;
     }
 
-    public double Add(double x, double y) 
+    public double Add(double x, double y)
     {
         return x + y;
     }
@@ -2101,22 +2865,22 @@ test "multiply function" {
         let csharp_code = r"
 namespace Calculator;
 
-public interface ICalculator 
+public interface ICalculator
 {
     double Add(double x, double y);
 }
 
-public class Calculator 
+public class Calculator
 {
     public static const double PI = 3.14159;
     private double _memory;
 
-    public Calculator() 
+    public Calculator()
     {
         _memory = 0.0;
     }
 
-    public double Add(double x, double y) 
+    public double Add(double x, double y)
     {
         return x + y;
     }

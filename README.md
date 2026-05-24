@@ -290,6 +290,8 @@ ck --inspect --model bge-small src/main.rs  # Test different models
 | JavaScript/TypeScript | ✅ | ✅ | ✅ Functions, classes, methods |
 | Rust | ✅ | ✅ | ✅ Functions, structs, traits |
 | Go | ✅ | ✅ | ✅ Functions, types, methods |
+| C | ✅ | ✅ | ✅ Functions, structs, enums, unions |
+| C++ | ✅ | ✅ | ✅ Classes, structs, namespaces, templates |
 | Ruby | ✅ | ✅ | ✅ Classes, methods, modules |
 | Haskell | ✅ | ✅ | ✅ Functions, types, instances |
 | C# | ✅ | ✅ | ✅ Classes, interfaces, methods |

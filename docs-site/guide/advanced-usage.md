@@ -272,10 +272,14 @@ Why JSONL for AI agents:
 | JavaScript/TypeScript | ✅ | Functions, classes, methods |
 | Rust | ✅ | Functions, structs, traits |
 | Go | ✅ | Functions, types, methods |
+| C | ✅ | Functions, structs, enums, unions |
+| C++ | ✅ | Classes, structs, namespaces, templates |
 | Ruby | ✅ | Classes, methods, modules |
 | Haskell | ✅ | Functions, types, instances |
 | C# | ✅ | Classes, interfaces, methods |
 | Zig | ✅ | Functions, structs |
+| Dart | ✅ | Classes, functions, methods |
+| Elixir | ✅ | Modules, functions, macros |
 
 Text formats (Markdown, JSON, YAML, TOML, XML, HTML, CSS, shell scripts, SQL) are also supported with content-based chunking.
 

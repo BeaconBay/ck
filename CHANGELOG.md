@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **C language support**: Full tree-sitter based semantic chunking for C files (.c, .h) - functions, structs, enums, unions, typedefs, macros
+- **C++ language support**: Full tree-sitter based semantic chunking for C++ files (.cpp, .cc, .cxx, .hpp, .h) - classes, structs, namespaces, templates, enums, unions
 ## [0.7.10] - 2026-05-24
 
 ### Security

@@ -98,7 +98,7 @@ ck's development roadmap, completed features, and planned improvements.
   — PHP (with tree-sitter-php)
   — Swift (with tree-sitter-swift)
   — Kotlin (requested #21)
-  — C/C++ (requested #21)
+  — C/C++ ✅ (shipped)
 
 ## Future Considerations
 
