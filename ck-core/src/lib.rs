@@ -55,6 +55,7 @@ pub enum Language {
     Zig,
     Dart,
     Elixir,
+    Markdown,
     Pdf,
 }
 
@@ -80,6 +81,7 @@ impl Language {
             "zig" => Some(Language::Zig),
             "dart" => Some(Language::Dart),
             "ex" | "exs" => Some(Language::Elixir),
+            "md" | "markdown" | "mdx" => Some(Language::Markdown),
             "pdf" => Some(Language::Pdf),
             _ => None,
         }
@@ -112,6 +114,7 @@ impl std::fmt::Display for Language {
             Language::Zig => "zig",
             Language::Dart => "dart",
             Language::Elixir => "elixir",
+            Language::Markdown => "markdown",
             Language::Pdf => "pdf",
         };
         write!(f, "{name}")

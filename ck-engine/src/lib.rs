@@ -1233,15 +1233,23 @@ fn extract_code_sections(file_path: &Path, content: &str) -> Option<Vec<(usize, 
 
     // Parse the file with tree-sitter and extract function/class sections
     if let Ok(chunks) = ck_chunk::chunk_text(content, Some(lang)) {
+        let include_markdown = lang == ck_core::Language::Markdown;
         let sections: Vec<(usize, usize, String)> = chunks
             .into_iter()
             .filter(|chunk| {
-                matches!(
-                    chunk.chunk_type,
-                    ck_chunk::ChunkType::Function
-                        | ck_chunk::ChunkType::Class
-                        | ck_chunk::ChunkType::Method
-                )
+                if include_markdown {
+                    matches!(
+                        chunk.chunk_type,
+                        ck_chunk::ChunkType::Module | ck_chunk::ChunkType::Text
+                    )
+                } else {
+                    matches!(
+                        chunk.chunk_type,
+                        ck_chunk::ChunkType::Function
+                            | ck_chunk::ChunkType::Class
+                            | ck_chunk::ChunkType::Method
+                    )
+                }
             })
             .map(|chunk| {
                 (

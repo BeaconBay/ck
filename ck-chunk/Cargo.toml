@@ -29,6 +29,7 @@ tree-sitter-c-sharp = { workspace = true }
 tree-sitter-zig = { workspace = true }
 tree-sitter-dart = { workspace = true }
 tree-sitter-elixir = { workspace = true }
+tree-sitter-md = { workspace = true }
 tracing = { workspace = true }
 
 [features]

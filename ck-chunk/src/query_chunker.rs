@@ -242,6 +242,8 @@ fn builtin_query(language: ParseableLanguage) -> Option<&'static str> {
         ParseableLanguage::Dart => Some(include_str!("../queries/dart/tags.scm")),
 
         ParseableLanguage::Elixir => Some(include_str!("../queries/elixir/tags.scm")),
+
+        ParseableLanguage::Markdown => Some(include_str!("../queries/markdown/tags.scm")),
     }
 }
 
@@ -397,6 +399,51 @@ def top_level():
             })
             .expect("top level chunk");
         assert!(top_level_chunk.metadata.ancestry.is_empty());
+    }
+
+    #[test]
+    fn markdown_queries_capture_headings_and_code_blocks() {
+        let source = r#"
+# Title
+
+Setext Section
+==============
+
+Intro paragraph with **bold** text.
+
+## Usage
+
+```rust
+fn main() {
+    println!("hi");
+}
+```
+
+- Item one
+- Item two
+"#;
+
+        let mut parser = Parser::new();
+        let ts_language =
+            tree_sitter_language(ParseableLanguage::Markdown).expect("markdown language");
+        parser
+            .set_language(&ts_language)
+            .expect("set markdown language");
+        let tree = parser.parse(source, None).expect("parse markdown source");
+
+        let chunks = chunk_with_queries(ParseableLanguage::Markdown, ts_language, &tree, source)
+            .expect("query execution")
+            .expect("query should be available");
+
+        assert!(chunks.iter().any(|chunk| {
+            chunk.chunk_type == ChunkType::Module
+                && (chunk.text.contains("# Title")
+                    || chunk.text.contains("## Usage")
+                    || chunk.text.contains("Setext Section"))
+        }));
+        assert!(chunks.iter().any(|chunk| {
+            chunk.chunk_type == ChunkType::Text && chunk.text.contains("```rust")
+        }));
     }
 
     #[test]

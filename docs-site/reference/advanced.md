@@ -258,6 +258,7 @@ Tree-sitter chunking available for:
 | JavaScript/TypeScript | Functions, classes, methods, arrow functions | `tree-sitter-javascript`, `tree-sitter-typescript` |
 | Rust | Functions, structs, impls, traits | `tree-sitter-rust` |
 | Go | Functions, methods, structs | `tree-sitter-go` |
+| Markdown | Headings, sections, code blocks | `tree-sitter-markdown` |
 | Ruby | Methods, classes, modules | `tree-sitter-ruby` |
 | Haskell | Functions, type declarations | `tree-sitter-haskell` |
 | C# | Methods, classes, namespaces | `tree-sitter-c-sharp` |
