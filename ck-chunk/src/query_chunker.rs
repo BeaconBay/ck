@@ -32,15 +32,14 @@ pub(crate) fn chunk_with_queries(
             if let Some(chunk_type) = chunk_type_from_capture(capture_name) {
                 // Filter out duplicates for C/C++ where template_declaration wraps the definition
                 if matches!(language, ParseableLanguage::C | ParseableLanguage::Cpp) {
-                    if let Some(parent) = capture.node.parent() {
-                        if parent.kind() == "template_declaration"
-                            && matches!(
-                                chunk_type,
-                                ChunkType::Class | ChunkType::Function | ChunkType::Method
-                            )
-                        {
-                            continue;
-                        }
+                    if let Some(parent) = capture.node.parent()
+                        && parent.kind() == "template_declaration"
+                        && matches!(
+                            chunk_type,
+                            ChunkType::Class | ChunkType::Function | ChunkType::Method
+                        )
+                    {
+                        continue;
                     }
 
                     if chunk_type == ChunkType::Class
@@ -182,10 +181,10 @@ fn declaration_contains_definition(node: tree_sitter::Node<'_>) -> bool {
 
 fn has_compound_statement(node: tree_sitter::Node<'_>) -> bool {
     for idx in 0..node.child_count() {
-        if let Some(child) = node.child(idx) {
-            if child.kind() == "compound_statement" {
-                return true;
-            }
+        if let Some(child) = node.child(idx)
+            && child.kind() == "compound_statement"
+        {
+            return true;
         }
     }
     false

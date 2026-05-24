@@ -1086,10 +1086,9 @@ pub(crate) fn build_chunk(
             target_node.kind(),
             "struct_specifier" | "union_specifier" | "enum_specifier"
         )
+        && !c_cpp_type_has_body_node(target_node)
     {
-        if !c_cpp_type_has_body_node(target_node) {
-            return None;
-        }
+        return None;
     }
     let (byte_start, start_row, leading_segments) =
         extend_with_leading_trivia(target_node, language, source);
@@ -1120,10 +1119,9 @@ pub(crate) fn build_chunk(
         ChunkMetadata::from_context(&text, ancestry, leading_trivia, trailing_trivia);
     if matches!(language, ParseableLanguage::C | ParseableLanguage::Cpp)
         && matches!(chunk_type, ChunkType::Function | ChunkType::Method)
+        && let Some(full_name) = c_cpp_function_breadcrumb(target_node, language, source)
     {
-        if let Some(full_name) = c_cpp_function_breadcrumb(target_node, language, source) {
-            metadata.breadcrumb = Some(full_name);
-        }
+        metadata.breadcrumb = Some(full_name);
     }
 
     Some(Chunk {
@@ -1217,14 +1215,14 @@ fn strip_method_bodies_in_class_text(
     let mut stack = vec![class_node];
 
     while let Some(node) = stack.pop() {
-        if is_method_like_node(node.kind()) {
-            if let Some(body) = find_method_body_node(node) {
-                let start = body.start_byte();
-                let end = body.end_byte();
-                if start >= byte_start && end <= byte_end && start < end {
-                    let replacement = method_body_placeholder(body, source);
-                    replacements.push((start, end, replacement));
-                }
+        if is_method_like_node(node.kind())
+            && let Some(body) = find_method_body_node(node)
+        {
+            let start = body.start_byte();
+            let end = body.end_byte();
+            if start >= byte_start && end <= byte_end && start < end {
+                let replacement = method_body_placeholder(body, source);
+                replacements.push((start, end, replacement));
             }
         }
 
@@ -1288,10 +1286,10 @@ fn find_method_body_node(node: tree_sitter::Node<'_>) -> Option<tree_sitter::Nod
     ];
 
     for idx in 0..node.child_count() {
-        if let Some(child) = node.child(idx) {
-            if body_kinds.contains(&child.kind()) {
-                return Some(child);
-            }
+        if let Some(child) = node.child(idx)
+            && body_kinds.contains(&child.kind())
+        {
+            return Some(child);
         }
     }
 
