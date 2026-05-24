@@ -13,7 +13,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.7.9"
+version = "0.7.10"
 edition = "2024"
 authors = ["Mike Renwick"]
 license = "MIT OR Apache-2.0"
@@ -24,14 +24,14 @@ rust-version = "1.88.0"
 [workspace.dependencies]
 # Intra-workspace crates — defined here so a version bump only touches
 # workspace.package.version and these eight lines, not every Cargo.toml.
-ck-core = { path = "ck-core", version = "0.7.9" }
-ck-models = { path = "ck-models", version = "0.7.9" }
-ck-embed = { path = "ck-embed", version = "0.7.9", default-features = false }
-ck-chunk = { path = "ck-chunk", version = "0.7.9", default-features = false }
-ck-ann = { path = "ck-ann", version = "0.7.9" }
-ck-index = { path = "ck-index", version = "0.7.9", default-features = false }
-ck-engine = { path = "ck-engine", version = "0.7.9", default-features = false }
-ck-tui = { path = "ck-tui", version = "0.7.9", default-features = false }
+ck-core = { path = "ck-core", version = "0.7.10" }
+ck-models = { path = "ck-models", version = "0.7.10" }
+ck-embed = { path = "ck-embed", version = "0.7.10", default-features = false }
+ck-chunk = { path = "ck-chunk", version = "0.7.10", default-features = false }
+ck-ann = { path = "ck-ann", version = "0.7.10" }
+ck-index = { path = "ck-index", version = "0.7.10", default-features = false }
+ck-engine = { path = "ck-engine", version = "0.7.10", default-features = false }
+ck-tui = { path = "ck-tui", version = "0.7.10", default-features = false }
 
 anyhow = "1.0"
 thiserror = "1.0"

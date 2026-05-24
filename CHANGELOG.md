@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.10] - 2026-05-24
+
+### Security
+- **11 CodeQL alerts in ck-vscode/webview/main.js** (#133):
+  - **XSS** in `updateResultCount` — was building HTML via template-literal interpolation + `innerHTML`. Rewritten with `createElement` + `textContent` + `appendChild`. Not exploitable in practice (inputs were typed numeric/boolean from JSON-RPC), but the safer construction removes any class of future regression.
+  - **10× ReDoS** in the syntax-highlighter regexes (Python/Ruby/Shell/JSON/YAML quoted-string matchers). Classic `(?:\\.|[^"])*` overlap on long backslash runs. Fixed by changing `[^"]` to `[^"\\]` so backslash must lead an escape sequence.
+- **4 npm transitive Dependabot alerts** (#133):
+  - **ck-vscode**: `npm audit fix` cleared brace-expansion + underscore.
+  - **docs-site**: vitepress 1.6.4 (latest stable) pins old vite/esbuild/rollup. Added pnpm overrides for `vite >=6.4.2` and `esbuild >=0.25.0`; `rollup >=4.59.0` resolved naturally via `pnpm update`.
+- **4 Rust Dependabot alerts dismissed via API** with rationale:
+  - rmcp DNS rebinding × 2 — we only compile `transport-io` (stdio), not the HTTP server transport.
+  - rand custom-logger unsoundness — already on rand 0.8.6 (patched), no custom logger.
+  - lru `IterMut` stacked borrows — we don't use `IterMut` anywhere.
+
+### Technical
+- **Pedantic clippy auto-fix cleanup** (#134): 27 files, mechanical `cargo clippy --fix` for `uninlined_format_args` (`format!("{}", x)` → `format!("{x}")`), `redundant_closure_for_method_calls`, `needless_raw_string_hashes`. No logic changes. Reduces incidental fmt drift on future PRs.
+
 ## [0.7.9] - 2026-05-24
 
 ### Changed
