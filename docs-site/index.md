@@ -90,7 +90,7 @@ ck --serve
 - 🤖 **AI-first** – Built-in MCP server for direct integration with AI coding assistants
 - ⚡ **Fast & efficient** – Automatic incremental indexing, sub-second queries
 - 🔧 **Drop-in replacement** – Works exactly like grep/ripgrep with all the flags you know
-- 🌐 **Multi-language** – Python, JavaScript/TypeScript, Rust, Go, Ruby, Haskell, C#, and more
+- 🌐 **Multi-language** – Python, JavaScript/TypeScript, Rust, Go, C, C++, Ruby, Haskell, C#, and more
 - 🔒 **Privacy-first** – 100% offline, no telemetry, no external API calls
 
 ## Installation

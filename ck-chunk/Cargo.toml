@@ -23,6 +23,8 @@ tree-sitter-haskell = { workspace = true }
 tree-sitter-rust = { workspace = true }
 tree-sitter-ruby = { workspace = true }
 tree-sitter-go = { workspace = true }
+tree-sitter-c = { workspace = true }
+tree-sitter-cpp = { workspace = true }
 tree-sitter-c-sharp = { workspace = true }
 tree-sitter-zig = { workspace = true }
 tree-sitter-dart = { workspace = true }

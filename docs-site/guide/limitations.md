@@ -187,12 +187,11 @@ export HF_HUB_CACHE=~/.cache/huggingface/hub
 
 ### Limited Language Parsers
 
-**Current support**: 9 languages with tree-sitter parsing
-- Python, JavaScript/TypeScript, Rust, Go, Ruby, Haskell, C#, Zig, Markdown
+**Current support**: 14 languages with tree-sitter parsing
+- Python, JavaScript/TypeScript, Rust, Go, C, C++, Ruby, Haskell, C#, Zig, Dart, Elixir, Markdown
 
 **Not yet supported**:
 - Java (#21)
-- C/C++ (#21)
 - Swift (#21)
 - Kotlin (#21)
 - PHP (roadmap)
