@@ -345,9 +345,65 @@ jobs:
 
           echo "All crates published successfully!"
 
+  publish-npm:
+    name: Publish to npm (@beaconbay/ck-search)
+    needs: build-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Sync package.json version from Cargo.toml + tag
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NPM_TOKEN_PRESENT:-}" ] && [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "::error::NPM_TOKEN repo secret is not set"
+            exit 1
+          fi
+
+          cargo_version=$(grep -m1 '^version = ' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+          tag_version="${{ github.ref_name }}"
+
+          echo "Cargo.toml version: $cargo_version"
+          echo "Git tag:           $tag_version"
+
+          if [ "$cargo_version" != "$tag_version" ]; then
+            echo "::error::Cargo.toml version ($cargo_version) doesn't match git tag ($tag_version)"
+            exit 1
+          fi
+
+          # Stamp package.json from the workspace version. Source of truth
+          # is Cargo.toml + git tag — package.json's committed version is
+          # informational, never the gate.
+          npm version "$cargo_version" --no-git-tag-version --allow-same-version
+          echo "package.json synced to $cargo_version"
+
+      - name: Check if already published
+        id: check
+        run: |
+          if npm view "@beaconbay/ck-search@${{ github.ref_name }}" version >/dev/null 2>&1; then
+            echo "already=true" >> "$GITHUB_OUTPUT"
+            echo "v${{ github.ref_name }} already on npm, skipping"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish to npm
+        if: steps.check.outputs.already == 'false'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
   finalize-release:
     name: Finalize GitHub Release
-    needs: [build-release, publish-crates]
+    needs: [build-release, publish-crates, publish-npm]
     runs-on: ubuntu-latest
     if: always() && needs.build-release.result == 'success'
     steps:
