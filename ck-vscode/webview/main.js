@@ -824,7 +824,7 @@
 
   function highlightPython(html) {
     html = highlightPattern(html, /(#.*)$/m, 'comment');
-    html = highlightPattern(html, /("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"])*"|'(?:\\.|[^'])*')/g, 'string');
+    html = highlightPattern(html, /("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g, 'string');
     html = highlightPattern(html, /\b\d+(?:\.\d+)?\b/g, 'number');
     html = highlightKeywords(html, [
       'def', 'return', 'if', 'elif', 'else', 'for', 'while', 'import', 'from',
@@ -850,7 +850,7 @@
 
   function highlightRuby(html) {
     html = highlightPattern(html, /(#.*)$/m, 'comment');
-    html = highlightPattern(html, /("(?:\\.|[^"])*"|'(?:\\.|[^'])*')/g, 'string');
+    html = highlightPattern(html, /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g, 'string');
     html = highlightPattern(html, /\b\d+(?:\.\d+)?\b/g, 'number');
     html = highlightKeywords(html, [
       'def', 'return', 'if', 'elsif', 'else', 'end', 'do', 'while', 'until',
@@ -863,7 +863,7 @@
 
   function highlightShell(html) {
     html = highlightPattern(html, /(#.*)$/m, 'comment');
-    html = highlightPattern(html, /("(?:\\.|[^"])*"|'(?:\\.|[^'])*')/g, 'string');
+    html = highlightPattern(html, /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g, 'string');
     html = highlightKeywords(html, [
       'if', 'then', 'else', 'elif', 'fi', 'for', 'while', 'do', 'done', 'in',
       'case', 'esac', 'function', 'return'
@@ -872,8 +872,8 @@
   }
 
   function highlightJson(html) {
-    html = highlightPattern(html, /("(?:\\.|[^"])*")(?=\s*:)/g, 'keyword');
-    html = highlightPattern(html, /("(?:\\.|[^"])*")/g, 'string');
+    html = highlightPattern(html, /("(?:\\.|[^"\\])*")(?=\s*:)/g, 'keyword');
+    html = highlightPattern(html, /("(?:\\.|[^"\\])*")/g, 'string');
     html = highlightPattern(html, /\b(true|false|null)\b/g, 'keyword');
     html = highlightPattern(html, /\b-?\d+(?:\.\d+)?\b/g, 'number');
     return html;
@@ -881,7 +881,7 @@
 
   function highlightYaml(html) {
     html = highlightPattern(html, /(#.*)$/m, 'comment');
-    html = highlightPattern(html, /("(?:\\.|[^"])*"|'(?:\\.|[^'])*')/g, 'string');
+    html = highlightPattern(html, /("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')/g, 'string');
     html = highlightPattern(html, /^(\s*-)/gm, 'operator');
     html = highlightPattern(html, /(^|\s)([A-Za-z_\-][A-Za-z0-9_\-]*)(?=\s*:)/gm, 'keyword');
     return html;
@@ -1042,12 +1042,15 @@
   }
 
   /**
-   * Update result count display with rerank badge
+   * Update result count display with rerank badge.
+   *
+   * Builds children via createElement + textContent rather than innerHTML
+   * interpolation: CodeQL otherwise flags this as XSS-able since the inputs
+   * flow from JSON-RPC, even though they're typed numeric/boolean in
+   * practice. DOM-construction makes the safety obvious to both reviewers
+   * and the scanner.
    */
   function updateResultCount(count, totalCount, hasMore) {
-    const countText = document.createElement('span');
-    countText.className = 'count-text';
-
     let text = `${count} result${count !== 1 ? 's' : ''}`;
     if (totalCount && totalCount !== count) {
       text += ` of ${totalCount}`;
@@ -1055,16 +1058,20 @@
     if (hasMore) {
       text += '+';
     }
+
+    resultCount.textContent = '';
+
+    const countText = document.createElement('span');
+    countText.className = 'count-text';
     countText.textContent = text;
+    resultCount.appendChild(countText);
 
-    // Show rerank badge for semantic/hybrid
-    const showRerank = currentMode === 'semantic' || currentMode === 'hybrid';
-
-    const html = showRerank
-      ? `<span class="count-text">${text}</span><span class="rerank-badge">⚡ RERANK</span>`
-      : `<span class="count-text">${text}</span>`;
-
-    resultCount.innerHTML = html;
+    if (currentMode === 'semantic' || currentMode === 'hybrid') {
+      const badge = document.createElement('span');
+      badge.className = 'rerank-badge';
+      badge.textContent = '⚡ RERANK';
+      resultCount.appendChild(badge);
+    }
   }
 
   function formatRelativeTime(epochSeconds) {
