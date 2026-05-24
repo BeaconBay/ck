@@ -159,7 +159,7 @@ impl std::fmt::Display for ParseableLanguage {
 
             ParseableLanguage::Elixir => "elixir",
         };
-        write!(f, "{}", name)
+        write!(f, "{name}")
     }
 }
 
@@ -183,8 +183,7 @@ impl TryFrom<ck_core::Language> for ParseableLanguage {
             ck_core::Language::Elixir => Ok(ParseableLanguage::Elixir),
 
             _ => Err(anyhow::anyhow!(
-                "Language {:?} is not supported for parsing",
-                lang
+                "Language {lang:?} is not supported for parsing"
             )),
         }
     }
@@ -393,7 +392,7 @@ fn chunk_language(text: &str, language: ParseableLanguage) -> Result<Vec<Chunk>>
 
     let tree = parser
         .parse(text, None)
-        .ok_or_else(|| anyhow::anyhow!("Failed to parse {} code", language))?;
+        .ok_or_else(|| anyhow::anyhow!("Failed to parse {language} code"))?;
 
     let mut chunks = match query_chunker::chunk_with_queries(language, ts_language, &tree, text)? {
         Some(query_chunks) if !query_chunks.is_empty() => query_chunks,
@@ -593,7 +592,7 @@ fn merge_haskell_functions(chunks: Vec<Chunk>, source: &str) -> Vec<Chunk> {
                 .split("::")
                 .next()
                 .and_then(|s| s.split_whitespace().next())
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
         } else {
             extract_haskell_function_name(&chunk.text)
         };
@@ -631,7 +630,7 @@ fn merge_haskell_functions(chunks: Vec<Chunk>, source: &str) -> Vec<Chunk> {
                     .split("::")
                     .next()
                     .and_then(|s| s.split_whitespace().next())
-                    .map(|s| s.to_string())
+                    .map(std::string::ToString::to_string)
             } else {
                 extract_haskell_function_name(&next_chunk.text)
             };
@@ -1085,7 +1084,7 @@ fn segments_to_strings(segments: &[TriviaSegment], source: &str) -> Vec<String> 
     for segment in segments {
         if let Some(text) = source
             .get(segment.start_byte..segment.end_byte)
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
         {
             result.push(text);
         }
@@ -1213,7 +1212,7 @@ fn first_word_of_node(node: tree_sitter::Node<'_>, source: &str) -> Option<Strin
 fn text_for_node(node: tree_sitter::Node<'_>, source: &str) -> Option<String> {
     node.utf8_text(source.as_bytes())
         .ok()
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
 }
 
 fn only_whitespace_between(source: &str, start: usize, end: usize) -> bool {
@@ -1221,7 +1220,7 @@ fn only_whitespace_between(source: &str, start: usize, end: usize) -> bool {
         return true;
     }
 
-    source[start..end].chars().all(|c| c.is_whitespace())
+    source[start..end].chars().all(char::is_whitespace)
 }
 
 fn adjust_chunk_type_for_context(
@@ -1543,7 +1542,7 @@ mod tests {
     fn test_chunk_generic_large_file_performance() {
         // Create a large text to ensure O(n) performance
         let lines: Vec<String> = (0..1000)
-            .map(|i| format!("Line {}: Some content here", i))
+            .map(|i| format!("Line {i}: Some content here"))
             .collect();
         let text = lines.join("\n");
 
@@ -1554,8 +1553,7 @@ mod tests {
         // Should complete quickly even for 1000 lines
         assert!(
             duration.as_millis() < 100,
-            "Chunking took too long: {:?}",
-            duration
+            "Chunking took too long: {duration:?}"
         );
         assert!(!chunks.is_empty());
 
@@ -1568,7 +1566,7 @@ mod tests {
 
     #[test]
     fn test_chunk_rust() {
-        let rust_code = r#"
+        let rust_code = r"
 pub struct Calculator {
     memory: f64,
 }
@@ -1590,7 +1588,7 @@ fn main() {
 pub mod utils {
     pub fn helper() {}
 }
-"#;
+";
 
         let chunks = chunk_language(rust_code, ParseableLanguage::Rust).unwrap();
         assert!(!chunks.is_empty());
@@ -1604,10 +1602,10 @@ pub mod utils {
 
     #[test]
     fn test_rust_doc_comments_attached() {
-        let rust_code = r#"
+        let rust_code = r"
 /// Doc comment
 pub struct Foo {}
-"#;
+";
         let chunks = chunk_language(rust_code, ParseableLanguage::Rust).unwrap();
         let struct_chunk = chunks
             .iter()
@@ -1621,7 +1619,7 @@ pub struct Foo {}
 
     #[test]
     fn test_rust_query_matches_legacy() {
-        let source = r#"
+        let source = r"
             mod sample {
                 struct Thing;
 
@@ -1632,14 +1630,14 @@ pub struct Foo {}
             }
 
             fn util() {}
-        "#;
+        ";
 
         assert_query_parity(ParseableLanguage::Rust, source);
     }
 
     #[test]
     fn test_python_query_matches_legacy() {
-        let source = r#"
+        let source = r"
 class Example:
     @classmethod
     def build(cls):
@@ -1652,7 +1650,7 @@ def helper():
 
 async def async_helper():
     return 2
-"#;
+";
 
         assert_query_parity(ParseableLanguage::Python, source);
     }
@@ -1760,7 +1758,7 @@ func main() {
     #[test]
     #[ignore] // TODO: Update test to match query-based chunking behavior
     fn test_chunk_typescript_arrow_context() {
-        let ts_code = r#"
+        let ts_code = r"
 // Utility function
 export const util = () => {
     // comment about util
@@ -1778,7 +1776,7 @@ export class Example {
 }
 
 const compute = (x: number) => x * 2;
-"#;
+";
 
         let chunks = chunk_language(ts_code, ParseableLanguage::TypeScript).unwrap();
 
@@ -1837,7 +1835,7 @@ const compute = (x: number) => x * 2;
     #[test]
     #[ignore]
     fn test_typescript_query_matches_legacy() {
-        let source = r#"
+        let source = r"
 export const util = () => {
     return 42;
 };
@@ -1849,7 +1847,7 @@ export class Example {
 }
 
 const compute = (x: number) => x * 2;
-"#;
+";
 
         assert_query_parity(ParseableLanguage::TypeScript, source);
     }
@@ -1928,7 +1926,7 @@ shapeDescription (Square s) = "square of side " ++ show s
 
     #[test]
     fn test_csharp_query_matches_legacy() {
-        let source = r#"
+        let source = r"
 namespace Calculator;
 
 public interface ICalculator 
@@ -1951,7 +1949,7 @@ public class Calculator
         return x + y;
     }
 }
-"#;
+";
 
         assert_query_parity(ParseableLanguage::CSharp, source);
     }
@@ -2071,20 +2069,17 @@ test "multiply function" {
 
         assert!(
             class_count >= 5,
-            "Expected at least 5 Class chunks (struct, enum, union, opaque, error set), found {}",
-            class_count
+            "Expected at least 5 Class chunks (struct, enum, union, opaque, error set), found {class_count}"
         );
 
         assert!(
             function_count >= 3,
-            "Expected at least 3 functions (multiply, divide, main), found {}",
-            function_count
+            "Expected at least 3 functions (multiply, divide, main), found {function_count}"
         );
 
         assert!(
             module_count >= 4,
-            "Expected at least 4 module-type chunks (const std, comptime, 2 tests), found {}",
-            module_count
+            "Expected at least 4 module-type chunks (const std, comptime, 2 tests), found {module_count}"
         );
 
         assert!(
@@ -2103,7 +2098,7 @@ test "multiply function" {
 
     #[test]
     fn test_chunk_csharp() {
-        let csharp_code = r#"
+        let csharp_code = r"
 namespace Calculator;
 
 public interface ICalculator 
@@ -2131,7 +2126,7 @@ public class Calculator
         var calc = new Calculator();
     }
 }
-"#;
+";
 
         let chunks = chunk_language(csharp_code, ParseableLanguage::CSharp).unwrap();
         assert!(!chunks.is_empty());
@@ -2196,7 +2191,7 @@ public class Calculator
     fn test_strided_chunk_line_calculation() {
         // Regression test for line_end calculation in strided chunks
         // Create a chunk large enough to force striding
-        let long_text = (1..=50).map(|i| format!("This is a longer line {} with more content to ensure token count is high enough", i)).collect::<Vec<_>>().join("\n");
+        let long_text = (1..=50).map(|i| format!("This is a longer line {i} with more content to ensure token count is high enough")).collect::<Vec<_>>().join("\n");
 
         let metadata = ChunkMetadata::from_text(&long_text);
         let chunk = Chunk {
@@ -2220,7 +2215,7 @@ public class Calculator
 
         let result = stride_large_chunk(chunk, &config);
         if let Err(e) = &result {
-            eprintln!("Stride error: {}", e);
+            eprintln!("Stride error: {e}");
         }
         assert!(result.is_ok());
 
@@ -2243,9 +2238,7 @@ public class Calculator
                 // Allow some tolerance for striding logic
                 assert!(
                     calculated_line_span <= line_count + 1,
-                    "Line span {} should not exceed content lines {} by more than 1",
-                    calculated_line_span,
-                    line_count
+                    "Line span {calculated_line_span} should not exceed content lines {line_count} by more than 1"
                 );
             }
         }
@@ -2310,7 +2303,7 @@ function main() {
         ];
 
         for (language, code) in test_cases {
-            eprintln!("\n=== Testing {} ===", language);
+            eprintln!("\n=== Testing {language} ===");
             let chunks = chunk_language(code, language).unwrap();
 
             // Verify all non-whitespace bytes are covered
@@ -2333,7 +2326,7 @@ function main() {
                 .collect();
 
             if !uncovered_non_ws.is_empty() {
-                eprintln!("\n=== UNCOVERED NON-WHITESPACE for {} ===", language);
+                eprintln!("\n=== UNCOVERED NON-WHITESPACE for {language} ===");
                 eprintln!("Total bytes: {}", code.len());
                 eprintln!("Uncovered non-whitespace: {}", uncovered_non_ws.len());
 
@@ -2442,7 +2435,7 @@ function main() {
 
     #[test]
     fn test_haskell_function_chunking() {
-        let haskell_code = r#"
+        let haskell_code = r"
 factorial :: Integer -> Integer
 factorial 0 = 1
 factorial n = n * factorial (n - 1)
@@ -2451,7 +2444,7 @@ fibonacci :: Integer -> Integer
 fibonacci 0 = 0
 fibonacci 1 = 1
 fibonacci n = fibonacci (n - 1) + fibonacci (n - 2)
-"#;
+";
 
         let mut parser = tree_sitter::Parser::new();
         parser
@@ -2601,7 +2594,7 @@ end
 
     #[test]
     fn test_chunk_elixir_genserver() {
-        let elixir_code = r#"
+        let elixir_code = r"
 defmodule MyServer do
   use GenServer
 
@@ -2621,7 +2614,7 @@ defmodule MyServer do
     {:noreply, value}
   end
 end
-"#;
+";
 
         let chunks = chunk_language(elixir_code, ParseableLanguage::Elixir).unwrap();
 
@@ -2650,7 +2643,7 @@ end
 
     #[test]
     fn test_chunk_elixir_macros() {
-        let elixir_code = r#"
+        let elixir_code = r"
 defmodule MyMacros do
   defmacro unless(condition, do: block) do
     quote do
@@ -2662,7 +2655,7 @@ defmodule MyMacros do
     quote do: unquote(x) * 2
   end
 end
-"#;
+";
 
         let chunks = chunk_language(elixir_code, ParseableLanguage::Elixir).unwrap();
 
@@ -2774,7 +2767,7 @@ end
     #[test]
     fn test_chunk_elixir_behavior_spelling() {
         // Test both British and American spellings
-        let elixir_code = r#"
+        let elixir_code = r"
 defmodule BritishModule do
   @behaviour GenServer
 end
@@ -2782,7 +2775,7 @@ end
 defmodule AmericanModule do
   @behavior GenServer
 end
-"#;
+";
 
         let chunks = chunk_language(elixir_code, ParseableLanguage::Elixir).unwrap();
 

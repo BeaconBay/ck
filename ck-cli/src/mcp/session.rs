@@ -267,7 +267,7 @@ impl SessionManager {
         // Validate cursor timestamp (not too old)
         let cursor_age = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map_err(|e| format!("System time error: {}", e))?
+            .map_err(|e| format!("System time error: {e}"))?
             .as_secs()
             - parsed_cursor.timestamp;
 
@@ -301,14 +301,14 @@ impl SessionManager {
             search_params_hash: search_params_hash.to_string(),
             timestamp: SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .map_err(|e| format!("System time error: {}", e))?
+                .map_err(|e| format!("System time error: {e}"))?
                 .as_secs(),
             version: 1,
             original_page_size,
         };
 
         let cursor_json = serde_json::to_string(&cursor)
-            .map_err(|e| format!("Failed to serialize cursor: {}", e))?;
+            .map_err(|e| format!("Failed to serialize cursor: {e}"))?;
 
         Ok(BASE64.encode(cursor_json.as_bytes()))
     }
@@ -317,13 +317,13 @@ impl SessionManager {
     fn parse_cursor(&self, cursor: &str) -> Result<PaginationCursor, String> {
         let cursor_bytes = BASE64
             .decode(cursor)
-            .map_err(|e| format!("Invalid cursor format: {}", e))?;
+            .map_err(|e| format!("Invalid cursor format: {e}"))?;
 
-        let cursor_json = String::from_utf8(cursor_bytes)
-            .map_err(|e| format!("Invalid cursor encoding: {}", e))?;
+        let cursor_json =
+            String::from_utf8(cursor_bytes).map_err(|e| format!("Invalid cursor encoding: {e}"))?;
 
         let parsed_cursor: PaginationCursor = serde_json::from_str(&cursor_json)
-            .map_err(|e| format!("Invalid cursor structure: {}", e))?;
+            .map_err(|e| format!("Invalid cursor structure: {e}"))?;
 
         // Validate cursor version
         if parsed_cursor.version != 1 {
@@ -474,8 +474,8 @@ mod tests {
     fn create_test_results(count: usize) -> Vec<SearchResult> {
         (0..count)
             .map(|i| SearchResult {
-                file: PathBuf::from(format!("/test/file_{}.rs", i)),
-                preview: format!("Test result {} content", i),
+                file: PathBuf::from(format!("/test/file_{i}.rs")),
+                preview: format!("Test result {i} content"),
                 span: ck_core::Span {
                     byte_start: i * 100,
                     byte_end: (i + 1) * 100,

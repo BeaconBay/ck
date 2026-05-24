@@ -30,7 +30,7 @@ fn run_example() {
         "exception handling best practices".to_string(),
     ];
 
-    println!("\nQuery: '{}'", query);
+    println!("\nQuery: '{query}'");
     println!("Documents to rerank:");
     for (i, doc) in documents.iter().enumerate() {
         println!("  {}: {}", i + 1, doc);

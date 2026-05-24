@@ -28,17 +28,20 @@ pub fn load_preview_lines(
 
         let cache_path = pdf::get_content_cache_path(&root, &resolved_path);
         let content = fs::read_to_string(&cache_path).map_err(|err| {
-            format!(
-                "PDF preview unavailable ({}). Run `ck --index .` to generate cache.",
-                err
-            )
+            format!("PDF preview unavailable ({err}). Run `ck --index .` to generate cache.")
         })?;
-        let lines: Vec<String> = content.lines().map(|line| line.to_string()).collect();
+        let lines: Vec<String> = content
+            .lines()
+            .map(std::string::ToString::to_string)
+            .collect();
         (content, lines)
     } else {
         let content = fs::read_to_string(&resolved_path)
             .map_err(|err| format!("Could not read {}: {}", resolved_path.display(), err))?;
-        let lines: Vec<String> = content.lines().map(|line| line.to_string()).collect();
+        let lines: Vec<String> = content
+            .lines()
+            .map(std::string::ToString::to_string)
+            .collect();
         (content, lines)
     };
 
@@ -81,7 +84,7 @@ fn load_chunk_spans(repo_root: &Path, file_path: &Path) -> Result<Vec<IndexedChu
     }
 
     let entry = load_index_entry(&sidecar_path)
-        .map_err(|err| format!("Failed to load chunk metadata: {}", err))?;
+        .map_err(|err| format!("Failed to load chunk metadata: {err}"))?;
     let mut metas: Vec<IndexedChunkMeta> = entry
         .chunks
         .iter()
@@ -132,7 +135,7 @@ pub fn render_heatmap_preview(
         let in_chunk_range = line_num >= match_line.saturating_sub(5) && line_num <= match_line + 5;
 
         let mut line_spans = vec![Span::styled(
-            format!("{:4} | ", line_num),
+            format!("{line_num:4} | "),
             if is_match_line {
                 Style::default()
                     .fg(COLOR_YELLOW)
@@ -209,7 +212,7 @@ pub fn render_syntax_preview(
 
                 let line_spans = vec![
                     Span::styled(
-                        format!("{:4} | ", line_num),
+                        format!("{line_num:4} | "),
                         if is_match_line {
                             Style::default()
                                 .fg(COLOR_YELLOW)
@@ -237,7 +240,7 @@ pub fn render_syntax_preview(
         let in_chunk_range = line_num >= match_line.saturating_sub(5) && line_num <= match_line + 5;
 
         let mut line_spans = vec![Span::styled(
-            format!("{:4} | ", line_num),
+            format!("{line_num:4} | "),
             if is_match_line {
                 Style::default()
                     .fg(COLOR_YELLOW)
@@ -289,7 +292,7 @@ pub fn render_chunks_preview(
             .breadcrumb
             .as_deref()
             .filter(|crumb| !crumb.is_empty())
-            .map(|crumb| format!(" • {}", crumb))
+            .map(|crumb| format!(" • {crumb}"))
             .unwrap_or_else(|| {
                 if !meta.ancestry.is_empty() {
                     format!(" • {}", meta.ancestry.join("::"))
@@ -299,7 +302,7 @@ pub fn render_chunks_preview(
             });
         let token_display = meta
             .estimated_tokens
-            .map(|tokens| format!(" • ~{} tokens", tokens))
+            .map(|tokens| format!(" • ~{tokens} tokens"))
             .unwrap_or_default();
 
         format!(
@@ -449,7 +452,7 @@ pub fn build_chunk_lines(
 
             // Use fixed-width line number formatting
             spans.push(Span::styled(
-                format!("{:width$} | ", line_num, width = line_num_width),
+                format!("{line_num:line_num_width$} | "),
                 if is_match_line {
                     Style::default()
                         .fg(COLOR_YELLOW)
@@ -532,12 +535,7 @@ pub fn build_chunk_strings(
                 }
             }
             line_buf.push(' ');
-            line_buf.push_str(&format!(
-                "{:width$} | {}",
-                line_num,
-                text,
-                width = line_num_width
-            ));
+            line_buf.push_str(&format!("{line_num:line_num_width$} | {text}"));
             if is_match_line {
                 line_buf.push_str("  <= match");
             }
@@ -613,7 +611,7 @@ pub fn dump_chunk_view_internal(
             .breadcrumb
             .as_deref()
             .filter(|crumb| !crumb.is_empty())
-            .map(|crumb| format!(" • {}", crumb))
+            .map(|crumb| format!(" • {crumb}"))
             .unwrap_or_else(|| {
                 if !meta.ancestry.is_empty() {
                     format!(" • {}", meta.ancestry.join("::"))
@@ -623,7 +621,7 @@ pub fn dump_chunk_view_internal(
             });
         let token_display = meta
             .estimated_tokens
-            .map(|tokens| format!(" • ~{} tokens", tokens))
+            .map(|tokens| format!(" • ~{tokens} tokens"))
             .unwrap_or_default();
 
         vec![
