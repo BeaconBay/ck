@@ -261,8 +261,7 @@ async fn test_mcp_top_k_page_size_interaction() {
             let match_count = matches.len();
             assert!(
                 match_count <= 3,
-                "First page should have at most 3 matches, got {}",
-                match_count
+                "First page should have at most 3 matches, got {match_count}"
             );
         }
 
@@ -270,16 +269,14 @@ async fn test_mcp_top_k_page_size_interaction() {
         if let Some(total_count) = response["results"]["total_count"].as_u64() {
             assert!(
                 total_count <= 5,
-                "Total count should respect top_k=5, got {}",
-                total_count
+                "Total count should respect top_k=5, got {total_count}"
             );
         }
 
         // Check that summary reflects correct top_k
         assert!(
             summary.contains("top_k: 5"),
-            "Summary should show top_k: 5, got: {}",
-            summary
+            "Summary should show top_k: 5, got: {summary}"
         );
     }
 
@@ -303,8 +300,7 @@ async fn test_mcp_top_k_page_size_interaction() {
         if let Some(total_count) = response2["results"]["total_count"].as_u64() {
             assert!(
                 total_count <= 2,
-                "Should respect top_k=2 limit, got {} total",
-                total_count
+                "Should respect top_k=2 limit, got {total_count} total"
             );
         }
 
@@ -312,16 +308,14 @@ async fn test_mcp_top_k_page_size_interaction() {
             let match_count = matches.len();
             assert!(
                 match_count <= 2,
-                "Should respect top_k=2 limit, got {} matches",
-                match_count
+                "Should respect top_k=2 limit, got {match_count} matches"
             );
         }
 
         // Check that summary reflects correct top_k
         assert!(
             summary2.contains("top_k: 2"),
-            "Summary should show top_k: 2, got: {}",
-            summary2
+            "Summary should show top_k: 2, got: {summary2}"
         );
     }
 }

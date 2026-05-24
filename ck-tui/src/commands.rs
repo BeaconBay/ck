@@ -30,10 +30,8 @@ pub fn execute_command(state: &mut TuiState) -> Result<()> {
             show_stats(state);
         }
         _ => {
-            state.status_message = format!(
-                "Unknown command: {}. Type /help for available commands",
-                cmd
-            );
+            state.status_message =
+                format!("Unknown command: {cmd}. Type /help for available commands");
         }
     }
 
@@ -203,7 +201,7 @@ pub fn show_chunks(state: &mut TuiState) {
                 "  Overlaps with: {}",
                 overlaps_with
                     .iter()
-                    .map(|n| format!("#{}", n))
+                    .map(|n| format!("#{n}"))
                     .collect::<Vec<_>>()
                     .join(", ")
             ));
@@ -277,7 +275,7 @@ fn load_chunk_spans(repo_root: &Path, file_path: &Path) -> Result<Vec<IndexedChu
     }
 
     let entry = load_index_entry(&sidecar_path)
-        .map_err(|err| format!("Failed to load chunk metadata: {}", err))?;
+        .map_err(|err| format!("Failed to load chunk metadata: {err}"))?;
     let mut metas: Vec<IndexedChunkMeta> = entry
         .chunks
         .iter()

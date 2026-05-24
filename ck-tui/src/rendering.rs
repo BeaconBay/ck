@@ -24,10 +24,7 @@ pub fn draw_query_input(f: &mut Frame, area: Rect, state: &TuiState) {
             SearchMode::Lexical => "[LEX]",
         };
         (
-            format!(
-                "Search {} (Tab to cycle, /help for commands)",
-                mode_indicator
-            ),
+            format!("Search {mode_indicator} (Tab to cycle, /help for commands)"),
             Style::default().fg(COLOR_YELLOW),
         )
     };
@@ -125,7 +122,7 @@ pub fn draw_status_bar(f: &mut Frame, area: Rect, state: &TuiState) {
 
         status_spans.push(Span::raw(" | "));
         status_spans.push(Span::styled(
-            format!("{} ", spinner),
+            format!("{spinner} "),
             Style::default().fg(COLOR_YELLOW),
         ));
 
@@ -133,7 +130,7 @@ pub fn draw_status_bar(f: &mut Frame, area: Rect, state: &TuiState) {
         if let Some(progress) = state.indexing_progress {
             let pct = (progress * 100.0).clamp(0.0, 100.0).round() as i32;
             status_spans.push(Span::styled(
-                format!("[{:>3}%] ", pct),
+                format!("[{pct:>3}%] "),
                 Style::default()
                     .fg(COLOR_GREEN)
                     .add_modifier(Modifier::BOLD),
@@ -180,7 +177,7 @@ pub fn draw_status_bar(f: &mut Frame, area: Rect, state: &TuiState) {
             stats.total_files, stats.total_chunks
         )
     } else if let Some(err) = state.index_stats_error.as_ref() {
-        format!("Index error: {}", err)
+        format!("Index error: {err}")
     } else {
         "Index: --".to_string()
     };
