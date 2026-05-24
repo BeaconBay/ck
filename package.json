@@ -27,7 +27,7 @@
     "test": "node scripts/test.js"
   },
   "engines": {
-    "node": ">=16"
+    "node": ">=18"
   },
   "files": [
     "cli/",
@@ -60,7 +60,7 @@
     "claude"
   ],
   "dependencies": {
-    "tar": "^6.2.1"
+    "tar": "^7.5.15"
   },
   "publishConfig": {
     "access": "public"
