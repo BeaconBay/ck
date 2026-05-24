@@ -349,6 +349,14 @@ jobs:
     name: Publish to npm (@beaconbay/ck-search)
     needs: build-release
     runs-on: ubuntu-latest
+    # Trusted Publishing (OIDC): GitHub mints a short-lived id-token,
+    # npm validates it against the trusted-publisher config on the
+    # @beaconbay/ck-search package. No long-lived NPM_TOKEN secret.
+    # The id-token also signs an SLSA provenance attestation that
+    # ties the published tarball to this exact workflow run + commit.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -362,11 +370,6 @@ jobs:
       - name: Sync package.json version from Cargo.toml + tag
         run: |
           set -euo pipefail
-
-          if [ -z "${NPM_TOKEN_PRESENT:-}" ] && [ -z "${{ secrets.NPM_TOKEN }}" ]; then
-            echo "::error::NPM_TOKEN repo secret is not set"
-            exit 1
-          fi
 
           cargo_version=$(grep -m1 '^version = ' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
           tag_version="${{ github.ref_name }}"
@@ -395,11 +398,9 @@ jobs:
             echo "already=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish to npm
+      - name: Publish to npm (with provenance)
         if: steps.check.outputs.already == 'false'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+        run: npm publish --access public --provenance
 
   finalize-release:
     name: Finalize GitHub Release

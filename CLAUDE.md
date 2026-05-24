@@ -55,10 +55,12 @@ When tag `X.Y.Z` is pushed:
 1. **Create GitHub release** (draft) and verify tag matches `Cargo.toml`
 2. **Build binaries** for 5 targets (linux x86_64, macos x86_64+arm64, windows x86_64+arm64), upload as `.tar.gz`/`.zip` assets
 3. **Publish 9 crates to crates.io** in dep order, with retry-on-"already-published" and verify-via-API (User-Agent required)
-4. **Publish to npm as `@beaconbay/ck-search`** — postinstall script downloads the platform binary from the GitHub release at user install time
+4. **Publish to npm as `@beaconbay/ck-search`** — uses npm Trusted Publishing (OIDC); GitHub mints a short-lived id-token, npm validates it against the trusted-publisher config on the package, no long-lived secret. Tarball is published with SLSA provenance attestation (cryptographically tied to this workflow run + commit). The package's postinstall script downloads the platform binary from the GitHub release at user install time.
 5. **Finalize GitHub release** (out of draft)
 
-Required repo secrets: `CARGO_REGISTRY_TOKEN`, `NPM_TOKEN`, `GITHUB_TOKEN` (auto).
+Required repo secrets: `CARGO_REGISTRY_TOKEN`, `GITHUB_TOKEN` (auto).
+npm publish requires NO secret — Trusted Publishing config lives on the npm
+package (Settings → Trusted Publishers).
 
 ### CHANGELOG.md Format
 
