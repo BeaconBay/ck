@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-05-24
+
+### Added
+- **npm distribution as `@beaconbay/ck-search`** (#117). Users without Rust installed can now `npm install -g @beaconbay/ck-search`. The postinstall script downloads the matching platform binary from the corresponding GitHub release (`ck-X.Y.Z-<target>.{tar.gz|zip}`) and a thin `cli/ck.js` wrapper spawns it with inherited stdio. `publish-npm` job added to release.yml; auto-stamps `package.json` version from `Cargo.toml` at publish time so maintainers only ever bump one file.
+
+### Security
+- **openssl 0.10.75 → 0.10.80** (#118). Picks up a buffer-overflow fix in `cipher_update_inplace` for AES key-wrap-with-padding (CVE-class).
+
+### Changed
+- **`@beaconbay/ck-search` requires Node.js ≥ 18** (#119). Bumped alongside the `tar` 6 → 7 upgrade (tar v7 dropped Node ≤ 17 support).
+- **Cargo dependency-bump policy** (#118): `.github/dependabot.yml` now groups patch/minor cargo bumps into a single `cargo-safe` PR while routing `rmcp` and `ort` to their own `cargo-flagged` PRs. Stops repeats of the #115 situation where a major rmcp bump blocked a batch of safe patches from landing.
+
+### Technical
+- **Bulk dependency refresh** (#125 + #118): patch/minor bumps for anyhow, serde_json, tokio, clap, regex, blake3, memmap2, tracing-subscriber, rayon, tree-sitter-{rust,c-sharp,elixir}, fastembed 5.8 → 5.13, tempfile, ctrlc, uuid, once_cell, chrono, schemars, owo-colors, bytes, lz4_flex, openssl, quinn-proto, rand, rustls-webpki, time.
+- **shlex 1.3 → 2.0** (#127). API-compatible for our usage; transitive deps still pull 1.3 via `cc`.
+- **GitHub Actions**: `actions/checkout` v4 → v6, `github/codeql-action/upload-sarif` v3 → v4 (#120).
+- **Dev deps**: `@types/vscode` 1.93 → 1.120 (#121), `vue` 3.5.22 → 3.5.34 in docs-site (#122).
+
 ## [0.7.7] - 2026-05-23
 
 ### Fixed
