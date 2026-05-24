@@ -37,15 +37,15 @@ anyhow = "1.0"
 thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tokio = { version = "1.35", features = ["full"] }
-clap = { version = "4.4", features = ["derive"] }
-regex = "1.10"
-blake3 = "1.5"
+tokio = { version = "1.50", features = ["full"] }
+clap = { version = "4.5", features = ["derive"] }
+regex = "1.12"
+blake3 = "1.8"
 memmap2 = "0.9"
 bincode = "1.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-rayon = "1.8"
+rayon = "1.12"
 walkdir = "2.4"
 tantivy = "0.24"
 tree-sitter = "0.25"
@@ -59,15 +59,15 @@ tree-sitter-c-sharp = "0.23"
 tree-sitter-zig = "1.1"
 tree-sitter-dart = "0.0.4"
 tree-sitter-elixir = "0.3"
-fastembed = { version = "5.1", default-features = false, features = ["hf-hub-rustls-tls", "ort-download-binaries"] }
+fastembed = { version = "5.13", default-features = false, features = ["hf-hub-rustls-tls", "ort-download-binaries"] }
 openssl = { version = "0.10" }
-tempfile = "3.8"
+tempfile = "3.27"
 glob = "0.3"
 globset = "0.4"
 ignore = "0.4"
-ctrlc = "3.4"
+ctrlc = "3.5"
 pdf-extract = "0.9"
-uuid = { version = "1.8", features = ["v4", "serde"] }
+uuid = { version = "1.23", features = ["v4", "serde"] }
 base64 = "0.22"
 sha2 = "0.10"
 hf-hub = { version = "0.4.3", default-features = false, features = ["ureq"] }
@@ -79,6 +79,6 @@ tokenizers = "0.20.1"
 # upgrades to rc.12 and 36 errors cascade. See:
 # https://github.com/BeaconBay/ck/pull/<TODO> for follow-up to evaluate rc.12.
 ort = { version = "=2.0.0-rc.11", default-features = false, features = ["download-binaries", "tls-native", "ndarray", "std"] }
-once_cell = "1.19"
+once_cell = "1.21"
 ndarray = { version = "0.17", default-features = false, features = ["std"] }
 num_cpus = "1.16"

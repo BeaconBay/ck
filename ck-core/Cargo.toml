@@ -20,4 +20,4 @@ regex = { workspace = true }
 bincode = { workspace = true }
 
 [dev-dependencies]
-tempfile = "3.8"
+tempfile = "3.27"
