@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.9] - 2026-05-24
+
+### Changed
+- **npm publish now uses Trusted Publishing (OIDC)** (#131). 0.7.8 failed to publish to npm because the classic token we'd issued didn't bypass 2FA. Switched to npm's recommended OIDC flow — GitHub mints a short-lived id-token per release run, npm validates it against the trusted-publisher config on the package. No long-lived secret stored anywhere. The tarball is now published with an SLSA provenance attestation that cryptographically ties it to this workflow run + commit. This is the first release where \`@beaconbay/ck-search\` actually lands on npm.
+
 ## [0.7.8] - 2026-05-24
 
 ### Added
