@@ -141,7 +141,7 @@ impl StatusReporter {
                 let _ = self.term.write_line(&format!(
                     "  {} {}",
                     style("...").dim(),
-                    style(format!("and {} more files", remaining)).dim()
+                    style(format!("and {remaining} more files")).dim()
                 ));
             }
         }
@@ -240,7 +240,7 @@ impl EnhancedIndexingProgress {
                 .unwrap()
                 .progress_chars("●◐○  "),
         );
-        file_pb.set_message(format!("📄 {}", file_name));
+        file_pb.set_message(format!("📄 {file_name}"));
 
         self.current_file_progress = Some(file_pb);
     }
@@ -248,7 +248,7 @@ impl EnhancedIndexingProgress {
     pub fn update_chunk_progress(&mut self, chunk_number: usize, chunk_size: usize) {
         if let Some(ref pb) = self.current_file_progress {
             pb.set_position(chunk_number as u64);
-            pb.set_message(format!("🔢 chunk {} ({} chars)", chunk_number, chunk_size));
+            pb.set_message(format!("🔢 chunk {chunk_number} ({chunk_size} chars)"));
         }
     }
 
@@ -275,7 +275,7 @@ impl EnhancedIndexingProgress {
 
         // Complete current file progress bar
         if let Some(pb) = self.current_file_progress.take() {
-            pb.finish_with_message(format!("✓ {} chunks", chunks_processed));
+            pb.finish_with_message(format!("✓ {chunks_processed} chunks"));
         }
     }
 

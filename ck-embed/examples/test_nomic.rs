@@ -39,13 +39,13 @@ fn run_example() {
                     );
                 }
                 Err(e) => {
-                    println!("❌ Failed to generate embeddings: {}", e);
+                    println!("❌ Failed to generate embeddings: {e}");
                 }
             }
         }
         Err(e) => {
-            println!("❌ Failed to create Nomic embedder: {}", e);
-            println!("   Error details: {:?}", e);
+            println!("❌ Failed to create Nomic embedder: {e}");
+            println!("   Error details: {e:?}");
 
             println!("\n--- Trying alternative model names ---");
 
@@ -57,10 +57,10 @@ fn run_example() {
             ];
 
             for alt in alternatives {
-                println!("Trying: {}", alt);
+                println!("Trying: {alt}");
                 match create_embedder(Some(alt)) {
-                    Ok(_) => println!("  ✅ {} works!", alt),
-                    Err(e) => println!("  ❌ {} failed: {}", alt, e),
+                    Ok(_) => println!("  ✅ {alt} works!"),
+                    Err(e) => println!("  ❌ {alt} failed: {e}"),
                 }
             }
         }
@@ -69,6 +69,6 @@ fn run_example() {
     println!("\n--- Testing working BGE model for comparison ---");
     match create_embedder(Some("BAAI/bge-small-en-v1.5")) {
         Ok(embedder) => println!("✅ BGE model works: {} dims", embedder.dim()),
-        Err(e) => println!("❌ Even BGE failed: {}", e),
+        Err(e) => println!("❌ Even BGE failed: {e}"),
     }
 }

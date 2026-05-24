@@ -1,0 +1,21 @@
+# Exclude everything by default
+*
+
+# Include only what we need for npm distribution
+!cli/
+!scripts/
+!package.json
+!README.md
+!LICENSE-MIT
+!LICENSE-APACHE
+
+# Don't include build artifacts or git stuff
+.git
+.github
+target/
+examples/
+tests/
+*.rs
+Cargo.*
+.gitignore
+.ckignore

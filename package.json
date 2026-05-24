@@ -1,0 +1,68 @@
+{
+  "name": "@beaconbay/ck-search",
+  "version": "0.7.7",
+  "description": "Semantic code search - grep that understands what you're looking for. Find code by meaning, not just keywords. Powered by AI embeddings with tree-sitter AST parsing.",
+  "license": "MIT OR Apache-2.0",
+  "author": {
+    "name": "Mike Renwick",
+    "url": "https://github.com/BeaconBay"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BeaconBay/ck.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BeaconBay/ck/issues"
+  },
+  "homepage": "https://github.com/BeaconBay/ck#readme",
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/BeaconBay"
+  },
+  "bin": {
+    "ck": "cli/ck.js"
+  },
+  "scripts": {
+    "install": "node scripts/install.js",
+    "test": "node scripts/test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": [
+    "cli/",
+    "scripts/",
+    "dist/",
+    "LICENSE-MIT",
+    "LICENSE-APACHE",
+    "README.md"
+  ],
+  "keywords": [
+    "code-search",
+    "semantic-search",
+    "search",
+    "grep",
+    "ripgrep",
+    "code",
+    "ast",
+    "tree-sitter",
+    "cli",
+    "rust",
+    "embeddings",
+    "ai",
+    "ml",
+    "vector-search",
+    "developer-tools",
+    "devtools",
+    "code-analysis",
+    "refactoring",
+    "mcp",
+    "claude"
+  ],
+  "dependencies": {
+    "tar": "^7.5.15"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

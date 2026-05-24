@@ -85,7 +85,7 @@ impl MixedbreadEmbedder {
 
         let seq_len = encodings
             .iter()
-            .map(|encoding| encoding.len())
+            .map(tokenizers::Encoding::len)
             .max()
             .unwrap_or(1)
             .min(self.max_length)
@@ -262,7 +262,7 @@ impl MixedbreadReranker {
 
         let seq_len = encodings
             .iter()
-            .map(|encoding| encoding.len())
+            .map(tokenizers::Encoding::len)
             .max()
             .unwrap_or(1)
             .min(self.max_length)

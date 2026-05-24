@@ -37,10 +37,10 @@ fn run_example() {
     ];
 
     for (name, model) in models {
-        println!("✓ {} - Available", name);
+        println!("✓ {name} - Available");
 
         // Try to get model info without downloading
-        println!("  Model enum variant: {:?}", model);
+        println!("  Model enum variant: {model:?}");
     }
 
     println!("\nNote: This just shows the models defined in the enum.");

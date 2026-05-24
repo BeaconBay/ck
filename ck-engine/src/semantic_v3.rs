@@ -209,7 +209,7 @@ pub async fn semantic_search_v3_with_progress(
         match ck_embed::create_reranker_for_config(&rerank_config, None) {
             Ok(mut reranker) => {
                 if let Some(ref callback) = progress_callback {
-                    callback(&format!("Reranking results with model {}", rerank_alias));
+                    callback(&format!("Reranking results with model {rerank_alias}"));
                 }
 
                 let documents: Vec<String> = results.iter().map(|r| r.preview.clone()).collect();

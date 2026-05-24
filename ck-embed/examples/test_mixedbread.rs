@@ -28,14 +28,14 @@ fn run_example() {
     let registry = ModelRegistry::default();
     match registry.resolve(Some("mxbai-xsmall")) {
         Ok((alias, config)) => {
-            println!("   ✅ Resolved alias: '{}'", alias);
+            println!("   ✅ Resolved alias: '{alias}'");
             println!("      Model name: {}", config.name);
             println!("      Provider: {}", config.provider);
             println!("      Dimensions: {}", config.dimensions);
             println!("      Max tokens: {}", config.max_tokens);
         }
         Err(e) => {
-            println!("   ❌ Failed to resolve alias: {}", e);
+            println!("   ❌ Failed to resolve alias: {e}");
             return;
         }
     }
@@ -85,10 +85,7 @@ fn run_example() {
                     // Check normalization (L2 norm should be ~1.0)
                     for (i, emb) in embeddings.iter().enumerate() {
                         let norm: f32 = emb.iter().map(|x| x * x).sum::<f32>().sqrt();
-                        println!(
-                            "      Embedding {} L2 norm: {:.6} (should be ~1.0)",
-                            i, norm
-                        );
+                        println!("      Embedding {i} L2 norm: {norm:.6} (should be ~1.0)");
                         assert!(
                             (norm - 1.0).abs() < 0.01,
                             "Embeddings should be L2-normalized"
@@ -96,14 +93,14 @@ fn run_example() {
                     }
                 }
                 Err(e) => {
-                    println!("   ❌ Failed to generate embeddings: {}", e);
+                    println!("   ❌ Failed to generate embeddings: {e}");
                     return;
                 }
             }
         }
         Err(e) => {
-            println!("   ❌ Failed to create Mixedbread embedder: {}", e);
-            println!("      Error details: {:?}", e);
+            println!("   ❌ Failed to create Mixedbread embedder: {e}");
+            println!("      Error details: {e:?}");
             return;
         }
     }
@@ -115,12 +112,12 @@ fn run_example() {
     let rerank_registry = RerankModelRegistry::default();
     match rerank_registry.resolve(Some("mxbai")) {
         Ok((alias, config)) => {
-            println!("   ✅ Resolved reranker alias: '{}'", alias);
+            println!("   ✅ Resolved reranker alias: '{alias}'");
             println!("      Model name: {}", config.name);
             println!("      Provider: {}", config.provider);
         }
         Err(e) => {
-            println!("   ❌ Failed to resolve reranker alias: {}", e);
+            println!("   ❌ Failed to resolve reranker alias: {e}");
             return;
         }
     }
@@ -142,7 +139,7 @@ fn run_example() {
                 "Rust provides excellent error handling mechanisms".to_string(),
                 "JavaScript async programming patterns".to_string(),
             ];
-            println!("   Query: '{}'", query);
+            println!("   Query: '{query}'");
             println!("   Reranking {} documents...", documents.len());
 
             match reranker.rerank(query, &documents) {
@@ -183,14 +180,14 @@ fn run_example() {
                     }
                 }
                 Err(e) => {
-                    println!("   ❌ Failed to rerank: {}", e);
+                    println!("   ❌ Failed to rerank: {e}");
                     return;
                 }
             }
         }
         Err(e) => {
-            println!("   ❌ Failed to create Mixedbread reranker: {}", e);
-            println!("      Error details: {:?}", e);
+            println!("   ❌ Failed to create Mixedbread reranker: {e}");
+            println!("      Error details: {e:?}");
             return;
         }
     }

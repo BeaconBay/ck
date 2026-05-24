@@ -13,8 +13,8 @@ fn estimate_tokens(text: &str) -> usize {
 
 #[allow(dead_code)]
 fn test_file(path: &str, language: Language) {
-    println!("=== Testing {} ===", path);
-    let code = std::fs::read_to_string(path).unwrap_or_else(|_| panic!("Failed to read {}", path));
+    println!("=== Testing {path} ===");
+    let code = std::fs::read_to_string(path).unwrap_or_else(|_| panic!("Failed to read {path}"));
 
     println!("File length: {} characters", code.len());
     println!("Estimated tokens: {}", estimate_tokens(&code));
@@ -44,7 +44,7 @@ fn test_file(path: &str, language: Language) {
         // Show first few lines of the chunk
         let lines: Vec<&str> = chunk.text.lines().take(3).collect();
         for line in lines {
-            println!("  {}", line);
+            println!("  {line}");
         }
         if chunk.text.lines().count() > 3 {
             println!("  ...");
@@ -110,7 +110,7 @@ fn test_striding() {
         );
 
         if token_estimate > config.max_tokens {
-            println!("  ⚠️  Still exceeds limit! ({})", token_estimate);
+            println!("  ⚠️  Still exceeds limit! ({token_estimate})");
         } else {
             println!("  ✅ Within limit");
         }

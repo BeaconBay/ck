@@ -117,7 +117,7 @@ impl std::fmt::Display for Language {
             Language::Markdown => "markdown",
             Language::Pdf => "pdf",
         };
-        write!(f, "{}", name)
+        write!(f, "{name}")
     }
 }
 
@@ -358,7 +358,7 @@ impl JsonlSearchResult {
         Self {
             path: result.file.to_string_lossy().to_string(),
             span: result.span.clone(),
-            language: result.lang.as_ref().map(|l| l.to_string()),
+            language: result.lang.as_ref().map(std::string::ToString::to_string),
             snippet: if include_snippet {
                 Some(result.preview.clone())
             } else {
@@ -454,7 +454,7 @@ pub fn get_default_exclude_patterns() -> Vec<String> {
 
 /// Get default .ckignore file content
 pub fn get_default_ckignore_content() -> &'static str {
-    r#"# .ckignore - Default patterns for ck semantic search
+    r"# .ckignore - Default patterns for ck semantic search
 # Created automatically during first index
 # Syntax: same as .gitignore (glob patterns, ! for negation)
 
@@ -519,7 +519,7 @@ pub fn get_default_ckignore_content() -> &'static str {
 *.yml
 
 # Add your custom patterns below this line
-"#
+"
 }
 
 /// Read and parse .ckignore file, returning patterns
@@ -534,9 +534,9 @@ pub fn read_ckignore_patterns(repo_root: &Path) -> Result<Vec<String>> {
 
     let patterns: Vec<String> = content
         .lines()
-        .map(|line| line.trim())
+        .map(str::trim)
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .map(|line| line.to_string())
+        .map(std::string::ToString::to_string)
         .collect();
 
     Ok(patterns)
@@ -1353,14 +1353,14 @@ mod tests {
         let ckignore_path = test_path.join(".ckignore");
         fs::write(
             &ckignore_path,
-            r#"# Comment line
+            r"# Comment line
 *.png
 *.jpg
 
 # Another comment
 *.json
 *.yaml
-"#,
+",
         )
         .unwrap();
 
@@ -1383,14 +1383,14 @@ mod tests {
         let ckignore_path = test_path.join(".ckignore");
         fs::write(
             &ckignore_path,
-            r#"
+            r"
 *.png
 
 *.jpg
 
 
 *.json
-"#,
+",
         )
         .unwrap();
 

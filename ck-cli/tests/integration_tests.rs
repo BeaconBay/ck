@@ -137,7 +137,7 @@ fn read_manifest_updated(dir: &Path) -> u64 {
     let manifest: serde_json::Value = serde_json::from_slice(&data).expect("valid json");
     manifest
         .get("updated")
-        .and_then(|v| v.as_u64())
+        .and_then(serde_json::Value::as_u64)
         .expect("updated timestamp")
 }
 
@@ -365,7 +365,7 @@ fn test_topk_limit() {
     // Create multiple files with matches
     for i in 1..=10 {
         fs::write(
-            temp_dir.path().join(format!("file{}.txt", i)),
+            temp_dir.path().join(format!("file{i}.txt")),
             "match content",
         )
         .unwrap();
@@ -756,9 +756,7 @@ fn test_add_single_file_to_index() {
     // Check for success message in either stdout or stderr
     assert!(
         stdout.contains("Added") || stderr.contains("Added"),
-        "Expected 'Added' in output, got stdout: {}, stderr: {}",
-        stdout,
-        stderr
+        "Expected 'Added' in output, got stdout: {stdout}, stderr: {stderr}"
     );
 
     // Verify the file was actually added by searching for it
@@ -857,8 +855,7 @@ fn test_no_ckignore_flag_disables_hierarchical_ignore() {
     // With --no-ckignore, should find .tmp files
     assert!(
         stdout.contains("ignored.tmp") || stdout.contains("also_ignored.tmp"),
-        "Should find .tmp files when --no-ckignore is used. Output: {}",
-        stdout
+        "Should find .tmp files when --no-ckignore is used. Output: {stdout}"
     );
 
     // Test WITHOUT --no-ckignore flag (default behavior) - .tmp files should be EXCLUDED
@@ -874,8 +871,7 @@ fn test_no_ckignore_flag_disables_hierarchical_ignore() {
     // Without --no-ckignore (default), should NOT find .tmp files
     assert!(
         !stdout.contains("ignored.tmp") && !stdout.contains("also_ignored.tmp"),
-        "Should NOT find .tmp files when .ckignore is active (default). Output: {}",
-        stdout
+        "Should NOT find .tmp files when .ckignore is active (default). Output: {stdout}"
     );
 
     // Should still find .txt files
@@ -899,10 +895,10 @@ fn test_mixedbread_index_and_search() {
     // Create test files with semantic content
     fs::write(
         temp_dir.path().join("rust_error.rs"),
-        r#"fn handle_error() -> Result<String, String> {
+        r"fn handle_error() -> Result<String, String> {
     let result = risky_operation()?;
     Ok(result)
-}"#,
+}",
     )
     .unwrap();
     fs::write(
@@ -946,13 +942,12 @@ fn test_mixedbread_index_and_search() {
         .expect("embedding_model should be set");
     assert!(
         embedding_model.contains("mxbai-embed-xsmall-v1"),
-        "Manifest should record Mixedbread model, got: {}",
-        embedding_model
+        "Manifest should record Mixedbread model, got: {embedding_model}"
     );
 
     let embedding_dimensions = manifest
         .get("embedding_dimensions")
-        .and_then(|v| v.as_u64())
+        .and_then(serde_json::Value::as_u64)
         .expect("embedding_dimensions should be set");
     assert_eq!(
         embedding_dimensions, 384,

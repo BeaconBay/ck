@@ -482,10 +482,9 @@ async fn run_index_workflow(
     let (chunk_tokens, overlap_tokens) =
         ck_chunk::get_model_chunk_config(Some(model_config.name.as_str()));
 
-    status.info(&format!("📏 FastEmbed Config: {} token limit", max_tokens));
+    status.info(&format!("📏 FastEmbed Config: {max_tokens} token limit"));
     status.info(&format!(
-        "📄 Chunk Config: {} tokens target, {} token overlap (~20%)",
-        chunk_tokens, overlap_tokens
+        "📄 Chunk Config: {chunk_tokens} tokens target, {overlap_tokens} token overlap (~20%)"
     ));
 
     // Create .ckignore file if it doesn't exist
@@ -549,7 +548,7 @@ async fn run_index_workflow(
 
         let progress_callback = Some(Box::new(move |file_name: &str| {
             let short_name = file_name.split('/').next_back().unwrap_or(file_name);
-            overall_pb_clone.set_message(format!("Processing {}", short_name));
+            overall_pb_clone.set_message(format!("Processing {short_name}"));
             overall_pb_clone.inc(1);
         }) as ck_index::ProgressCallback);
 
@@ -695,7 +694,7 @@ async fn dump_file_chunks(file_path: &PathBuf) -> Result<()> {
 
     // Use the shared live chunking function
     let (lines, chunk_metas) = ck_tui::chunk_file_live(path).map_err(|err| {
-        eprintln!("Error: {}", err);
+        eprintln!("Error: {err}");
         std::process::exit(1);
     })?;
 
@@ -713,7 +712,7 @@ async fn dump_file_chunks(file_path: &PathBuf) -> Result<()> {
     // Print header
     println!("File: {}", file_path.display());
     if let Some(lang) = ck_core::Language::from_path(path) {
-        println!("Language: {}", lang);
+        println!("Language: {lang}");
     }
     println!("Chunks: {}", chunk_metas.len());
 
@@ -722,7 +721,7 @@ async fn dump_file_chunks(file_path: &PathBuf) -> Result<()> {
         .iter()
         .filter(|c| c.chunk_type.as_deref() == Some("text"))
         .count();
-    println!("  - Text chunks: {}", text_chunk_count);
+    println!("  - Text chunks: {text_chunk_count}");
     println!(
         "  - Structural chunks: {}",
         chunk_metas.len() - text_chunk_count
@@ -869,13 +868,13 @@ async fn inspect_file_metadata(file_path: &PathBuf, status: &StatusReporter) -> 
 #[tokio::main]
 async fn main() {
     if let Err(e) = run_main().await {
-        eprintln!("DETAILED ERROR: {:#}", e);
+        eprintln!("DETAILED ERROR: {e:#}");
         eprintln!("DEBUG: Error occurred in main");
 
         // Print the error chain for better debugging
         let mut source = e.source();
         while let Some(err) = source {
-            eprintln!("CAUSED BY: {}", err);
+            eprintln!("CAUSED BY: {err}");
             source = err.source();
         }
 
@@ -979,8 +978,7 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
 
                 status.success("No rebuild required; index already on requested model");
                 status.info(&format!(
-                    "Use '--switch-model {} --force' to rebuild anyway",
-                    model_name
+                    "Use '--switch-model {model_name} --force' to rebuild anyway"
                 ));
                 return Ok(());
             }
@@ -1206,11 +1204,10 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
                     .unwrap_or(0);
 
                 if alias == model_name {
-                    status.info(&format!("  Model: {} ({} dims)", model_name, dims));
+                    status.info(&format!("  Model: {model_name} ({dims} dims)"));
                 } else {
                     status.info(&format!(
-                        "  Model: {} (alias '{}', {} dims)",
-                        model_name, alias, dims
+                        "  Model: {model_name} (alias '{alias}', {dims} dims)"
                     ));
                 }
             }
@@ -1218,8 +1215,8 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
             if verbose {
                 let size_mb = stats.total_size_bytes as f64 / (1024.0 * 1024.0);
                 let index_size_mb = stats.index_size_bytes as f64 / (1024.0 * 1024.0);
-                status.info(&format!("  Source size: {:.1} MB", size_mb));
-                status.info(&format!("  Index size: {:.1} MB", index_size_mb));
+                status.info(&format!("  Source size: {size_mb:.1} MB"));
+                status.info(&format!("  Index size: {index_size_mb:.1} MB"));
 
                 use std::time::UNIX_EPOCH;
                 if stats.index_created > 0
@@ -1533,7 +1530,7 @@ fn highlight_regex_matches(text: &str, pattern: &str, options: &SearchOptions) -
         }
         Err(e) => {
             // Surface regex compilation error to user
-            eprintln!("Warning: Invalid regex pattern '{}': {}", pattern, e);
+            eprintln!("Warning: Invalid regex pattern '{pattern}': {e}");
             // Return original text without highlighting
             text.to_string()
         }
@@ -1606,11 +1603,8 @@ async fn run_search(
             .map_or("unlimited".to_string(), |k| k.to_string());
         let threshold_info = options
             .threshold
-            .map_or("none".to_string(), |t| format!("{:.1}", t));
-        eprintln!(
-            "ℹ Semantic search: top {} results, threshold ≥{}",
-            topk_info, threshold_info
-        );
+            .map_or("none".to_string(), |t| format!("{t:.1}"));
+        eprintln!("ℹ Semantic search: top {topk_info} results, threshold ≥{threshold_info}");
 
         let resolved_model =
             ck_engine::resolve_model_for_path(&options.path, options.embedding_model.as_deref())?;
@@ -1634,10 +1628,9 @@ async fn run_search(
         let (chunk_tokens, overlap_tokens) =
             ck_chunk::get_model_chunk_config(Some(resolved_model.canonical_name()));
 
-        eprintln!("📏 FastEmbed Config: {} token limit", max_tokens);
+        eprintln!("📏 FastEmbed Config: {max_tokens} token limit");
         eprintln!(
-            "📄 Chunk Config: {} tokens target, {} token overlap (~20%)",
-            chunk_tokens, overlap_tokens
+            "📄 Chunk Config: {chunk_tokens} tokens target, {overlap_tokens} token overlap (~20%)"
         );
     }
 
@@ -1685,7 +1678,7 @@ async fn run_search(
         // Basic progress callback for file-level updates
         let indexing_progress_callback = Some(Box::new(move |file_name: &str| {
             let short_name = file_name.split('/').next_back().unwrap_or(file_name);
-            overall_pb_clone.set_message(format!("Processing {}", short_name));
+            overall_pb_clone.set_message(format!("Processing {short_name}"));
             overall_pb_clone.inc(1);
         }) as ck_engine::IndexingProgressCallback);
 
@@ -1824,7 +1817,7 @@ async fn run_search(
                 );
             } else {
                 // No filename or line number
-                println!("{}{}", score_text, highlighted_preview);
+                println!("{score_text}{highlighted_preview}");
             }
         }
     }

@@ -35,3 +35,8 @@ docs-site/.vitepress/.temp
 # Claude Code local settings
 .claude/
 docs/tasks
+
+# npm distribution (root) — produced by scripts/install.js
+dist/
+node_modules/
+package-lock.json

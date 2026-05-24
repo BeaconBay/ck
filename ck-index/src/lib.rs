@@ -100,7 +100,7 @@ fn build_overrides(
         if pattern.starts_with('!') {
             builder.add(pattern)?;
         } else {
-            builder.add(&format!("!{}", pattern))?;
+            builder.add(&format!("!{pattern}"))?;
         }
     }
 
@@ -182,7 +182,7 @@ fn should_include_file(entry: &ignore::DirEntry, index_dir: &Path) -> bool {
 /// Apply common filtering to a WalkBuilder iterator
 fn filter_and_collect_files(walker: ignore::Walk, index_dir: &Path) -> Vec<PathBuf> {
     walker
-        .filter_map(|entry| entry.ok())
+        .filter_map(std::result::Result::ok)
         .filter(|entry| should_include_file(entry, index_dir))
         .map(|entry| entry.path().to_path_buf())
         .collect()
@@ -897,10 +897,7 @@ pub async fn smart_update_index_with_detailed_progress(
         for file_path in files_to_update.iter() {
             // Check for interrupt
             if INTERRUPTED.load(Ordering::SeqCst) {
-                eprintln!(
-                    "Indexing interrupted. {} files processed.",
-                    _processed_count
-                );
+                eprintln!("Indexing interrupted. {_processed_count} files processed.");
                 break;
             }
 
@@ -1014,10 +1011,7 @@ pub async fn smart_update_index_with_detailed_progress(
         while let Ok((file_path, entry)) = rx.recv() {
             // Check for interrupt
             if INTERRUPTED.load(Ordering::SeqCst) {
-                eprintln!(
-                    "Indexing interrupted. {} files processed.",
-                    _processed_count
-                );
+                eprintln!("Indexing interrupted. {_processed_count} files processed.");
                 drop(rx); // Drop receiver to signal worker to stop
                 break;
             }
@@ -1207,9 +1201,7 @@ fn index_single_file_with_progress(
                         let embeddings = embedder.embed(std::slice::from_ref(&chunk.text))?;
                         embeddings.into_iter().next().ok_or_else(|| {
                             anyhow::anyhow!(
-                                "Embedder returned empty results for chunk {} in file {:?}. This may indicate an issue with the embedding model or chunk content.",
-                                chunk_index,
-                                file_path
+                                "Embedder returned empty results for chunk {chunk_index} in file {file_path:?}. This may indicate an issue with the embedding model or chunk content."
                             )
                         })?
                     }
@@ -1219,9 +1211,7 @@ fn index_single_file_with_progress(
                     let embeddings = embedder.embed(std::slice::from_ref(&chunk.text))?;
                     embeddings.into_iter().next().ok_or_else(|| {
                         anyhow::anyhow!(
-                            "Embedder returned empty results for chunk {} in file {:?}. This may indicate an issue with the embedding model or chunk content.",
-                            chunk_index,
-                            file_path
+                            "Embedder returned empty results for chunk {chunk_index} in file {file_path:?}. This may indicate an issue with the embedding model or chunk content."
                         )
                     })?
                 };
@@ -2064,8 +2054,7 @@ mod tests {
         assert_eq!(
             files.len(),
             1,
-            "With respect_gitignore=true, .git/info/exclude should hide files, found: {:?}",
-            files
+            "With respect_gitignore=true, .git/info/exclude should hide files, found: {files:?}"
         );
 
         // With respect_gitignore=false, .git/info/exclude should be ignored
@@ -2078,8 +2067,7 @@ mod tests {
         assert_eq!(
             files.len(),
             2,
-            "With respect_gitignore=false, .git/info/exclude should be ignored, found: {:?}",
-            files
+            "With respect_gitignore=false, .git/info/exclude should be ignored, found: {files:?}"
         );
     }
 
