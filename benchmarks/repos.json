@@ -1,0 +1,439 @@
+[
+  {
+    "name": "aiohttp",
+    "language": "python",
+    "url": "https://github.com/aio-libs/aiohttp.git",
+    "revision": "fc67cfdfd7d4bbf53ef76515fae69726626fe256",
+    "benchmark_root": "aiohttp"
+  },
+  {
+    "name": "fastapi",
+    "language": "python",
+    "url": "https://github.com/fastapi/fastapi.git",
+    "revision": "c3c9dd6b1a08bcda766e7b43eafe72c4c5e9e193",
+    "benchmark_root": "fastapi"
+  },
+  {
+    "name": "flask",
+    "language": "python",
+    "url": "https://github.com/pallets/flask.git",
+    "revision": "258d68b6ff5e2244386540f48b48bab90d6ab827",
+    "benchmark_root": "src/flask"
+  },
+  {
+    "name": "httpx",
+    "language": "python",
+    "url": "https://github.com/encode/httpx.git",
+    "revision": "b5addb64f0161ff6bfe94c124ef76f6a1fba5254",
+    "benchmark_root": "httpx"
+  },
+  {
+    "name": "model2vec",
+    "language": "python",
+    "url": "https://github.com/MinishLab/model2vec.git",
+    "revision": "b3012ee04e41c634383a5d735cb3c7c51e806a18",
+    "benchmark_root": "model2vec"
+  },
+  {
+    "name": "pydantic",
+    "language": "python",
+    "url": "https://github.com/pydantic/pydantic.git",
+    "revision": "82c15f0ba8a9f8d8d6ba595df73ad20e2ee2eccf",
+    "benchmark_root": "pydantic"
+  },
+  {
+    "name": "requests",
+    "language": "python",
+    "url": "https://github.com/psf/requests.git",
+    "revision": "ef439eb779c1eba7cbdeeeb302b11e1e061b4b7d",
+    "benchmark_root": "src/requests"
+  },
+  {
+    "name": "starlette",
+    "language": "python",
+    "url": "https://github.com/encode/starlette.git",
+    "revision": "1894d0d89badf43bc8bfe03ed221a8b2e100b2ab",
+    "benchmark_root": "starlette"
+  },
+  {
+    "name": "axios",
+    "language": "javascript",
+    "url": "https://github.com/axios/axios.git",
+    "revision": "c7a76ddbf277db864ee6cfb4ef17b8a08ffbe3f5",
+    "benchmark_root": "lib"
+  },
+  {
+    "name": "express",
+    "language": "javascript",
+    "url": "https://github.com/expressjs/express.git",
+    "revision": "8e022edc9185f540a3fcecaf5e56b850d919cdac",
+    "benchmark_root": "lib"
+  },
+  {
+    "name": "redux",
+    "language": "javascript",
+    "url": "https://github.com/reduxjs/redux.git",
+    "revision": "aaa04ae8402ba2caba55a9c75bfa8d3df6c78f8c",
+    "benchmark_root": "src"
+  },
+  {
+    "name": "gin",
+    "language": "go",
+    "url": "https://github.com/gin-gonic/gin.git",
+    "revision": "d3ffc9985281dcf4d3bef604cce4e662b1a327a6"
+  },
+  {
+    "name": "cobra",
+    "language": "go",
+    "url": "https://github.com/spf13/cobra.git",
+    "revision": "61968e893eee2f27696c2fbc8e34fa5c4afaf7c4"
+  },
+  {
+    "name": "chi",
+    "language": "go",
+    "url": "https://github.com/go-chi/chi.git",
+    "revision": "a54874f0e2f12647a19e82ee70dfa8185014100c"
+  },
+  {
+    "name": "gson",
+    "language": "java",
+    "url": "https://github.com/google/gson.git",
+    "revision": "f4d371d29c04066dbe7fdb31f642831f9c7f40cd",
+    "benchmark_root": "gson"
+  },
+  {
+    "name": "commons-lang",
+    "language": "java",
+    "url": "https://github.com/apache/commons-lang.git",
+    "revision": "0ba92dc402312a38252a3398931ffbfbb4a88f7d",
+    "benchmark_root": "src/main/java/org/apache/commons/lang3"
+  },
+  {
+    "name": "jackson-databind",
+    "language": "java",
+    "url": "https://github.com/FasterXML/jackson-databind.git",
+    "revision": "e30139539416f69f1d7ae31c7e1d6da5b25bf362",
+    "benchmark_root": "src/main/java/tools/jackson/databind"
+  },
+  {
+    "name": "guzzle",
+    "language": "php",
+    "url": "https://github.com/guzzle/guzzle.git",
+    "revision": "fb92d95f80a9da51bf8f2a5b26d8e8ea3b6d99ed",
+    "benchmark_root": "src"
+  },
+  {
+    "name": "monolog",
+    "language": "php",
+    "url": "https://github.com/Seldaek/monolog.git",
+    "revision": "68b974809baff3f071893de61447212e9e688ee7",
+    "benchmark_root": "src/Monolog"
+  },
+  {
+    "name": "laravel-framework",
+    "language": "php",
+    "url": "https://github.com/laravel/framework.git",
+    "revision": "0dcc8d2ba7f41bc8376a08e9ccd5d7b83e6a6d90",
+    "benchmark_root": "src/Illuminate"
+  },
+  {
+    "name": "sinatra",
+    "language": "ruby",
+    "url": "https://github.com/sinatra/sinatra.git",
+    "revision": "f891dd2b6f4911e356600efe6c3b82af97d262c6",
+    "benchmark_root": "lib"
+  },
+  {
+    "name": "rack",
+    "language": "ruby",
+    "url": "https://github.com/rack/rack.git",
+    "revision": "ca8a404704ed043797c4f9d482c97d722c0dc719",
+    "benchmark_root": "lib/rack"
+  },
+  {
+    "name": "rails",
+    "language": "ruby",
+    "url": "https://github.com/rails/rails.git",
+    "revision": "75f9e28379ac7418b82fa950cfa81f6147275308",
+    "benchmark_root": "railties/lib/rails"
+  },
+  {
+    "name": "tokio",
+    "language": "rust",
+    "url": "https://github.com/tokio-rs/tokio.git",
+    "revision": "5db10f538b683fe88d699dfd11be31d193db011c",
+    "benchmark_root": "tokio/src"
+  },
+  {
+    "name": "trpc",
+    "language": "typescript",
+    "url": "https://github.com/trpc/trpc.git",
+    "revision": "c188dab0822caf3615199e4ac95147bc7560d26f",
+    "benchmark_root": "packages/server/src"
+  },
+  {
+    "name": "messagepack-csharp",
+    "language": "csharp",
+    "url": "https://github.com/neuecc/MessagePack-CSharp.git",
+    "revision": "84db9f79e3ecc5f4e8b7c7f77cd15d7745f5f2a7",
+    "benchmark_root": "src/MessagePack"
+  },
+  {
+    "name": "ktor",
+    "language": "kotlin",
+    "url": "https://github.com/ktorio/ktor.git",
+    "revision": "5913745a96101e8c78e47565e52d2baa8414441f",
+    "benchmark_root": "ktor-client/ktor-client-core/common/src"
+  },
+  {
+    "name": "cats",
+    "language": "scala",
+    "url": "https://github.com/typelevel/cats.git",
+    "revision": "2102251a2f24a6ee14e087fc5da7768d267f2d6e",
+    "benchmark_root": "core/src/main/scala"
+  },
+  {
+    "name": "alamofire",
+    "language": "swift",
+    "url": "https://github.com/Alamofire/Alamofire.git",
+    "revision": "e938f8c66708e7352fc7e3512647fa54255b267a",
+    "benchmark_root": "Source"
+  },
+  {
+    "name": "click",
+    "language": "python",
+    "url": "https://github.com/pallets/click.git",
+    "revision": "04ef3a6f473deb2499721a8d11f92a7d2c0912f2",
+    "benchmark_root": "src/click"
+  },
+  {
+    "name": "serde",
+    "language": "rust",
+    "url": "https://github.com/serde-rs/serde.git",
+    "revision": "fa7da4a93567ed347ad0735c28e439fca688ef26"
+  },
+  {
+    "name": "zod",
+    "language": "typescript",
+    "url": "https://github.com/colinhacks/zod.git",
+    "revision": "c7805073fef5b6b8857307c3d4b3597a70613bc2",
+    "benchmark_root": "packages/zod/src"
+  },
+  {
+    "name": "nlohmann-json",
+    "language": "cpp",
+    "url": "https://github.com/nlohmann/json.git",
+    "revision": "3946872265598aed5a7aea68cad4d9d1f168bd4b",
+    "benchmark_root": "include/nlohmann"
+  },
+  {
+    "name": "phoenix",
+    "language": "elixir",
+    "url": "https://github.com/phoenixframework/phoenix.git",
+    "revision": "c88da921ef8009e0aca8643d5334585cd35d5573",
+    "benchmark_root": "lib"
+  },
+  {
+    "name": "axum",
+    "language": "rust",
+    "url": "https://github.com/tokio-rs/axum.git",
+    "revision": "309d1bd9530eec2217134cb262760af1df42ee3b",
+    "benchmark_root": "axum/src"
+  },
+  {
+    "name": "vitest",
+    "language": "typescript",
+    "url": "https://github.com/vitest-dev/vitest.git",
+    "revision": "596f73986abe2161a9a06f0ca03df68e82690b21",
+    "benchmark_root": "packages/vitest/src"
+  },
+  {
+    "name": "newtonsoft-json",
+    "language": "csharp",
+    "url": "https://github.com/JamesNK/Newtonsoft.Json.git",
+    "revision": "4f73e74372445108d2c1bda37b36e6f5e43402e0",
+    "benchmark_root": "Src/Newtonsoft.Json"
+  },
+  {
+    "name": "dapper",
+    "language": "csharp",
+    "url": "https://github.com/DapperLib/Dapper.git",
+    "revision": "288730e69b05c32cac898d9b55ebea219ea8a2d1",
+    "benchmark_root": "Dapper"
+  },
+  {
+    "name": "kotlinx-coroutines",
+    "language": "kotlin",
+    "url": "https://github.com/Kotlin/kotlinx.coroutines.git",
+    "revision": "643c1aa554139a82f60724a59e79b801f303fdfe",
+    "benchmark_root": "kotlinx-coroutines-core/common/src"
+  },
+  {
+    "name": "exposed",
+    "language": "kotlin",
+    "url": "https://github.com/JetBrains/Exposed.git",
+    "revision": "7c80ed943b529f293b33ee7e0facdfd880cf4aec",
+    "benchmark_root": "exposed-core/src/main/kotlin"
+  },
+  {
+    "name": "circe",
+    "language": "scala",
+    "url": "https://github.com/circe/circe.git",
+    "revision": "cd16ce270257daec47f4a011163a03da5df9a630",
+    "benchmark_root": "modules/core/shared/src/main/scala"
+  },
+  {
+    "name": "http4s",
+    "language": "scala",
+    "url": "https://github.com/http4s/http4s.git",
+    "revision": "9f17a8e727d22692e637b5f01de15a222fb66092",
+    "benchmark_root": "core/shared/src/main/scala"
+  },
+  {
+    "name": "vapor",
+    "language": "swift",
+    "url": "https://github.com/vapor/vapor.git",
+    "revision": "cfd8f434843ac7850e2d97f46c1aa5ddb906cf1c",
+    "benchmark_root": "Sources/Vapor"
+  },
+  {
+    "name": "snapkit",
+    "language": "swift",
+    "url": "https://github.com/SnapKit/SnapKit.git",
+    "revision": "19f59a63f0faac287f4e59986959859d81ec851c",
+    "benchmark_root": "Sources"
+  },
+  {
+    "name": "plug",
+    "language": "elixir",
+    "url": "https://github.com/elixir-plug/plug.git",
+    "revision": "47649aa7bb910f481b66cc3e98c14b2c3b761c3c",
+    "benchmark_root": "lib/plug"
+  },
+  {
+    "name": "ecto",
+    "language": "elixir",
+    "url": "https://github.com/elixir-ecto/ecto.git",
+    "revision": "cf3a5b7219a552c24aae24bf5eef7354c1184b8a",
+    "benchmark_root": "lib/ecto"
+  },
+  {
+    "name": "abseil-cpp",
+    "language": "cpp",
+    "url": "https://github.com/abseil/abseil-cpp.git",
+    "revision": "b9536c952c6f6bbcb37a5edb4fa88ee62d27cd7e",
+    "benchmark_root": "absl"
+  },
+  {
+    "name": "fmtlib",
+    "language": "cpp",
+    "url": "https://github.com/fmtlib/fmt.git",
+    "revision": "382609a920d2c43c00f2951233bc0d578a783982",
+    "benchmark_root": "include/fmt"
+  },
+  {
+    "name": "curl",
+    "language": "c",
+    "url": "https://github.com/curl/curl.git",
+    "revision": "021a87cf81638af5317e142610ea0dd9f9fb4890",
+    "benchmark_root": "lib"
+  },
+  {
+    "name": "redis",
+    "language": "c",
+    "url": "https://github.com/redis/redis.git",
+    "revision": "47575618616b6419562356b0cfbd4b17bb443bdd",
+    "benchmark_root": "src"
+  },
+  {
+    "name": "libuv",
+    "language": "c",
+    "url": "https://github.com/libuv/libuv.git",
+    "revision": "40178b916e5937ed43c557aa051bdb3f86f6ca93",
+    "benchmark_root": "src"
+  },
+  {
+    "name": "bats-core",
+    "language": "bash",
+    "url": "https://github.com/bats-core/bats-core.git",
+    "revision": "d9faff0d7bc32e7adebc6552446f978118d3ab3b",
+    "benchmark_root": "lib"
+  },
+  {
+    "name": "aeson",
+    "language": "haskell",
+    "url": "https://github.com/haskell/aeson.git",
+    "revision": "cd59793ca2405353ecee65f25b18ad7610104914",
+    "benchmark_root": "src/Data/Aeson"
+  },
+  {
+    "name": "telescope.nvim",
+    "language": "lua",
+    "url": "https://github.com/nvim-telescope/telescope.nvim.git",
+    "revision": "471eebb1037899fd942cc0f52c012f8773505da1",
+    "benchmark_root": "lua/telescope"
+  },
+  {
+    "name": "lazy.nvim",
+    "language": "lua",
+    "url": "https://github.com/folke/lazy.nvim.git",
+    "revision": "306a05526ada86a7b30af95c5cc81ffba93fef97",
+    "benchmark_root": "lua/lazy"
+  },
+  {
+    "name": "zig",
+    "language": "zig",
+    "url": "https://github.com/ziglang/zig.git",
+    "revision": "738d2be9d6b6ef3ff3559130c05159ef53336224",
+    "benchmark_root": "lib/std"
+  },
+  {
+    "name": "nvm",
+    "language": "bash",
+    "url": "https://github.com/nvm-sh/nvm.git",
+    "revision": "d200a215594bdda07e130117c9d392fff29cba84",
+    "benchmark_root": null
+  },
+  {
+    "name": "bash-it",
+    "language": "bash",
+    "url": "https://github.com/Bash-it/bash-it.git",
+    "revision": "d281c8265f3c48b8276624d46284a3599d359a75",
+    "benchmark_root": null
+  },
+  {
+    "name": "pandoc",
+    "language": "haskell",
+    "url": "https://github.com/jgm/pandoc.git",
+    "revision": "d9838eba11ae18216f52e233dbbca735f0f97ccb",
+    "benchmark_root": "src/Text/Pandoc"
+  },
+  {
+    "name": "xmonad",
+    "language": "haskell",
+    "url": "https://github.com/xmonad/xmonad.git",
+    "revision": "59107a6c6f30d82d74449795a5c9149503f176ac",
+    "benchmark_root": "src/XMonad"
+  },
+  {
+    "name": "mini.nvim",
+    "language": "lua",
+    "url": "https://github.com/echasnovski/mini.nvim.git",
+    "revision": "29447d7b0e1fc9bc9d0384953e63be3fae816736",
+    "benchmark_root": "lua/mini"
+  },
+  {
+    "name": "zls",
+    "language": "zig",
+    "url": "https://github.com/zigtools/zls.git",
+    "revision": "295cedd8ddd040c77e6666ddab6ef6da8c0beffa",
+    "benchmark_root": "src"
+  },
+  {
+    "name": "zig-clap",
+    "language": "zig",
+    "url": "https://github.com/Hejsil/zig-clap.git",
+    "revision": "fc1e5cc3f6d9d3001112385ee6256d694e959d2f",
+    "benchmark_root": null
+  }
+]

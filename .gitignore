@@ -40,3 +40,8 @@ docs/tasks
 dist/
 node_modules/
 package-lock.json
+
+# benchmark output (results json, large to track)
+benchmarks/results/
+__pycache__/
+*.pyc
