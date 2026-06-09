@@ -1087,9 +1087,6 @@ fn test_concurrent_indexing_is_serialized() {
         .unwrap();
     }
 
-    // Note: `--index` resolves its target from the positional pattern slot,
-    // so an explicit path argument would be misparsed (see UNEXPECTED.md).
-    // Run from inside the directory instead.
     let spawn_indexer = || {
         Command::new(ck_binary())
             .arg("--index")
@@ -1173,5 +1170,55 @@ fn test_sigpipe_terminates_silently() {
         status.signal(),
         Some(libc::SIGPIPE),
         "ck should be terminated by SIGPIPE, got status {status:?}"
+    );
+}
+
+/// Command-mode flags must honor an explicit path argument: `ck --index /dir`
+/// parses the path into the positional pattern slot (these commands take no
+/// search pattern) and previously ran against the cwd instead.
+#[test]
+fn test_command_flags_honor_explicit_path() {
+    let target = TempDir::new().unwrap();
+    let elsewhere = TempDir::new().unwrap();
+    fs::write(target.path().join("a.txt"), "indexable content here").unwrap();
+
+    // --index <path> from an unrelated cwd must index <path>, not the cwd
+    let output = Command::new(ck_binary())
+        .args(["--index", target.path().to_str().unwrap()])
+        .current_dir(elsewhere.path())
+        .output()
+        .expect("Failed to run ck --index <path>");
+    assert!(
+        output.status.success(),
+        "ck --index <path> failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        target.path().join(".ck").exists(),
+        "--index must create the index at the given path"
+    );
+    assert!(
+        !elsewhere.path().join(".ck").exists(),
+        "--index must not index the cwd when a path is given"
+    );
+
+    // --status <path> must report the index at <path>
+    let output = Command::new(ck_binary())
+        .args(["--status", target.path().to_str().unwrap()])
+        .current_dir(elsewhere.path())
+        .output()
+        .expect("Failed to run ck --status <path>");
+    assert!(output.status.success());
+
+    // --clean <path> must remove the index at <path>
+    let output = Command::new(ck_binary())
+        .args(["--clean", target.path().to_str().unwrap()])
+        .current_dir(elsewhere.path())
+        .output()
+        .expect("Failed to run ck --clean <path>");
+    assert!(output.status.success());
+    assert!(
+        !target.path().join(".ck").exists(),
+        "--clean must remove the index at the given path"
     );
 }
