@@ -1125,3 +1125,53 @@ fn test_concurrent_indexing_is_serialized() {
         "manifest lost entries under concurrent indexing"
     );
 }
+
+/// Writing to a closed pipe (`ck pattern | head`) must terminate ck silently
+/// via SIGPIPE (exit status 141), matching grep — not panic with a
+/// "failed printing to stdout: Broken pipe" message.
+#[cfg(unix)]
+#[test]
+fn test_sigpipe_terminates_silently() {
+    use std::io::Read;
+    use std::os::unix::process::ExitStatusExt;
+    use std::process::Stdio;
+
+    let temp_dir = TempDir::new().unwrap();
+
+    // Enough matching output to overflow the OS pipe buffer after the read
+    // end closes (pipe buffers are typically 64KB).
+    let line = "match: the quick brown fox jumps over the lazy dog\n";
+    fs::write(temp_dir.path().join("big.txt"), line.repeat(50_000)).unwrap();
+
+    let mut child = Command::new(ck_binary())
+        .args(["match", temp_dir.path().to_str().unwrap()])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("Failed to spawn ck");
+
+    // Read a little, then close the read end like `head` does.
+    let mut stdout = child.stdout.take().unwrap();
+    let mut buf = [0u8; 4096];
+    let _ = stdout.read(&mut buf).unwrap();
+    drop(stdout);
+
+    let status = child.wait().expect("Failed to wait on ck");
+    let mut stderr_out = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut stderr_out)
+        .unwrap();
+
+    assert!(
+        !stderr_out.contains("panicked"),
+        "ck panicked on broken pipe: {stderr_out}"
+    );
+    assert_eq!(
+        status.signal(),
+        Some(libc::SIGPIPE),
+        "ck should be terminated by SIGPIPE, got status {status:?}"
+    );
+}

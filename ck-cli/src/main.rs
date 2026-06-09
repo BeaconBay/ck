@@ -865,8 +865,25 @@ async fn inspect_file_metadata(file_path: &PathBuf, status: &StatusReporter) -> 
     Ok(())
 }
 
+/// Restore SIGPIPE's default disposition so that writing to a closed pipe
+/// (e.g. `ck pattern | head`) terminates the process silently with status 141,
+/// matching grep, instead of panicking on a BrokenPipe write error. Rust's
+/// runtime ignores SIGPIPE by default, which turns EPIPE into a panic inside
+/// `println!`.
+#[cfg(unix)]
+fn reset_sigpipe() {
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+}
+
+#[cfg(not(unix))]
+fn reset_sigpipe() {}
+
 #[tokio::main]
 async fn main() {
+    reset_sigpipe();
+
     if let Err(e) = run_main().await {
         eprintln!("DETAILED ERROR: {e:#}");
         eprintln!("DEBUG: Error occurred in main");

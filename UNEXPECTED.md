@@ -41,6 +41,32 @@ This file tracks instances where ck behaves unexpectedly during testing or usage
 
 ---
 
+**Command:** `ck -i "rrf|reciprocal" ck-engine/src/lib.rs | head -8`
+**Expected:** First 8 matches, clean exit (grep behavior under SIGPIPE)
+**Actual:** Rust panic printed to stderr: `thread 'main' panicked at ... failed printing to stdout: Broken pipe (os error 32)`
+**Date:** 2026-06-09
+**Status:** Fixed (fix/sigpipe-panic — SIGPIPE default disposition restored on Unix at startup; exits 141 like grep)
+**Notes:** Piping into `head`/`less` is core grep usage. Needs SIGPIPE handling (e.g. restore default SIGPIPE disposition on Unix, or treat BrokenPipe write errors as silent success).
+
+---
+
+**Command:** MCP `index_status` on this repo
+**Expected:** Index size reflecting 1825 embedded chunks (tens of MB)
+**Actual:** `index_size_bytes: 928` — appears to report only the manifest, not the actual `.ck` directory size
+**Date:** 2026-06-09
+**Status:** Open
+
+---
+
+**Command:** MCP `semantic_search` query "where does the RRF reciprocal rank fusion merging of regex and semantic results happen"
+**Expected:** `hybrid_search_with_progress` / RRF scoring code in ck-engine/src/lib.rs (it exists, has RRF comments, and is regex-findable)
+**Actual:** Single result: a docs-site roadmap.md bullet (score 0.60). The actual implementation never surfaced; default threshold 0.6 filtered everything else. Same miss via CLI `--sem` scoped to ck-engine/ (best candidate scored 0.578, and was the wrong chunk). `--hybrid "RRF reciprocal rank fusion"` also failed to surface it in top 5.
+**Date:** 2026-06-09
+**Status:** Open
+**Notes:** Also: that first MCP search reported `search_time_ms: 1839209` (~30 min) — metric is clearly wrong, possibly accumulating indexing time or wrong unit. Subsequent search reported 887ms.
+
+---
+
 **Command:** `ck --index /some/other/dir` (from inside a different directory)
 **Expected:** Indexes `/some/other/dir` ("Create or update search index for the specified path")
 **Actual:** The path argument lands in the positional *pattern* slot, `files` stays empty, and ck indexes the **current working directory** instead. `ck --index .` only works by coincidence (the "." pattern is ignored and "." is also the default path). Likely the same root cause as the `ck --add /tmp/test.txt` entry above.

@@ -523,6 +523,7 @@ impl CkMcpServer {
         mode: &str,
         search_params: serde_json::Value,
         search_time_ms: u64,
+        index_update: Option<&ck_engine::IndexUpdate>,
     ) -> serde_json::Value {
         let results: Vec<serde_json::Value> = page.matches.iter().map(|result| {
             let match_type = format!("{mode}_match");
@@ -575,7 +576,15 @@ impl CkMcpServer {
                 "current_page": page.current_page
             },
             "metadata": {
+                // Time spent searching, excluding any automatic index update
+                // (see "indexing" for that).
                 "search_time_ms": search_time_ms,
+                "indexing": index_update.map(|u| json!({
+                    "triggered": u.did_work(),
+                    "files_indexed": u.files_indexed,
+                    "orphaned_files_removed": u.orphaned_files_removed,
+                    "duration_ms": u.duration_ms,
+                })),
                 "index_stats": null  // TODO: Add index information
             }
         })
@@ -608,7 +617,8 @@ impl CkMcpServer {
         let query = request.get_query();
         let search_params = request.get_search_params();
 
-        let structured_result = Self::search_page_to_json(page, &query, &mode, search_params, 0);
+        let structured_result =
+            Self::search_page_to_json(page, &query, &mode, search_params, 0, None);
 
         let summary = format!(
             "Retrieved page {} of {} search results for '{}'",
@@ -1101,7 +1111,7 @@ impl CkMcpServer {
         let mut indexing_progress_callback = indexing_progress_callback;
         let mut effective_mode: Option<String> = None;
         let started = Instant::now();
-        let search_results = match ck_engine::search_enhanced_with_indexing_progress(
+        let (search_results, index_update) = match ck_engine::search_enhanced_with_outcome(
             &options,
             None,
             indexing_progress_callback.take(),
@@ -1109,7 +1119,7 @@ impl CkMcpServer {
         )
         .await
         {
-            Ok(results) => results,
+            Ok(outcome) => (outcome.results, outcome.index_update),
             Err(e) => {
                 let message = e.to_string();
                 if message.contains("No embeddings found") {
@@ -1119,7 +1129,7 @@ impl CkMcpServer {
                     );
                     let mut reindex_options = options.clone();
                     reindex_options.reindex = true;
-                    match ck_engine::search_enhanced_with_indexing_progress(
+                    match ck_engine::search_enhanced_with_outcome(
                         &reindex_options,
                         None,
                         None,
@@ -1127,14 +1137,14 @@ impl CkMcpServer {
                     )
                     .await
                     {
-                        Ok(results) => results,
+                        Ok(outcome) => (outcome.results, outcome.index_update),
                         Err(retry_err) => {
                             tracing::warn!("semantic search failed after reindex: {}", retry_err);
                             // Fallback to lexical search when embeddings are unavailable
                             let mut fallback_options = options.clone();
                             fallback_options.mode = SearchMode::Lexical;
                             fallback_options.reindex = true;
-                            match ck_engine::search_enhanced_with_indexing_progress(
+                            match ck_engine::search_enhanced_with_outcome(
                                 &fallback_options,
                                 None,
                                 None,
@@ -1142,7 +1152,8 @@ impl CkMcpServer {
                             )
                             .await
                             {
-                                Ok(mut lexical_results) => {
+                                Ok(outcome) => {
+                                    let mut lexical_results = outcome.results;
                                     if let Some(limit) = top_k {
                                         lexical_results
                                             .matches
@@ -1150,7 +1161,7 @@ impl CkMcpServer {
                                     }
                                     effective_mode =
                                         Some("semantic (lexical fallback)".to_string());
-                                    lexical_results
+                                    (lexical_results, outcome.index_update)
                                 }
                                 Err(final_err) => {
                                     return Err(ErrorData::internal_error(
@@ -1167,7 +1178,8 @@ impl CkMcpServer {
                 }
             }
         };
-        let elapsed_ms = started.elapsed().as_millis() as u64;
+        let elapsed_ms = (started.elapsed().as_millis() as u64)
+            .saturating_sub(index_update.as_ref().map_or(0, |u| u.duration_ms));
 
         // Create session and get first page
         let page = self
@@ -1187,8 +1199,14 @@ impl CkMcpServer {
         });
 
         let current_page = page.current_page;
-        let mut structured_result =
-            Self::search_page_to_json(page, &query_clone, "semantic", search_params, elapsed_ms);
+        let mut structured_result = Self::search_page_to_json(
+            page,
+            &query_clone,
+            "semantic",
+            search_params,
+            elapsed_ms,
+            index_update.as_ref(),
+        );
 
         if let Some(ref note) = effective_mode
             && let Some(metadata) = structured_result.get_mut("metadata")
@@ -1296,14 +1314,13 @@ impl CkMcpServer {
         };
 
         let started = Instant::now();
-        let search_results =
-            match ck_engine::search_enhanced_with_indexing_progress(&options, None, None, None)
-                .await
-            {
-                Ok(results) => results,
+        let (search_results, index_update) =
+            match ck_engine::search_enhanced_with_outcome(&options, None, None, None).await {
+                Ok(outcome) => (outcome.results, outcome.index_update),
                 Err(e) => return Err(ErrorData::internal_error(e.to_string(), None)),
             };
-        let elapsed_ms = started.elapsed().as_millis() as u64;
+        let elapsed_ms = (started.elapsed().as_millis() as u64)
+            .saturating_sub(index_update.as_ref().map_or(0, |u| u.duration_ms));
 
         let page = self
             .context
@@ -1322,8 +1339,14 @@ impl CkMcpServer {
         });
 
         let current_page = page.current_page;
-        let structured_result =
-            Self::search_page_to_json(page, &query_clone, "lexical", search_params, elapsed_ms);
+        let structured_result = Self::search_page_to_json(
+            page,
+            &query_clone,
+            "lexical",
+            search_params,
+            elapsed_ms,
+            index_update.as_ref(),
+        );
 
         let summary = format!(
             "Lexical search for '{}' found {} matches in {} (top_k: {}, threshold: {}) - Page {}",
@@ -1454,8 +1477,14 @@ impl CkMcpServer {
             "context_lines": context.unwrap_or(0)
         });
 
-        let structured_result =
-            Self::search_page_to_json(page, &pattern_clone, "regex", search_params, elapsed_ms);
+        let structured_result = Self::search_page_to_json(
+            page,
+            &pattern_clone,
+            "regex",
+            search_params,
+            elapsed_ms,
+            None, // regex mode never touches the index
+        );
 
         let summary = format!(
             "Regex search for pattern '{}' found {} matches in {} (case_sensitive: {}, context: {} lines) - Page 1",
@@ -1553,17 +1582,18 @@ impl CkMcpServer {
 
         // Perform the search (suppress progress callbacks for MCP)
         let started = Instant::now();
-        let search_results = match ck_engine::search_enhanced_with_indexing_progress(
+        let (search_results, index_update) = match ck_engine::search_enhanced_with_outcome(
             &options, None, // No search progress callback for MCP
             None, // No indexing progress callback for MCP
             None, // No detailed indexing progress callback for MCP
         )
         .await
         {
-            Ok(results) => results,
+            Ok(outcome) => (outcome.results, outcome.index_update),
             Err(e) => return Err(ErrorData::internal_error(e.to_string(), None)),
         };
-        let elapsed_ms = started.elapsed().as_millis() as u64;
+        let elapsed_ms = (started.elapsed().as_millis() as u64)
+            .saturating_sub(index_update.as_ref().map_or(0, |u| u.duration_ms));
 
         // Create session and get first page
         let page = self
@@ -1583,8 +1613,14 @@ impl CkMcpServer {
         });
 
         let current_page = page.current_page;
-        let structured_result =
-            Self::search_page_to_json(page, &query_clone, "hybrid", search_params, elapsed_ms);
+        let structured_result = Self::search_page_to_json(
+            page,
+            &query_clone,
+            "hybrid",
+            search_params,
+            elapsed_ms,
+            index_update.as_ref(),
+        );
 
         let summary = format!(
             "Hybrid search for '{}' found {} matches in {} (threshold: {:.3}, top_k: {}, combines semantic + regex) - Page {}",
@@ -1599,7 +1635,7 @@ impl CkMcpServer {
         Ok((summary, structured_result))
     }
 
-    async fn handle_index_status(
+    pub async fn handle_index_status(
         &self,
         request: IndexStatusRequest,
         _meta: Option<Meta>,
@@ -1624,9 +1660,7 @@ impl CkMcpServer {
         });
 
         if index_exists {
-            // Try to get more detailed information about the index
             if let Ok(metadata) = std::fs::metadata(&index_path) {
-                index_info["index_size_bytes"] = json!(metadata.len());
                 index_info["last_modified"] = json!(
                     metadata
                         .modified()
@@ -1639,16 +1673,34 @@ impl CkMcpServer {
             }
 
             // Get detailed index statistics using ck_index with caching
-            if let Some(cached_stats) = self.context.stats_cache.get(&path_buf).await {
-                index_info["total_files"] = json!(cached_stats.file_count);
-                index_info["total_chunks"] = json!(cached_stats.chunk_count);
+            let index_stats = if let Some(cached) = self.context.stats_cache.get(&path_buf).await {
                 index_info["cache_hit"] = json!(true);
-            } else if let Ok(index_stats) = ck_index::get_index_stats(&path_buf) {
-                index_info["total_files"] = json!(index_stats.total_files);
-                index_info["total_chunks"] = json!(index_stats.total_chunks);
-                index_info["embedded_chunks"] = json!(index_stats.embedded_chunks);
-                index_info["total_size_bytes"] = json!(index_stats.total_size_bytes);
+                Some(cached)
+            } else if let Ok(fresh) = ck_index::get_index_stats(&path_buf) {
                 index_info["cache_hit"] = json!(false);
+                self.context
+                    .stats_cache
+                    .update(path_buf.clone(), fresh.clone())
+                    .await;
+                Some(fresh)
+            } else {
+                None
+            };
+
+            if let Some(stats) = index_stats {
+                index_info["total_files"] = json!(stats.total_files);
+                index_info["total_chunks"] = json!(stats.total_chunks);
+                index_info["embedded_chunks"] = json!(stats.embedded_chunks);
+                // Chunks indexed but not yet embedded (e.g. index built without
+                // embeddings, or interrupted embedding pass). Semantic search
+                // only sees embedded chunks.
+                index_info["chunks_pending_embedding"] =
+                    json!(stats.total_chunks.saturating_sub(stats.embedded_chunks));
+                // Combined size of the indexed source files
+                index_info["total_size_bytes"] = json!(stats.total_size_bytes);
+                // On-disk size of the .ck directory itself (sidecars, manifest,
+                // caches) — previously misreported as the directory entry size
+                index_info["index_size_bytes"] = json!(stats.index_size_bytes);
 
                 // Add model information if available
                 let manifest_path = path_buf.join(".ck").join("manifest.json");
@@ -1680,19 +1732,6 @@ impl CkMcpServer {
                         "dimensions": dims,
                     });
                 }
-
-                // Update cache with fresh stats
-                let cache_stats = crate::mcp::cache::IndexStats {
-                    file_count: index_stats.total_files,
-                    chunk_count: index_stats.total_chunks,
-                    model_name: "unknown".to_string(), // TODO: Get from manifest
-                    last_updated: std::time::SystemTime::now(),
-                    is_valid: true,
-                };
-                self.context
-                    .stats_cache
-                    .update(path_buf.clone(), cache_stats)
-                    .await;
             } else {
                 // Fallback: Count files in directory for estimation
                 let file_count = WalkDir::new(&path_buf)
