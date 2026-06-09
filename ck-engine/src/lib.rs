@@ -322,12 +322,55 @@ pub async fn search_enhanced_with_progress(
 }
 
 /// Enhanced search with both search and indexing progress callbacks
+/// Summary of index maintenance performed automatically before a search.
+#[derive(Debug, Clone, Default)]
+pub struct IndexUpdate {
+    pub files_indexed: usize,
+    pub orphaned_files_removed: usize,
+    /// Wall-clock time spent checking and updating the index, in milliseconds.
+    /// This covers the staleness check even when no files needed work.
+    pub duration_ms: u64,
+}
+
+impl IndexUpdate {
+    /// True when the index actually changed (files re-indexed or removed),
+    /// as opposed to a no-op staleness check.
+    pub fn did_work(&self) -> bool {
+        self.files_indexed > 0 || self.orphaned_files_removed > 0
+    }
+}
+
+/// Search results plus what auto-indexing did to produce them, so callers can
+/// report search latency separately from index-build latency.
+#[derive(Debug)]
+pub struct SearchOutcome {
+    pub results: ck_core::SearchResults,
+    /// `None` for regex mode (which never touches the index).
+    pub index_update: Option<IndexUpdate>,
+}
+
 pub async fn search_enhanced_with_indexing_progress(
     options: &SearchOptions,
     progress_callback: Option<SearchProgressCallback>,
     indexing_progress_callback: Option<IndexingProgressCallback>,
     detailed_indexing_progress_callback: Option<DetailedIndexingProgressCallback>,
 ) -> Result<ck_core::SearchResults> {
+    let outcome = search_enhanced_with_outcome(
+        options,
+        progress_callback,
+        indexing_progress_callback,
+        detailed_indexing_progress_callback,
+    )
+    .await?;
+    Ok(outcome.results)
+}
+
+pub async fn search_enhanced_with_outcome(
+    options: &SearchOptions,
+    progress_callback: Option<SearchProgressCallback>,
+    indexing_progress_callback: Option<IndexingProgressCallback>,
+    detailed_indexing_progress_callback: Option<DetailedIndexingProgressCallback>,
+) -> Result<SearchOutcome> {
     // Validate that the search path exists
     if !options.path.exists() {
         return Err(ck_core::CkError::Search(format!(
@@ -338,10 +381,12 @@ pub async fn search_enhanced_with_indexing_progress(
     }
 
     // Auto-update index if needed (unless it's regex-only mode)
+    let mut index_update = None;
     if !matches!(options.mode, SearchMode::Regex) {
         let need_embeddings = matches!(options.mode, SearchMode::Semantic | SearchMode::Hybrid);
         let file_options = ck_core::FileCollectionOptions::from(options);
-        ensure_index_updated_with_progress(
+        let started = std::time::Instant::now();
+        let update_stats = ensure_index_updated_with_progress(
             &options.path,
             options.reindex,
             need_embeddings,
@@ -351,6 +396,17 @@ pub async fn search_enhanced_with_indexing_progress(
             options.embedding_model.as_deref(),
         )
         .await?;
+        index_update = Some(IndexUpdate {
+            files_indexed: update_stats
+                .as_ref()
+                .map(|s| s.files_indexed)
+                .unwrap_or_default(),
+            orphaned_files_removed: update_stats
+                .as_ref()
+                .map(|s| s.orphaned_files_removed)
+                .unwrap_or_default(),
+            duration_ms: started.elapsed().as_millis() as u64,
+        });
     }
 
     let search_results = match options.mode {
@@ -381,7 +437,10 @@ pub async fn search_enhanced_with_indexing_progress(
         }
     };
 
-    Ok(search_results)
+    Ok(SearchOutcome {
+        results: search_results,
+        index_update,
+    })
 }
 
 fn regex_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
@@ -1143,6 +1202,8 @@ fn collect_files(
     Ok(files)
 }
 
+/// Returns the indexing stats when a directory-level smart update ran, or
+/// `None` for the single-file fast path (which reports no stats).
 async fn ensure_index_updated_with_progress(
     path: &Path,
     force_reindex: bool,
@@ -1151,7 +1212,7 @@ async fn ensure_index_updated_with_progress(
     detailed_progress_callback: Option<ck_index::DetailedProgressCallback>,
     file_options: &ck_core::FileCollectionOptions,
     model_override: Option<&str>,
-) -> Result<()> {
+) -> Result<Option<ck_index::UpdateStats>> {
     // Find index root for .ck directory location
     let index_root_buf = find_nearest_index_root(path).unwrap_or_else(|| {
         if path.is_file() {
@@ -1182,7 +1243,7 @@ async fn ensure_index_updated_with_progress(
                 stats.orphaned_files_removed
             );
         }
-        return Ok(());
+        return Ok(Some(stats));
     }
 
     // For incremental updates with individual files, we need special handling
@@ -1191,6 +1252,7 @@ async fn ensure_index_updated_with_progress(
         // Index just this one file
         use ck_index::index_file;
         index_file(path, need_embeddings).await?;
+        Ok(None)
     } else {
         // For directories, use the standard smart update
         let stats = ck_index::smart_update_index_with_detailed_progress(
@@ -1210,9 +1272,8 @@ async fn ensure_index_updated_with_progress(
                 stats.orphaned_files_removed
             );
         }
+        Ok(Some(stats))
     }
-
-    Ok(())
 }
 
 fn get_context_preview(lines: &[String], line_idx: usize, options: &SearchOptions) -> String {
