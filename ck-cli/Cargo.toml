@@ -60,6 +60,9 @@ base64 = { workspace = true }
 sha2 = { workspace = true }
 dirs = "5.0"
 
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [features]
 default = ["fastembed", "mixedbread"]
 fastembed = ["ck-embed/fastembed", "ck-index/fastembed", "ck-engine/fastembed", "ck-chunk/fastembed", "ck-tui/fastembed"]
