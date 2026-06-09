@@ -380,3 +380,101 @@ async fn test_mcp_semantic_search_with_missing_files() {
         assert!(summary.contains("top_k: 20"));
     }
 }
+
+#[tokio::test]
+async fn test_mcp_index_status_reports_real_index_size() {
+    use ck_search::IndexStatusRequest;
+
+    let temp_dir = create_test_files().await;
+    let server = CkMcpServer::new(temp_dir.path().to_path_buf()).unwrap();
+
+    // Build the index by running a semantic search first (auto-indexes)
+    let search = SemanticSearchRequest {
+        query: "error handling".to_string(),
+        path: temp_dir.path().to_string_lossy().to_string(),
+        threshold: Some(0.0),
+        ..Default::default()
+    };
+    server
+        .handle_semantic_search(search, None, None)
+        .await
+        .expect("semantic search should succeed");
+
+    let request = IndexStatusRequest {
+        path: temp_dir.path().to_string_lossy().to_string(),
+    };
+    let (_, response) = server
+        .handle_index_status(request, None, None)
+        .await
+        .expect("index_status should succeed");
+
+    let info = &response["index_status"];
+    assert_eq!(info["index_exists"], true);
+
+    // index_size_bytes must be the recursive on-disk size of .ck, not the
+    // directory entry's own size. Compare against an independent walk.
+    let expected_size: u64 = walkdir::WalkDir::new(temp_dir.path().join(".ck"))
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|e| e.file_type().is_file())
+        .filter_map(|e| e.metadata().ok())
+        .map(|m| m.len())
+        .sum();
+    assert!(expected_size > 0, "test setup: index should not be empty");
+    assert_eq!(info["index_size_bytes"], expected_size);
+
+    // Chunk accounting must be present and consistent
+    let total = info["total_chunks"].as_u64().unwrap();
+    let embedded = info["embedded_chunks"].as_u64().unwrap();
+    let pending = info["chunks_pending_embedding"].as_u64().unwrap();
+    assert_eq!(pending, total - embedded);
+}
+
+#[tokio::test]
+async fn test_mcp_search_time_excludes_indexing_and_reports_it() {
+    let temp_dir = create_test_files().await;
+    let server = CkMcpServer::new(temp_dir.path().to_path_buf()).unwrap();
+
+    let request = || SemanticSearchRequest {
+        query: "error handling".to_string(),
+        path: temp_dir.path().to_string_lossy().to_string(),
+        threshold: Some(0.0),
+        ..Default::default()
+    };
+
+    // First search on an unindexed directory triggers auto-indexing,
+    // which must be reported separately from search time.
+    let (_, response) = server
+        .handle_semantic_search(request(), None, None)
+        .await
+        .expect("semantic search should succeed");
+    let indexing = &response["metadata"]["indexing"];
+    assert!(
+        indexing.is_object(),
+        "semantic search should report indexing metadata, got: {indexing}"
+    );
+    assert_eq!(indexing["triggered"], true);
+    assert!(indexing["files_indexed"].as_u64().unwrap() > 0);
+    assert!(response["metadata"]["search_time_ms"].is_number());
+
+    // Second search finds a fresh index: the staleness check runs but no work
+    let (_, response) = server
+        .handle_semantic_search(request(), None, None)
+        .await
+        .expect("semantic search should succeed");
+    let indexing = &response["metadata"]["indexing"];
+    assert_eq!(indexing["triggered"], false);
+    assert_eq!(indexing["files_indexed"], 0);
+
+    // Regex search never touches the index
+    let regex_request = RegexSearchRequest {
+        pattern: "function".to_string(),
+        path: temp_dir.path().to_string_lossy().to_string(),
+        ..Default::default()
+    };
+    let (_, response) = server
+        .handle_regex_search(regex_request)
+        .await
+        .expect("regex search should succeed");
+    assert!(response["metadata"]["indexing"].is_null());
+}

@@ -8,20 +8,10 @@ use tokio::sync::RwLock;
 // Currently, search functions create embedders internally via ck_embed::create_embedder().
 // Future optimization: expose search APIs that accept pre-created embedders for true caching.
 
-/// Cache for index statistics with TTL
-#[derive(Debug, Clone)]
-pub struct IndexStats {
-    #[allow(dead_code)]
-    pub file_count: usize,
-    #[allow(dead_code)]
-    pub chunk_count: usize,
-    #[allow(dead_code)]
-    pub model_name: String,
-    #[allow(dead_code)]
-    pub last_updated: SystemTime,
-    #[allow(dead_code)]
-    pub is_valid: bool,
-}
+/// Cache for index statistics with TTL. Stores the full `ck_index::IndexStats`
+/// so cache hits report the same fields as fresh reads (chunk counts, embedded
+/// chunk counts, on-disk index size).
+pub use ck_index::IndexStats;
 
 #[derive(Clone)]
 pub struct StatsCache {
