@@ -382,6 +382,21 @@ struct Cli {
     tui: bool,
 }
 
+impl Cli {
+    /// Target path for command-mode flags (`--index`, `--clean`, `--status`,
+    /// `--switch-model`, …). These commands take no search pattern, so a lone
+    /// positional argument (`ck --index /repo`) is parsed into the `pattern`
+    /// slot — previously it was silently ignored and the command ran against
+    /// the cwd. Explicit later positionals (`files`) win when both exist.
+    fn command_target_path(&self) -> PathBuf {
+        self.files
+            .first()
+            .cloned()
+            .or_else(|| self.pattern.as_ref().map(PathBuf::from))
+            .unwrap_or_else(|| PathBuf::from("."))
+    }
+}
+
 fn canonicalize_for_comparison(path: &Path) -> PathBuf {
     if let Ok(canonical) = path.canonicalize() {
         return canonical;
@@ -955,11 +970,7 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
 
     // Handle command flags first (these take precedence over search)
     if let Some(model_name) = cli.switch_model.as_deref() {
-        let path = cli
-            .files
-            .first()
-            .cloned()
-            .unwrap_or_else(|| PathBuf::from("."));
+        let path = cli.command_target_path();
 
         let registry = ck_models::ModelRegistry::default();
         let (model_alias, model_config) = registry
@@ -1015,11 +1026,7 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
     }
 
     if cli.index {
-        let path = cli
-            .files
-            .first()
-            .cloned()
-            .unwrap_or_else(|| PathBuf::from("."));
+        let path = cli.command_target_path();
 
         let registry = ck_models::ModelRegistry::default();
         let (model_alias, model_config) = registry
@@ -1041,11 +1048,7 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
 
     if cli.clean || cli.clean_orphans {
         // Handle --clean and --clean-orphans flags
-        let clean_path = cli
-            .files
-            .first()
-            .cloned()
-            .unwrap_or_else(|| PathBuf::from("."));
+        let clean_path = cli.command_target_path();
         let orphans_only = cli.clean_orphans;
 
         if orphans_only {
@@ -1092,25 +1095,12 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
 
     if cli.add {
         // Handle --add flag
-        // When using --add, the file path might be in pattern or files
-        let file = if let Some(ref pattern) = cli.pattern {
-            // If pattern is provided and no files, use pattern as the file path
-            if cli.files.is_empty() {
-                PathBuf::from(pattern)
-            } else {
-                // Otherwise use the first file
-                cli.files
-                    .first()
-                    .cloned()
-                    .ok_or_else(|| anyhow::anyhow!("No file specified. Usage: ck --add <file>"))?
-            }
-        } else {
-            // No pattern, must be in files
-            cli.files
-                .first()
-                .cloned()
-                .ok_or_else(|| anyhow::anyhow!("No file specified. Usage: ck --add <file>"))?
-        };
+        let file = cli
+            .files
+            .first()
+            .cloned()
+            .or_else(|| cli.pattern.as_ref().map(PathBuf::from))
+            .ok_or_else(|| anyhow::anyhow!("No file specified. Usage: ck --add <file>"))?;
         status.section_header("Adding File to Index");
         status.info(&format!("Processing {}", file.display()));
 
@@ -1124,11 +1114,7 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
 
     if cli.status || cli.status_verbose || cli.status_json {
         // Handle --status, --status-verbose, and --status-json flags
-        let status_path = cli
-            .files
-            .first()
-            .cloned()
-            .unwrap_or_else(|| PathBuf::from("."));
+        let status_path = cli.command_target_path();
         let verbose = cli.status_verbose;
 
         let stats = if cli.status_json {
