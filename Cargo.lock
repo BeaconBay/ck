@@ -539,6 +539,7 @@ dependencies = [
  "glob",
  "globset",
  "indicatif",
+ "libc",
  "openssl",
  "owo-colors",
  "ratatui",
