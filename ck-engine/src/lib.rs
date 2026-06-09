@@ -1048,59 +1048,214 @@ async fn hybrid_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
     hybrid_search_with_progress(options, None).await
 }
 
+/// English filler words excluded from the keyword arm of hybrid search.
+/// The keyword arm has no relevance scoring of its own, so terms like "the"
+/// or "does" would flood it with matches that pollute the fused ranking.
+const HYBRID_STOPWORDS: &[&str] = &[
+    "the", "and", "for", "with", "that", "this", "from", "into", "when", "where", "how", "what",
+    "why", "who", "which", "does", "are", "was", "were", "has", "have", "had", "can", "could",
+    "should", "would", "will", "its", "use", "uses", "used", "using", "between", "over", "under",
+    "than", "then", "them", "they", "their", "there", "your", "our", "not", "but", "all", "any",
+    "each", "other", "some", "such", "only", "own", "same", "more", "most", "very", "happen",
+    "happens", "get", "gets", "code", "function", "where", "place",
+];
+
+/// Distinct meaningful terms from a hybrid query, for keyword matching.
+fn hybrid_query_terms(query: &str) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    query
+        .split(|c: char| !c.is_alphanumeric() && c != '_')
+        .map(str::to_lowercase)
+        .filter(|t| t.len() >= 3 && !HYBRID_STOPWORDS.contains(&t.as_str()))
+        .filter(|t| seen.insert(t.clone()))
+        .collect()
+}
+
+/// The keyword arm of hybrid search. Natural-language queries ("how are stale
+/// entries cleaned up") almost never match the corpus as a literal regex,
+/// which previously degraded hybrid search to semantic-only exactly when the
+/// keyword boost mattered most. When the literal pattern finds nothing, retry
+/// with a case-insensitive alternation of the query's meaningful terms and
+/// rank the matches by how many distinct terms each line covers (the regex
+/// engine itself has no scoring — raw traversal order would rank a line
+/// matching one common term above a line matching all of them).
+fn hybrid_keyword_search(options: &SearchOptions) -> Result<(Vec<SearchResult>, bool)> {
+    let literal = regex_search(options)?;
+    if !literal.is_empty() || options.fixed_string {
+        return Ok((literal, false));
+    }
+
+    let terms = hybrid_query_terms(&options.query);
+    if terms.len() < 2 {
+        return Ok((literal, false));
+    }
+
+    let mut keyword_options = options.clone();
+    keyword_options.query = terms
+        .iter()
+        .map(|t| regex::escape(t))
+        .collect::<Vec<_>>()
+        .join("|");
+    keyword_options.case_insensitive = true;
+    // The fallback pattern matches single terms, so it can hit far more lines
+    // than the literal pattern would; don't let regex_search's internal top_k
+    // cut them in traversal order before we rank them below.
+    keyword_options.top_k = None;
+    let matches = regex_search(&keyword_options)?;
+
+    // Rank matches by the rarity of the terms they contain (IDF over the
+    // match set): a line containing a term that matched 3 lines corpus-wide
+    // says far more than one containing a term that matched 500. Without
+    // this, filler-adjacent terms ("results", "semantic" in a search tool's
+    // own repo) drown the discriminative ones.
+    let lowered: Vec<String> = matches.iter().map(|r| r.preview.to_lowercase()).collect();
+    let doc_freq: Vec<usize> = terms
+        .iter()
+        .map(|t| {
+            lowered
+                .iter()
+                .filter(|line| line.contains(String::as_str(t)))
+                .count()
+        })
+        .collect();
+    let total = matches.len() as f32;
+    // String::as_str fully qualified above and below: tantivy's `Value`
+    // trait is in scope and its `as_str(&self) -> Option<&str>` would win
+    // method resolution.
+    let mut scored: Vec<(f32, SearchResult)> = matches
+        .into_iter()
+        .zip(lowered)
+        .map(|(r, line)| {
+            let weight: f32 = terms
+                .iter()
+                .zip(&doc_freq)
+                .filter(|(t, _)| line.contains(String::as_str(t)))
+                .map(|(_, &df)| ((total + 1.0) / (df as f32 + 1.0)).ln())
+                .sum();
+            (weight, r)
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    if let Some(top_k) = options.top_k {
+        scored.truncate(top_k);
+    }
+    Ok((scored.into_iter().map(|(_, r)| r).collect(), true))
+}
+
+/// Fuse keyword and semantic rankings with Reciprocal Rank Fusion:
+/// RRFscore(d) = Σ(r∈R) 1/(k + r(d)), k = 60 (original paper's constant).
+///
+/// Results are keyed by logical location: a semantic chunk owns every keyword
+/// hit whose line falls inside its span. (The previous exact `file:line` key
+/// meant chunk-level semantic results and line-level keyword results never
+/// shared a key, so nothing ever actually fused.) Each ranking contributes at
+/// most one rank per key — its best. Fused entries keep the semantic chunk's
+/// content, which carries more context than a single matched line.
+/// `keyword_weight` scales the keyword arm's contribution. Literal matches
+/// (the user's pattern actually occurs in the corpus) deserve full weight;
+/// the synthesized term-OR fallback is a much weaker signal — at full weight
+/// its noise demotes results the semantic ranking already had right.
+fn rrf_fuse(
+    keyword_results: &[SearchResult],
+    semantic_results: &[SearchResult],
+    keyword_weight: f32,
+) -> Vec<SearchResult> {
+    const RRF_K: f32 = 60.0;
+
+    struct Fused {
+        result: SearchResult,
+        keyword_rank: Option<usize>,
+        semantic_rank: Option<usize>,
+    }
+
+    // Per-file semantic spans, for mapping keyword hits into chunks
+    let mut sem_spans: HashMap<String, Vec<(usize, usize, String)>> = HashMap::new();
+    let mut combined: HashMap<String, Fused> = HashMap::new();
+
+    for (rank, result) in semantic_results.iter().enumerate() {
+        let file = result.file.display().to_string();
+        let key = format!(
+            "{}:{}-{}",
+            file, result.span.line_start, result.span.line_end
+        );
+        sem_spans.entry(file).or_default().push((
+            result.span.line_start,
+            result.span.line_end,
+            key.clone(),
+        ));
+        combined.entry(key).or_insert(Fused {
+            result: result.clone(),
+            keyword_rank: None,
+            semantic_rank: Some(rank + 1),
+        });
+    }
+
+    for (rank, result) in keyword_results.iter().enumerate() {
+        let file = result.file.display().to_string();
+        let key = sem_spans
+            .get(&file)
+            .and_then(|spans| {
+                spans
+                    .iter()
+                    .find(|(start, end, _)| (*start..=*end).contains(&result.span.line_start))
+                    .map(|(_, _, key)| key.clone())
+            })
+            .unwrap_or_else(|| format!("{}:{}", file, result.span.line_start));
+        combined
+            .entry(key)
+            .and_modify(|fused| {
+                if fused.keyword_rank.is_none() {
+                    fused.keyword_rank = Some(rank + 1);
+                }
+            })
+            .or_insert(Fused {
+                result: result.clone(),
+                keyword_rank: Some(rank + 1),
+                semantic_rank: None,
+            });
+    }
+
+    combined
+        .into_values()
+        .map(|fused| {
+            let mut result = fused.result;
+            let rank_score = |rank: Option<usize>| rank.map_or(0.0, |r| 1.0 / (RRF_K + r as f32));
+            result.score =
+                keyword_weight * rank_score(fused.keyword_rank) + rank_score(fused.semantic_rank);
+            result
+        })
+        .collect()
+}
+
 async fn hybrid_search_with_progress(
     options: &SearchOptions,
     progress_callback: Option<SearchProgressCallback>,
 ) -> Result<Vec<SearchResult>> {
+    // Fetch more candidates from each arm than the final cut: fusion can
+    // only promote results it sees, and both regex_search and the semantic
+    // ranking truncate to top_k internally — at the original top_k, a result
+    // boosted by the other arm would never reach the fusion stage at all.
+    let mut arm_options = options.clone();
+    arm_options.top_k = options.top_k.map(|k| (k * 5).max(50));
+
     if let Some(ref callback) = progress_callback {
-        callback("Running regex search...");
+        callback("Running keyword search...");
     }
-    let regex_results = regex_search(options)?;
+    let (keyword_results, keyword_is_fallback) = hybrid_keyword_search(&arm_options)?;
 
     if let Some(ref callback) = progress_callback {
         callback("Running semantic search...");
     }
-    let semantic_results = semantic_search_v3_with_progress(options, progress_callback).await?;
+    let semantic_results =
+        semantic_search_v3_with_progress(&arm_options, progress_callback).await?;
 
-    let mut combined = HashMap::new();
+    let keyword_weight = if keyword_is_fallback { 0.3 } else { 1.0 };
+    let mut rrf_results = rrf_fuse(&keyword_results, &semantic_results.matches, keyword_weight);
 
-    for (rank, result) in regex_results.iter().enumerate() {
-        let key = format!("{}:{}", result.file.display(), result.span.line_start);
-        combined
-            .entry(key)
-            .or_insert(Vec::new())
-            .push((rank + 1, result.clone()));
+    // Apply threshold filtering to raw RRF scores
+    if let Some(threshold) = options.threshold {
+        rrf_results.retain(|result| result.score >= threshold);
     }
-
-    for (rank, result) in semantic_results.matches.iter().enumerate() {
-        let key = format!("{}:{}", result.file.display(), result.span.line_start);
-        combined
-            .entry(key)
-            .or_insert(Vec::new())
-            .push((rank + 1, result.clone()));
-    }
-
-    // Calculate RRF scores according to original paper: RRFscore(d) = Σ(r∈R) 1/(k + r(d))
-    let mut rrf_results: Vec<SearchResult> = combined
-        .into_values()
-        .map(|ranks| {
-            let mut result = ranks[0].1.clone();
-            let rrf_score = ranks
-                .iter()
-                .map(|(rank, _)| 1.0 / (60.0 + *rank as f32))
-                .sum();
-            result.score = rrf_score;
-            result
-        })
-        .filter(|result| {
-            // Apply threshold filtering to raw RRF scores
-            if let Some(threshold) = options.threshold {
-                result.score >= threshold
-            } else {
-                true
-            }
-        })
-        .collect();
 
     rrf_results.retain(|result| path_matches_include(&result.file, &options.include_patterns));
 
@@ -1348,6 +1503,97 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::TempDir;
+
+    fn make_result(file: &str, line_start: usize, line_end: usize, preview: &str) -> SearchResult {
+        SearchResult {
+            file: PathBuf::from(file),
+            span: Span {
+                byte_start: 0,
+                byte_end: 0,
+                line_start,
+                line_end,
+            },
+            score: 0.0,
+            preview: preview.to_string(),
+            lang: None,
+            symbol: None,
+            chunk_hash: None,
+            index_epoch: None,
+        }
+    }
+
+    #[test]
+    fn test_hybrid_query_terms_filters_stopwords_and_dedupes() {
+        let terms =
+            hybrid_query_terms("How does the RRF rank fusion merge rank results from regex?");
+        assert_eq!(
+            terms,
+            vec!["rrf", "rank", "fusion", "merge", "results", "regex"]
+        );
+
+        // Single short/stopword-only queries produce nothing
+        assert!(hybrid_query_terms("how does the it").is_empty());
+    }
+
+    #[test]
+    fn test_rrf_fuse_merges_keyword_hit_into_containing_semantic_chunk() {
+        // Semantic chunk spans lines 10-50; keyword hit lands on line 20
+        let semantic = vec![
+            make_result("src/a.rs", 10, 50, "fn fuse() { /* rrf */ }"),
+            make_result("src/b.rs", 1, 5, "unrelated chunk"),
+        ];
+        let keyword = vec![make_result("src/a.rs", 20, 20, "let rrf_score = ranks")];
+
+        let fused = rrf_fuse(&keyword, &semantic, 1.0);
+
+        // The keyword hit fused into the chunk: 3 inputs, 2 outputs
+        assert_eq!(fused.len(), 2);
+        let chunk = fused
+            .iter()
+            .find(|r| r.file == PathBuf::from("src/a.rs"))
+            .unwrap();
+        // Chunk-level span retained, score = both lists at rank 1
+        assert_eq!((chunk.span.line_start, chunk.span.line_end), (10, 50));
+        let expected = 1.0 / 61.0 + 1.0 / 61.0;
+        assert!((chunk.score - expected).abs() < 1e-6);
+
+        // The fused result must outrank the semantic-only one
+        let other = fused
+            .iter()
+            .find(|r| r.file == PathBuf::from("src/b.rs"))
+            .unwrap();
+        assert!(chunk.score > other.score);
+    }
+
+    #[test]
+    fn test_rrf_fuse_keyword_only_hit_keeps_own_identity() {
+        let semantic = vec![make_result("src/a.rs", 10, 50, "chunk")];
+        let keyword = vec![make_result("src/z.rs", 7, 7, "standalone line")];
+
+        let fused = rrf_fuse(&keyword, &semantic, 1.0);
+        assert_eq!(fused.len(), 2);
+        let standalone = fused
+            .iter()
+            .find(|r| r.file == PathBuf::from("src/z.rs"))
+            .unwrap();
+        assert!((standalone.score - 1.0 / 61.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_rrf_fuse_counts_each_list_once_per_key() {
+        // Two keyword hits inside the same semantic chunk: only the best
+        // keyword rank contributes, not both.
+        let semantic = vec![make_result("src/a.rs", 10, 50, "chunk")];
+        let keyword = vec![
+            make_result("src/a.rs", 12, 12, "first hit"),
+            make_result("src/a.rs", 40, 40, "second hit"),
+        ];
+
+        let fused = rrf_fuse(&keyword, &semantic, 1.0);
+        assert_eq!(fused.len(), 1);
+        let expected = 1.0 / 61.0 + 1.0 / 61.0; // sem rank 1 + best keyword rank 1
+        assert!((fused[0].score - expected).abs() < 1e-6);
+    }
 
     fn create_test_files(dir: &std::path::Path) -> Vec<PathBuf> {
         let files = vec![
