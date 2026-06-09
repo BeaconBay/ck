@@ -248,7 +248,56 @@ fn collect_files_as_hashset(
     Ok(collect_files(path, options)?.into_iter().collect())
 }
 
+/// Name of the advisory lock file inside `.ck`, guarding against concurrent
+/// writers (two `ck` processes indexing the same directory would otherwise
+/// interleave manifest writes and silently lose each other's entries).
+const INDEX_LOCK_FILE: &str = ".lock";
+
+/// Held for the duration of any index mutation. The OS advisory lock is
+/// released when this is dropped (the file handle closes).
+///
+/// Readers take no lock: every manifest and sidecar write goes through
+/// `atomic_write` (temp file + rename), so a reader can never observe a
+/// partially written file — only writers conflict with writers.
+struct IndexWriteLock {
+    _file: std::fs::File,
+}
+
+/// Acquire an exclusive cross-process lock on the index directory, creating
+/// the directory if needed. Blocks (with a log message) if another process
+/// holds the lock.
+fn acquire_index_write_lock(index_dir: &Path) -> Result<IndexWriteLock> {
+    use fs4::fs_std::FileExt;
+
+    fs::create_dir_all(index_dir)?;
+    let lock_path = index_dir.join(INDEX_LOCK_FILE);
+    let file = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .write(true)
+        .open(&lock_path)?;
+    if !file.try_lock_exclusive()? {
+        tracing::info!(
+            "Index {} is locked by another ck process; waiting for it to finish",
+            index_dir.display()
+        );
+        file.lock_exclusive()?;
+    }
+    Ok(IndexWriteLock { _file: file })
+}
+
 pub async fn index_directory(
+    path: &Path,
+    compute_embeddings: bool,
+    options: &ck_core::FileCollectionOptions,
+    model: Option<&str>,
+) -> Result<()> {
+    let _lock = acquire_index_write_lock(&path.join(".ck"))?;
+    index_directory_inner(path, compute_embeddings, options, model).await
+}
+
+/// Body of [`index_directory`]; callers must hold the index write lock.
+async fn index_directory_inner(
     path: &Path,
     compute_embeddings: bool,
     options: &ck_core::FileCollectionOptions,
@@ -403,7 +452,7 @@ pub async fn index_directory(
 pub async fn index_file(file_path: &Path, compute_embeddings: bool) -> Result<()> {
     let repo_root = find_repo_root(file_path)?;
     let index_dir = repo_root.join(".ck");
-    fs::create_dir_all(&index_dir)?;
+    let _lock = acquire_index_write_lock(&index_dir)?;
 
     let manifest_path = index_dir.join("manifest.json");
     let mut manifest = load_or_create_manifest(&manifest_path)?;
@@ -454,8 +503,10 @@ pub async fn update_index(
     options: &ck_core::FileCollectionOptions,
 ) -> Result<()> {
     let index_dir = path.join(".ck");
-    if !index_dir.exists() {
-        return index_directory(
+    let index_existed = index_dir.exists();
+    let _lock = acquire_index_write_lock(&index_dir)?;
+    if !index_existed {
+        return index_directory_inner(
             path,
             compute_embeddings,
             options,
@@ -592,8 +643,34 @@ pub async fn update_index(
 
 pub fn clean_index(path: &Path) -> Result<()> {
     let index_dir = path.join(".ck");
-    if index_dir.exists() {
-        fs::remove_dir_all(&index_dir)?;
+    if !index_dir.exists() {
+        return Ok(());
+    }
+    let lock = acquire_index_write_lock(&index_dir)?;
+    clean_index_inner(&index_dir)?;
+    drop(lock);
+    // Best-effort: remove the lock file and the now-empty directory. If a
+    // concurrent process re-acquired the lock in the meantime, removal fails
+    // and we leave the directory to it (it is rebuilding the index anyway).
+    let _ = fs::remove_file(index_dir.join(INDEX_LOCK_FILE));
+    let _ = fs::remove_dir(&index_dir);
+    Ok(())
+}
+
+/// Remove all index contents except the lock file (which the caller holds
+/// open — deleting an open locked file would fail on Windows).
+fn clean_index_inner(index_dir: &Path) -> Result<()> {
+    for entry in fs::read_dir(index_dir)? {
+        let entry = entry?;
+        if entry.file_name().to_str() == Some(INDEX_LOCK_FILE) {
+            continue;
+        }
+        let entry_path = entry.path();
+        if entry.file_type()?.is_dir() {
+            fs::remove_dir_all(&entry_path)?;
+        } else {
+            fs::remove_file(&entry_path)?;
+        }
     }
     Ok(())
 }
@@ -606,6 +683,7 @@ pub fn cleanup_index(
     if !index_dir.exists() {
         return Ok(CleanupStats::default());
     }
+    let _lock = acquire_index_write_lock(&index_dir)?;
 
     let manifest_path = index_dir.join("manifest.json");
     let mut manifest = load_or_create_manifest(&manifest_path)?;
@@ -734,6 +812,7 @@ pub async fn smart_update_index_with_detailed_progress(
     model: Option<&str>,
 ) -> Result<UpdateStats> {
     let index_dir = path.join(".ck");
+    let _lock = acquire_index_write_lock(&index_dir)?;
     let mut stats = UpdateStats::default();
 
     // Set up interrupt handler (only once per process)
@@ -748,8 +827,10 @@ pub async fn smart_update_index_with_detailed_progress(
     INTERRUPTED.store(false, Ordering::SeqCst);
 
     if force_rebuild {
-        clean_index(path)?;
-        index_directory(path, compute_embeddings, options, model).await?;
+        // Use the unlocked variants: we already hold the index write lock,
+        // and a second acquisition on a fresh handle would self-deadlock.
+        clean_index_inner(&index_dir)?;
+        index_directory_inner(path, compute_embeddings, options, model).await?;
         let index_stats = get_index_stats(path)?;
         stats.files_indexed = index_stats.total_files;
         return Ok(stats);
@@ -1908,6 +1989,49 @@ mod tests {
         // Check that manifest was updated
         let updated_manifest = load_or_create_manifest(&manifest_path).unwrap();
         assert_eq!(updated_manifest.files.len(), 0);
+    }
+
+    #[test]
+    fn test_index_write_lock_blocks_concurrent_writer() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let temp_dir = TempDir::new().unwrap();
+        let index_dir = temp_dir.path().join(".ck");
+
+        let lock = acquire_index_write_lock(&index_dir).unwrap();
+        let released = Arc::new(AtomicBool::new(false));
+
+        let dir = index_dir.clone();
+        let released_flag = released.clone();
+        let waiter = std::thread::spawn(move || {
+            let _lock = acquire_index_write_lock(&dir).unwrap();
+            assert!(
+                released_flag.load(Ordering::SeqCst),
+                "second writer acquired the index lock while the first still held it"
+            );
+        });
+
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        released.store(true, Ordering::SeqCst);
+        drop(lock);
+        waiter.join().unwrap();
+    }
+
+    #[test]
+    fn test_clean_index_removes_index_dir() {
+        let temp_dir = TempDir::new().unwrap();
+        let test_path = temp_dir.path();
+        let index_dir = test_path.join(".ck");
+        fs::create_dir_all(index_dir.join("sub")).unwrap();
+        fs::write(index_dir.join("manifest.json"), "{}").unwrap();
+        fs::write(index_dir.join("sub").join("file.rs.ck"), "x").unwrap();
+
+        clean_index(test_path).unwrap();
+        assert!(
+            !index_dir.exists(),
+            "clean_index should remove the .ck directory entirely"
+        );
     }
 
     #[test]

@@ -41,6 +41,15 @@ This file tracks instances where ck behaves unexpectedly during testing or usage
 
 ---
 
+**Command:** `ck --index /some/other/dir` (from inside a different directory)
+**Expected:** Indexes `/some/other/dir` ("Create or update search index for the specified path")
+**Actual:** The path argument lands in the positional *pattern* slot, `files` stays empty, and ck indexes the **current working directory** instead. `ck --index .` only works by coincidence (the "." pattern is ignored and "." is also the default path). Likely the same root cause as the `ck --add /tmp/test.txt` entry above.
+**Date:** 2026-06-10
+**Status:** Open
+**Notes:** Found while writing a concurrent-indexing test: two `ck --index <tempdir>` processes silently indexed the ck repo itself (cwd). Command-mode flags (`--index`, `--clean`, `--add`, …) should treat the first positional arg as their target path.
+
+---
+
 ## Instructions
 
 When you encounter unexpected behavior while using ck:

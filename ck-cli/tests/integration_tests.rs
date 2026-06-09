@@ -1069,3 +1069,59 @@ fn test_switch_model_to_mixedbread() {
         "Manifest should now have Mixedbread model"
     );
 }
+
+/// Two ck processes indexing the same directory concurrently must serialize
+/// on the index write lock instead of interleaving manifest writes. Both
+/// should succeed and the final manifest should contain every file.
+#[test]
+fn test_concurrent_indexing_is_serialized() {
+    use std::process::Stdio;
+
+    let temp_dir = TempDir::new().unwrap();
+    let file_count = 30;
+    for i in 0..file_count {
+        fs::write(
+            temp_dir.path().join(format!("file{i}.txt")),
+            format!("searchable content number {i}\n").repeat(50),
+        )
+        .unwrap();
+    }
+
+    // Note: `--index` resolves its target from the positional pattern slot,
+    // so an explicit path argument would be misparsed (see UNEXPECTED.md).
+    // Run from inside the directory instead.
+    let spawn_indexer = || {
+        Command::new(ck_binary())
+            .arg("--index")
+            .current_dir(temp_dir.path())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("Failed to spawn ck --index")
+    };
+
+    let first = spawn_indexer();
+    let second = spawn_indexer();
+
+    for child in [first, second] {
+        let output = child.wait_with_output().expect("Failed to wait on ck");
+        assert!(
+            output.status.success(),
+            "concurrent ck --index failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let manifest_data =
+        fs::read(temp_dir.path().join(".ck").join("manifest.json")).expect("manifest must exist");
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&manifest_data).expect("manifest must be valid JSON");
+    let files = manifest["files"]
+        .as_object()
+        .expect("manifest.files object");
+    assert_eq!(
+        files.len(),
+        file_count,
+        "manifest lost entries under concurrent indexing"
+    );
+}
