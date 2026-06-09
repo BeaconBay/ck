@@ -25,6 +25,7 @@ memmap2 = { workspace = true }
 tokio = { workspace = true }
 rayon = { workspace = true }
 walkdir = { workspace = true }
+fs4 = { workspace = true }
 tracing = { workspace = true }
 ignore = { workspace = true }
 ctrlc = { workspace = true }
