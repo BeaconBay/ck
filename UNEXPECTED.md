@@ -62,8 +62,8 @@ This file tracks instances where ck behaves unexpectedly during testing or usage
 **Expected:** `hybrid_search_with_progress` / RRF scoring code in ck-engine/src/lib.rs (it exists, has RRF comments, and is regex-findable)
 **Actual:** Single result: a docs-site roadmap.md bullet (score 0.60). The actual implementation never surfaced; default threshold 0.6 filtered everything else. Same miss via CLI `--sem` scoped to ck-engine/ (best candidate scored 0.578, and was the wrong chunk). `--hybrid "RRF reciprocal rank fusion"` also failed to surface it in top 5.
 **Date:** 2026-06-09
-**Status:** Open
-**Notes:** Also: that first MCP search reported `search_time_ms: 1839209` (~30 min) — metric is clearly wrong, possibly accumulating indexing time or wrong unit. Subsequent search reported 887ms.
+**Status:** Partially fixed (fix/hybrid-nl-queries — hybrid's keyword arm now falls back to IDF-ranked term matching for NL queries, fuses line hits into containing semantic chunks, and widens both arms pre-fusion; the scoped query now ranks the implementation #1, was #4). Remaining open: pure `--sem` on doc-heavy repos still ranks docs above implementations (semantic rank 87 for this chunk — needs corpus-level work, e.g. doc/code balancing or better chunk identity, not a threshold tweak).
+**Notes:** Also: that first MCP search reported `search_time_ms: 1839209` (~30 min) — metric was real wall time including silent auto-reindexing; fixed separately in fix/mcp-index-metrics by reporting indexing separately.
 
 ---
 
