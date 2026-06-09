@@ -58,7 +58,7 @@ openssl = { workspace = true, optional = true }
 uuid = { workspace = true }
 base64 = { workspace = true }
 sha2 = { workspace = true }
-dirs = "5.0"
+dirs = "6.0"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
