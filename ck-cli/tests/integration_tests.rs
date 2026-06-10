@@ -1247,12 +1247,21 @@ fn test_lexical_search_reflects_file_changes() {
     let output = Command::new(ck_binary())
         .args(["--lex", "alphaterm", "."])
         .current_dir(temp_dir.path())
+        .env("RUST_LOG", "ck_engine=debug,ck_index=debug")
         .output()
         .expect("ck --lex should run");
+    let ck_dir_listing: Vec<String> = walkdir::WalkDir::new(temp_dir.path().join(".ck"))
+        .into_iter()
+        .filter_map(Result::ok)
+        .map(|e| e.path().display().to_string())
+        .collect();
     assert!(
         output.status.success(),
-        "initial lexical search failed: {}",
-        String::from_utf8_lossy(&output.stderr)
+        "initial lexical search failed.\nstderr: {}\nstdout: {}\n.ck contents: {:#?}\nmeta: {:?}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout),
+        ck_dir_listing,
+        fs::read_to_string(temp_dir.path().join(".ck").join("tantivy_index.meta")),
     );
 
     // Add a new file AFTER the lexical index was built

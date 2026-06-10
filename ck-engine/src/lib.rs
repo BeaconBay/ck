@@ -1585,7 +1585,7 @@ mod tests {
         );
 
         // Removing a file changes the fingerprint
-        let shrunk = lexical_corpus_fingerprint(&[a.clone()]);
+        let shrunk = lexical_corpus_fingerprint(std::slice::from_ref(&a));
         assert_ne!(shrunk, lexical_corpus_fingerprint(&[a, b]));
     }
 
