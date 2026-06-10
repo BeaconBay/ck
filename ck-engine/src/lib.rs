@@ -840,8 +840,20 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
 
     // The tantivy index always covers the whole index root (include patterns
     // are applied per result at search time below), so corpus membership only
-    // depends on the root and the exclude patterns.
-    let corpus = collect_files(&index_root, true, &options.exclude_patterns)?;
+    // depends on the root and the exclusion rules.
+    //
+    // Collection goes through ck_index::collect_files — the same walker the
+    // regex and semantic paths use — so gitignore/.ckignore semantics match
+    // and exclude patterns apply relative to the walk root. The engine-local
+    // collect_files matched exclude globs against every *absolute* path
+    // component, so a corpus under e.g. /tmp on Linux matched the default
+    // "tmp" exclude and silently produced an empty lexical index.
+    let file_options = ck_core::FileCollectionOptions {
+        respect_gitignore: options.respect_gitignore,
+        use_ckignore: options.use_ckignore,
+        exclude_patterns: options.exclude_patterns.clone(),
+    };
+    let corpus = ck_index::collect_files(&index_root, &file_options)?;
     let fingerprint = lexical_corpus_fingerprint(&corpus);
     let meta_path = index_dir.join(TANTIVY_META_FILE);
     let is_fresh = tantivy_index_path.exists()
