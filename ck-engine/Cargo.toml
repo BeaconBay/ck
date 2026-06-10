@@ -15,7 +15,6 @@ blake3 = { workspace = true }
 ck-core = { workspace = true }
 ck-index = { workspace = true }
 ck-embed = { workspace = true }
-ck-ann = { workspace = true }
 ck-chunk = { workspace = true }
 ck-models = { workspace = true }
 serde_json = { workspace = true }

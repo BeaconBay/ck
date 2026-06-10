@@ -31,11 +31,11 @@ Always check existing tags first: `git tag --sort=-version:refname`
 
 ### Version Bump Process
 
-All nine crates ship in lockstep. To bump from OLD to NEW:
+All eight crates ship in lockstep. To bump from OLD to NEW:
 
 1. **Workspace `Cargo.toml`** — update two places:
    - `[workspace.package] version = "NEW"`
-   - The eight `ck-* = { path = "...", version = "NEW", ... }` lines under `[workspace.dependencies]`
+   - The seven `ck-* = { path = "...", version = "NEW", ... }` lines under `[workspace.dependencies]`
 2. **Update `CHANGELOG.md`** with release notes (format below)
 3. **Tag** as `X.Y.Z` (no `v` prefix) — `release.yml` does the rest
 
@@ -54,7 +54,7 @@ When tag `X.Y.Z` is pushed:
 
 1. **Create GitHub release** (draft) and verify tag matches `Cargo.toml`
 2. **Build binaries** for 5 targets (linux x86_64, macos x86_64+arm64, windows x86_64+arm64), upload as `.tar.gz`/`.zip` assets
-3. **Publish 9 crates to crates.io** in dep order, with retry-on-"already-published" and verify-via-API (User-Agent required)
+3. **Publish 8 crates to crates.io** in dep order, with retry-on-"already-published" and verify-via-API (User-Agent required)
 4. **Publish to npm as `@beaconbay/ck-search`** — uses npm Trusted Publishing (OIDC); GitHub mints a short-lived id-token, npm validates it against the trusted-publisher config on the package, no long-lived secret. Tarball is published with SLSA provenance attestation (cryptographically tied to this workflow run + commit). The package's postinstall script downloads the platform binary from the GitHub release at user install time.
 5. **Finalize GitHub release** (out of draft)
 
