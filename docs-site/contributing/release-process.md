@@ -157,7 +157,6 @@ cargo publish --package ck-models
 
 # Then dependent crates
 cargo publish --package ck-chunk
-cargo publish --package ck-ann
 cargo publish --package ck-embed
 cargo publish --package ck-index
 cargo publish --package ck-engine

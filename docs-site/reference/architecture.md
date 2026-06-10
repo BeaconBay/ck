@@ -18,7 +18,6 @@ ck/
 ├── ck-engine/       # Search engine implementations
 ├── ck-index/        # File indexing and sidecar management
 ├── ck-embed/        # Text embedding providers
-├── ck-ann/          # Approximate nearest neighbor indices
 ├── ck-chunk/        # Text segmentation and parsing
 └── ck-models/       # Model registry and configuration
 ```
@@ -59,7 +58,7 @@ ck/
 - HybridEngine: Reciprocal Rank Fusion
 - Result ranking and scoring
 
-**Dependencies:** ck-core, ck-index, ck-embed, ck-ann
+**Dependencies:** ck-core, ck-index, ck-embed
 
 ### ck-index
 
@@ -86,18 +85,6 @@ ck/
 - Model download management
 
 **Dependencies:** ck-core, ck-models
-
-### ck-ann
-
-**Purpose**: Vector similarity search
-
-**Key components:**
-- Approximate Nearest Neighbor indices
-- Cosine similarity scoring
-- Index persistence
-- Vector storage
-
-**Dependencies:** ck-core
 
 ### ck-chunk
 
@@ -139,9 +126,7 @@ ck-chunk: Parse and segment code
     ↓
 ck-embed: Generate embeddings
     ↓
-ck-ann: Build vector index
-    ↓
-ck-index: Save index to .ck/
+ck-index: Save embeddings in sidecars under .ck/
 ```
 
 ### Search Flow (Semantic)
@@ -153,9 +138,7 @@ ck-cli: Parse arguments
     ↓
 ck-embed: Embed query
     ↓
-ck-ann: Find similar vectors
-    ↓
-ck-engine: Rank and score results
+ck-engine: Score stored embeddings (cosine) and rank results
     ↓
 ck-cli: Format and display output
 ```

@@ -393,17 +393,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ck-ann"
-version = "0.7.11"
-dependencies = [
- "anyhow",
- "bincode",
- "ck-core",
- "serde",
- "tempfile",
-]
-
-[[package]]
 name = "ck-chunk"
 version = "0.7.11"
 dependencies = [
@@ -465,7 +454,6 @@ name = "ck-engine"
 version = "0.7.11"
 dependencies = [
  "anyhow",
- "ck-ann",
  "ck-chunk",
  "ck-core",
  "ck-embed",
@@ -525,7 +513,6 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "chrono",
- "ck-ann",
  "ck-chunk",
  "ck-core",
  "ck-embed",

@@ -26,7 +26,6 @@ ck-index = { workspace = true }
 ck-engine = { workspace = true }
 ck-chunk = { workspace = true }
 ck-embed = { workspace = true }
-ck-ann = { workspace = true }
 ck-models = { workspace = true }
 ck-tui = { workspace = true }
 
