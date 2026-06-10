@@ -323,7 +323,6 @@ jobs:
             "ck-models"
             "ck-embed"
             "ck-chunk"
-            "ck-ann"
             "ck-index"
             "ck-engine"
             "ck-tui"

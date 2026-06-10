@@ -401,7 +401,6 @@ ck uses a modular Rust workspace:
 - **`ck-engine`** - Search engine implementations (regex, semantic, hybrid)
 - **`ck-index`** - File indexing, hashing, and sidecar management
 - **`ck-embed`** - Text embedding providers (FastEmbed, API backends)
-- **`ck-ann`** - Approximate nearest neighbor search indices
 - **`ck-chunk`** - Text segmentation and language-aware parsing ([query-based chunking](docs/explanation/query-based-chunking.md))
 - **`ck-models`** - Model registry and configuration management
 
