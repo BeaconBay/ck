@@ -1222,3 +1222,77 @@ fn test_command_flags_honor_explicit_path() {
         "--clean must remove the index at the given path"
     );
 }
+
+/// The tantivy lexical index used to be built once on first --lex and never
+/// refreshed: files added or edited afterwards were invisible to lexical
+/// search. It must now rebuild when the corpus changes.
+#[test]
+#[serial]
+fn test_lexical_search_reflects_file_changes() {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(
+        temp_dir.path().join("a.txt"),
+        "alphaterm appears in the original corpus",
+    )
+    .unwrap();
+
+    let status = Command::new(ck_binary())
+        .args(["--index", "."])
+        .current_dir(temp_dir.path())
+        .status()
+        .expect("ck --index should run");
+    assert!(status.success());
+
+    // First lexical search builds the tantivy index
+    let output = Command::new(ck_binary())
+        .args(["--lex", "alphaterm", "."])
+        .current_dir(temp_dir.path())
+        .env("RUST_LOG", "ck_engine=debug,ck_index=debug")
+        .output()
+        .expect("ck --lex should run");
+    let ck_dir_listing: Vec<String> = walkdir::WalkDir::new(temp_dir.path().join(".ck"))
+        .into_iter()
+        .filter_map(Result::ok)
+        .map(|e| e.path().display().to_string())
+        .collect();
+    assert!(
+        output.status.success(),
+        "initial lexical search failed.\nstderr: {}\nstdout: {}\n.ck contents: {:#?}\nmeta: {:?}",
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout),
+        ck_dir_listing,
+        fs::read_to_string(temp_dir.path().join(".ck").join("tantivy_index.meta")),
+    );
+
+    // Add a new file AFTER the lexical index was built
+    fs::write(
+        temp_dir.path().join("b.txt"),
+        "zebraterm only exists in the new file",
+    )
+    .unwrap();
+
+    let output = Command::new(ck_binary())
+        .args(["--lex", "zebraterm", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("ck --lex should run");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success() && stdout.contains("b.txt"),
+        "lexical search must see files added after the index was built; stdout: {stdout} stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    // Modify the original file: removed content must stop matching
+    fs::write(temp_dir.path().join("a.txt"), "completely different now").unwrap();
+    let output = Command::new(ck_binary())
+        .args(["--lex", "alphaterm", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("ck --lex should run");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !stdout.contains("a.txt"),
+        "lexical search returned stale content for a modified file; stdout: {stdout}"
+    );
+}

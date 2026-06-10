@@ -785,6 +785,42 @@ fn process_streaming_line(
     }
 }
 
+/// Name of the metadata file (inside `.ck`) recording the corpus fingerprint
+/// the tantivy index was built from, so staleness is detectable.
+const TANTIVY_META_FILE: &str = "tantivy_index.meta";
+
+/// Fingerprint of the file set a tantivy index covers: path, mtime and size
+/// of every corpus file. Any added, removed, or modified file changes the
+/// fingerprint, as does a different exclude-pattern set (it changes the
+/// collected file list).
+fn lexical_corpus_fingerprint(files: &[PathBuf]) -> String {
+    let mut entries: Vec<String> = files
+        .iter()
+        .map(|f| {
+            let (mtime, size) = fs::metadata(f)
+                .map(|m| {
+                    let mtime = m
+                        .modified()
+                        .ok()
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map(|d| d.as_nanos())
+                        .unwrap_or(0);
+                    (mtime, m.len())
+                })
+                .unwrap_or((0, 0));
+            format!("{}\x00{}\x00{}", f.display(), mtime, size)
+        })
+        .collect();
+    entries.sort_unstable();
+
+    let mut hasher = blake3::Hasher::new();
+    for entry in &entries {
+        hasher.update(entry.as_bytes());
+        hasher.update(b"\n");
+    }
+    hasher.finalize().to_hex().to_string()
+}
+
 async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
     // Handle both files and directories and reuse nearest existing .ck index up the tree
     let index_root = find_nearest_index_root(&options.path).unwrap_or_else(|| {
@@ -802,8 +838,47 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
 
     let tantivy_index_path = index_dir.join("tantivy_index");
 
-    if !tantivy_index_path.exists() {
-        return build_tantivy_index(options).await;
+    // The tantivy index always covers the whole index root (include patterns
+    // are applied per result at search time below), so corpus membership only
+    // depends on the root and the exclusion rules.
+    //
+    // Collection goes through ck_index::collect_files — the same walker the
+    // regex and semantic paths use — so gitignore/.ckignore semantics match
+    // and exclude patterns apply relative to the walk root. The engine-local
+    // collect_files matched exclude globs against every *absolute* path
+    // component, so a corpus under e.g. /tmp on Linux matched the default
+    // "tmp" exclude and silently produced an empty lexical index.
+    let file_options = ck_core::FileCollectionOptions {
+        respect_gitignore: options.respect_gitignore,
+        use_ckignore: options.use_ckignore,
+        exclude_patterns: options.exclude_patterns.clone(),
+    };
+    let corpus = ck_index::collect_files(&index_root, &file_options)?;
+    let fingerprint = lexical_corpus_fingerprint(&corpus);
+    let meta_path = index_dir.join(TANTIVY_META_FILE);
+    let is_fresh = tantivy_index_path.exists()
+        && fs::read_to_string(&meta_path)
+            .map(|stored| stored.trim() == fingerprint)
+            .unwrap_or(false);
+
+    if !is_fresh {
+        // Serialize with index mutations (and concurrent lexical rebuilds);
+        // re-check freshness after acquiring in case another process just
+        // rebuilt the same corpus.
+        let _lock = ck_index::acquire_index_write_lock(&index_dir)?;
+        let still_stale = !tantivy_index_path.exists()
+            || fs::read_to_string(&meta_path)
+                .map(|stored| stored.trim() != fingerprint)
+                .unwrap_or(true);
+        if still_stale {
+            tracing::info!(
+                "Lexical index stale or missing for {}; rebuilding from {} files",
+                index_root.display(),
+                corpus.len()
+            );
+            build_tantivy_index(&tantivy_index_path, &corpus)?;
+            fs::write(&meta_path, &fingerprint)?;
+        }
     }
 
     let mut schema_builder = Schema::builder();
@@ -903,37 +978,33 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
     Ok(results)
 }
 
-async fn build_tantivy_index(options: &SearchOptions) -> Result<Vec<SearchResult>> {
-    // Handle both files and directories by finding the appropriate directory for indexing
-    let index_root = if options.path.is_file() {
-        options.path.parent().unwrap_or(&options.path)
-    } else {
-        &options.path
-    };
-
-    let index_dir = index_root.join(".ck");
-    let tantivy_index_path = index_dir.join("tantivy_index");
-
-    fs::create_dir_all(&tantivy_index_path)?;
+/// (Re)build the tantivy index at `tantivy_index_path` over `files`.
+/// Callers must hold the index write lock. Any existing index is replaced —
+/// tantivy has no cheap way to diff segments against a changed corpus, and a
+/// full text-only rebuild is fast relative to embedding work.
+///
+/// Searching the result happens in [`lexical_search`]; this function builds
+/// only (its previous incarnation duplicated the entire search/read path,
+/// which had already drifted — the rebuilt-path copy lost include filtering).
+fn build_tantivy_index(tantivy_index_path: &Path, files: &[PathBuf]) -> Result<()> {
+    if tantivy_index_path.exists() {
+        fs::remove_dir_all(tantivy_index_path)?;
+    }
+    fs::create_dir_all(tantivy_index_path)?;
 
     let mut schema_builder = Schema::builder();
     let content_field = schema_builder.add_text_field("content", TEXT | STORED);
     let path_field = schema_builder.add_text_field("path", TEXT | STORED);
     let schema = schema_builder.build();
 
-    let index = Index::create_in_dir(&tantivy_index_path, schema.clone())
+    let index = Index::create_in_dir(tantivy_index_path, schema)
         .map_err(|e| CkError::Index(format!("Failed to create tantivy index: {e}")))?;
 
     let mut index_writer = index
         .writer(50_000_000)
         .map_err(|e| CkError::Index(format!("Failed to create index writer: {e}")))?;
 
-    let files = filter_files_by_include(
-        collect_files(index_root, true, &options.exclude_patterns)?,
-        &options.include_patterns,
-    );
-
-    for file_path in &files {
+    for file_path in files {
         if let Ok(content) = fs::read_to_string(file_path) {
             let doc = doc!(
                 content_field => content,
@@ -947,100 +1018,7 @@ async fn build_tantivy_index(options: &SearchOptions) -> Result<Vec<SearchResult
         .commit()
         .map_err(|e| CkError::Index(format!("Failed to commit index: {e}")))?;
 
-    // After building, search again with the same options
-    let tantivy_index_path = index_root.join(".ck").join("tantivy_index");
-    let mut schema_builder = Schema::builder();
-    let content_field = schema_builder.add_text_field("content", TEXT | STORED);
-    let path_field = schema_builder.add_text_field("path", TEXT | STORED);
-    let _schema = schema_builder.build();
-
-    let index = Index::open_in_dir(&tantivy_index_path)
-        .map_err(|e| CkError::Index(format!("Failed to open tantivy index: {e}")))?;
-
-    let reader = index
-        .reader_builder()
-        .reload_policy(ReloadPolicy::OnCommitWithDelay)
-        .try_into()
-        .map_err(|e| CkError::Index(format!("Failed to create index reader: {e}")))?;
-
-    let searcher = reader.searcher();
-    let query_parser = QueryParser::for_index(&index, vec![content_field]);
-
-    let query = query_parser
-        .parse_query(&options.query)
-        .map_err(|e| CkError::Search(format!("Failed to parse query: {e}")))?;
-
-    let top_docs = if let Some(top_k) = options.top_k {
-        searcher.search(&query, &TopDocs::with_limit(top_k))?
-    } else {
-        searcher.search(&query, &TopDocs::with_limit(100))?
-    };
-
-    // First, collect all results with raw scores
-    let mut raw_results = Vec::new();
-    for (_score, doc_address) in top_docs {
-        let retrieved_doc: TantivyDocument = searcher.doc(doc_address)?;
-        let path_text = retrieved_doc
-            .get_first(path_field)
-            .map(|field_value| field_value.as_str().unwrap_or(""))
-            .unwrap_or("");
-        let content_text = retrieved_doc
-            .get_first(content_field)
-            .map(|field_value| field_value.as_str().unwrap_or(""))
-            .unwrap_or("");
-
-        let file_path = PathBuf::from(path_text);
-        let preview = if options.full_section {
-            content_text.to_string()
-        } else {
-            content_text.lines().take(3).collect::<Vec<_>>().join("\n")
-        };
-
-        raw_results.push((
-            _score,
-            SearchResult {
-                file: file_path,
-                span: Span {
-                    byte_start: 0,
-                    byte_end: content_text.len(),
-                    line_start: 1,
-                    line_end: content_text.lines().count(),
-                },
-                score: _score,
-                preview,
-                lang: ck_core::Language::from_path(&PathBuf::from(path_text)),
-                symbol: None,
-                chunk_hash: None,
-                index_epoch: None,
-            },
-        ));
-    }
-
-    // Normalize scores to 0-1 range and apply threshold
-    let mut results = Vec::new();
-    if !raw_results.is_empty() {
-        let max_score = raw_results
-            .iter()
-            .map(|(score, _)| *score)
-            .fold(0.0f32, f32::max);
-        if max_score > 0.0 {
-            for (raw_score, mut result) in raw_results {
-                let normalized_score = raw_score / max_score;
-
-                // Apply threshold filtering with normalized score
-                if let Some(threshold) = options.threshold
-                    && normalized_score < threshold
-                {
-                    continue;
-                }
-
-                result.score = normalized_score;
-                results.push(result);
-            }
-        }
-    }
-
-    Ok(results)
+    Ok(())
 }
 
 #[allow(dead_code)]
@@ -1593,6 +1571,34 @@ mod tests {
         assert_eq!(fused.len(), 1);
         let expected = 1.0 / 61.0 + 1.0 / 61.0; // sem rank 1 + best keyword rank 1
         assert!((fused[0].score - expected).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_lexical_corpus_fingerprint_tracks_changes() {
+        let temp_dir = TempDir::new().unwrap();
+        let a = temp_dir.path().join("a.txt");
+        let b = temp_dir.path().join("b.txt");
+        fs::write(&a, "one").unwrap();
+        fs::write(&b, "two").unwrap();
+
+        let original = lexical_corpus_fingerprint(&[a.clone(), b.clone()]);
+
+        // Order-insensitive
+        assert_eq!(
+            original,
+            lexical_corpus_fingerprint(&[b.clone(), a.clone()])
+        );
+
+        // Content change (different size) changes the fingerprint
+        fs::write(&a, "one but longer").unwrap();
+        assert_ne!(
+            original,
+            lexical_corpus_fingerprint(&[a.clone(), b.clone()])
+        );
+
+        // Removing a file changes the fingerprint
+        let shrunk = lexical_corpus_fingerprint(std::slice::from_ref(&a));
+        assert_ne!(shrunk, lexical_corpus_fingerprint(&[a, b]));
     }
 
     fn create_test_files(dir: &std::path::Path) -> Vec<PathBuf> {
