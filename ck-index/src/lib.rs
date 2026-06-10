@@ -259,14 +259,17 @@ const INDEX_LOCK_FILE: &str = ".lock";
 /// Readers take no lock: every manifest and sidecar write goes through
 /// `atomic_write` (temp file + rename), so a reader can never observe a
 /// partially written file — only writers conflict with writers.
-struct IndexWriteLock {
+pub struct IndexWriteLock {
     _file: std::fs::File,
 }
 
 /// Acquire an exclusive cross-process lock on the index directory, creating
 /// the directory if needed. Blocks (with a log message) if another process
 /// holds the lock.
-fn acquire_index_write_lock(index_dir: &Path) -> Result<IndexWriteLock> {
+///
+/// Public so other layers writing inside `.ck` (e.g. ck-engine's tantivy
+/// index build) serialize with index mutations.
+pub fn acquire_index_write_lock(index_dir: &Path) -> Result<IndexWriteLock> {
     use fs4::fs_std::FileExt;
 
     fs::create_dir_all(index_dir)?;

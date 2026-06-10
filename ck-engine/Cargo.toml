@@ -11,6 +11,7 @@ keywords = ["search", "engine", "semantic"]
 categories = ["algorithms"]
 
 [dependencies]
+blake3 = { workspace = true }
 ck-core = { workspace = true }
 ck-index = { workspace = true }
 ck-embed = { workspace = true }
