@@ -14,7 +14,7 @@
   "packageManager": "pnpm@10.12.4",
   "devDependencies": {
     "vitepress": "^1.6.4",
-    "vue": "^3.5.34"
+    "vue": "^3.5.37"
   },
   "pnpm": {
     "comment": "Override transitives to patched-but-compatible versions. Vite is constrained to 6.x because vite 7+ ships with Rolldown by default and vite 8 makes esbuild an optional install, both of which break vitepress 1.6.4's plugin and rendering.",
