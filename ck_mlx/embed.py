@@ -96,7 +96,7 @@ class LocalMLXEmbeddingProvider:
 
     def dimension(self) -> int:
         if self._dim is None:
-            self._dim = len(self.embed(["ck-search dimension probe"])[0])
+            self._dim = len(self.embed(["ck-mlx dimension probe"])[0])
         return self._dim
 
     def model_name(self) -> str:
@@ -153,7 +153,7 @@ def _discover_embedding_metadata(
     provider = APIEmbeddingProvider(
         EmbeddingConfig(base_url, api_key, model, max_concurrent_requests=1, batch_size=1)
     )
-    vectors = provider.embed(["ck-search dimension probe"], input_type="document")
+    vectors = provider.embed(["ck-mlx dimension probe"], input_type="document")
     if not vectors:
         raise RuntimeError("Embedding probe returned no vectors.")
     dimension = len(vectors[0])

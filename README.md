@@ -1,6 +1,6 @@
-# ck-search
+# ck-mlx
 
-`ck-search` is a local code search CLI and MCP server with two embedding backends:
+`ck-mlx` is a local code search CLI and MCP server with two embedding backends:
 
 - `local` runs MLX embedding and reranking models directly on Apple Silicon.
 - `api` talks to an OpenAI-compatible oMLX server.
@@ -8,12 +8,12 @@
 This fork replaces the original Rust workspace with the working Python dual-backend implementation and keeps the user-facing search flow simple:
 
 ```bash
-uv run ck --backend local status
-uv run ck --backend local index . --force
-uv run ck --backend local search "embedding provider" --mode hybrid --rerank
+uv run ck-mlx --backend local status
+uv run ck-mlx --backend local index . --force
+uv run ck-mlx --backend local search "embedding provider" --mode hybrid --rerank
 ```
 
-Both `ck` and `ck-search` console scripts are installed.
+The `ck-mlx` console script is installed.
 
 ## Install
 
@@ -24,7 +24,7 @@ uv sync --extra local --group dev
 Package install:
 
 ```bash
-pip install 'ck-search[local]'
+pip install 'ck-mlx[local]'
 ```
 
 ## Backend selection
@@ -44,8 +44,8 @@ Override that behavior with either:
 Local mode downloads Hugging Face MLX models on first use. No running server is required.
 
 ```bash
-CK_BACKEND=local uv run ck index . --force
-CK_BACKEND=local uv run ck search "rerank provider" --mode hybrid --rerank
+CK_BACKEND=local uv run ck-mlx index . --force
+CK_BACKEND=local uv run ck-mlx search "rerank provider" --mode hybrid --rerank
 ```
 
 Default local models:
@@ -73,14 +73,14 @@ export CK_BACKEND=api
 export OMLX_BASE_URL=http://127.0.0.1:8000/v1
 export OMLX_API_KEY=omlx-local
 export OMLX_MODEL=zembed-1-embedding-mlx-6Bit
-uv run ck index . --force
+uv run ck-mlx index . --force
 ```
 
 ## Commands
 
-- `uv run ck index <path>` builds or refreshes the local index.
-- `uv run ck search "query" --mode hybrid` searches the current index.
-- `uv run ck status` reports the active backend, model selection, and index metadata.
+- `uv run ck-mlx index <path>` builds or refreshes the local index.
+- `uv run ck-mlx search "query" --mode hybrid` searches the current index.
+- `uv run ck-mlx status` reports the active backend, model selection, and index metadata.
 
 Indexes are stored under `.ck/index.db`.
 

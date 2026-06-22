@@ -9,7 +9,7 @@ from ck_mlx.cli_query import search_command, status_command
 
 INDEX_DIR_NAME = ".ck"
 
-app = typer.Typer(help="ck-search — local code search with API or MLX backends")
+app = typer.Typer(help="ck-mlx — local code search with API or MLX backends")
 
 
 @app.callback()

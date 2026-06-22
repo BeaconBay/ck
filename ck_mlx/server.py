@@ -10,7 +10,7 @@ from ck_mlx.walk import walk_files
 
 INDEX_DIR_NAME = ".ck"
 
-mcp = FastMCP("ck-search")
+mcp = FastMCP("ck-mlx")
 
 
 def find_index_root(start_path: Path) -> Path:
