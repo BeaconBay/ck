@@ -1,42 +1,19 @@
-# Rust
-target/
-**/*.rs.bk
-
-# ck index files
-.ck/
-.ckignore
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Debug
-*.pdb
-
-.fastembed_cache
-.cache
-
-# MCP config files (user-specific)
-.mcp.json
-*mcp_config*.json
-
-# Documentation site (Node.js)
-docs-site/node_modules/
-docs-site/.vitepress/dist/
-docs-site/.vitepress/cache/
-docs-site/.vitepress/.temp
-
-# Claude Code local settings
-.claude/
-docs/tasks
-
-# npm distribution (root) — produced by scripts/install.js
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
 dist/
-node_modules/
-package-lock.json
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Local indexes
+.ck/
+.ck-mlx/
+
+# Local tooling/runtime state
+.codegraph
+.omx/
+.serena/

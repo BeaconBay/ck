@@ -1,1 +1,0 @@
-Hollywood This is demo file 1 with some content for indexing. It contains words like function, class, error handling, and database connections.

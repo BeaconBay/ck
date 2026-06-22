@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ck-search"
+version = "0.1.0"
+description = "Local code search with API or MLX-native embedding backends"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastmcp>=3.4.2",
+    "openai>=2.43.0",
+    "pathspec>=1.1.1",
+    "sqlite-vec>=0.1.9",
+    "tokenizers>=0.22.0,<=0.23.0",
+    "tree-sitter-language-pack>=1.10.1",
+    "typer>=0.25.1",
+]
+
+[project.optional-dependencies]
+local = [
+    "huggingface_hub>=0.24.0",
+    "mlx-embeddings>=0.1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
+
+[project.scripts]
+ck = "ck_mlx.cli:app"
+ck-search = "ck_mlx.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ck_mlx"]
