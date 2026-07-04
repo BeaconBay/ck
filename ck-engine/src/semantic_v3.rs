@@ -26,13 +26,16 @@ pub async fn semantic_search_v3_with_progress(
         }
     });
 
-    let index_dir = index_root.join(".ck");
+    let index_dir = ck_core::index_dir(&index_root);
     if !index_dir.exists() {
         return Err(CkError::Index(
             "Index creation failed. Please try running 'ck --index' explicitly.".to_string(),
         )
         .into());
     }
+    // Refuse to serve results from an index dir that a different root claimed
+    // via a CK_INDEX_DIR basename-hash collision. No-op in-tree.
+    ck_core::check_index_root_marker(&index_root)?;
 
     if let Some(ref callback) = progress_callback {
         callback("Loading embeddings from sidecar files...");

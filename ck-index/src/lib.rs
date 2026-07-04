@@ -192,7 +192,7 @@ pub fn collect_files(
     path: &Path,
     options: &ck_core::FileCollectionOptions,
 ) -> Result<Vec<PathBuf>> {
-    let index_dir = path.join(".ck");
+    let index_dir = ck_core::index_dir(path);
 
     if options.respect_gitignore {
         let overrides = build_overrides(path, &options.exclude_patterns)?;
@@ -295,7 +295,7 @@ pub async fn index_directory(
     options: &ck_core::FileCollectionOptions,
     model: Option<&str>,
 ) -> Result<()> {
-    let _lock = acquire_index_write_lock(&path.join(".ck"))?;
+    let _lock = acquire_index_write_lock(&ck_core::index_dir(path))?;
     index_directory_inner(path, compute_embeddings, options, model).await
 }
 
@@ -310,8 +310,13 @@ async fn index_directory_inner(
         "index_directory called with compute_embeddings={}",
         compute_embeddings
     );
-    let index_dir = path.join(".ck");
+    let index_dir = ck_core::index_dir(path);
     fs::create_dir_all(&index_dir)?;
+    // Under CK_INDEX_DIR, two roots that share a basename hash to the same dir.
+    // Refuse to write into one already claimed by a different root, then stamp
+    // this root so later searches can detect the collision. No-op in-tree.
+    ck_core::check_index_root_marker(path)?;
+    ck_core::write_index_root_marker(path)?;
 
     let manifest_path = index_dir.join("manifest.json");
     let mut manifest = load_or_create_manifest(&manifest_path)?;
@@ -454,7 +459,7 @@ async fn index_directory_inner(
 
 pub async fn index_file(file_path: &Path, compute_embeddings: bool) -> Result<()> {
     let repo_root = find_repo_root(file_path)?;
-    let index_dir = repo_root.join(".ck");
+    let index_dir = ck_core::index_dir(&repo_root);
     let _lock = acquire_index_write_lock(&index_dir)?;
 
     let manifest_path = index_dir.join("manifest.json");
@@ -505,7 +510,7 @@ pub async fn update_index(
     compute_embeddings: bool,
     options: &ck_core::FileCollectionOptions,
 ) -> Result<()> {
-    let index_dir = path.join(".ck");
+    let index_dir = ck_core::index_dir(path);
     let index_existed = index_dir.exists();
     let _lock = acquire_index_write_lock(&index_dir)?;
     if !index_existed {
@@ -645,7 +650,7 @@ pub async fn update_index(
 }
 
 pub fn clean_index(path: &Path) -> Result<()> {
-    let index_dir = path.join(".ck");
+    let index_dir = ck_core::index_dir(path);
     if !index_dir.exists() {
         return Ok(());
     }
@@ -682,7 +687,7 @@ pub fn cleanup_index(
     path: &Path,
     options: &ck_core::FileCollectionOptions,
 ) -> Result<CleanupStats> {
-    let index_dir = path.join(".ck");
+    let index_dir = ck_core::index_dir(path);
     if !index_dir.exists() {
         return Ok(CleanupStats::default());
     }
@@ -714,7 +719,7 @@ pub fn cleanup_index(
 }
 
 pub fn get_index_stats(path: &Path) -> Result<IndexStats> {
-    let index_dir = path.join(".ck");
+    let index_dir = ck_core::index_dir(path);
     if !index_dir.exists() {
         return Ok(IndexStats::default());
     }
@@ -814,8 +819,12 @@ pub async fn smart_update_index_with_detailed_progress(
     options: &ck_core::FileCollectionOptions,
     model: Option<&str>,
 ) -> Result<UpdateStats> {
-    let index_dir = path.join(".ck");
+    let index_dir = ck_core::index_dir(path);
     let _lock = acquire_index_write_lock(&index_dir)?;
+    // Guard against a CK_INDEX_DIR basename-hash collision before any
+    // destructive rebuild, so a colliding root's index isn't clobbered. No-op
+    // in-tree. The claim is written once the directory is established below.
+    ck_core::check_index_root_marker(path)?;
     let mut stats = UpdateStats::default();
 
     // Set up interrupt handler (only once per process)
@@ -848,6 +857,7 @@ pub async fn smart_update_index_with_detailed_progress(
 
     // Then perform incremental update
     fs::create_dir_all(&index_dir)?;
+    ck_core::write_index_root_marker(path)?;
     let manifest_path = index_dir.join("manifest.json");
     let mut manifest = load_or_create_manifest(&manifest_path)?;
     normalize_manifest_paths(&mut manifest, &repo_root);
@@ -1589,7 +1599,7 @@ fn find_repo_root(path: &Path) -> Result<PathBuf> {
     };
 
     loop {
-        if current.join(".ck").exists() || current.join(".git").exists() {
+        if ck_core::index_exists(current) || current.join(".git").exists() {
             return Ok(current.to_path_buf());
         }
 
@@ -1752,6 +1762,7 @@ pub struct UpdateStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use std::fs;
     use tempfile::TempDir;
 
@@ -1958,7 +1969,9 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_cleanup_index() {
+        unsafe { std::env::remove_var(ck_core::INDEX_DIR_ENV) };
         let temp_dir = TempDir::new().unwrap();
         let test_path = temp_dir.path();
 
@@ -2022,7 +2035,9 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_clean_index_removes_index_dir() {
+        unsafe { std::env::remove_var(ck_core::INDEX_DIR_ENV) };
         let temp_dir = TempDir::new().unwrap();
         let test_path = temp_dir.path();
         let index_dir = test_path.join(".ck");
@@ -2038,7 +2053,9 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_get_index_stats() {
+        unsafe { std::env::remove_var(ck_core::INDEX_DIR_ENV) };
         let temp_dir = TempDir::new().unwrap();
         let test_path = temp_dir.path();
 

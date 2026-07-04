@@ -591,9 +591,129 @@ pub fn build_exclude_patterns(additional_excludes: &[String], use_defaults: bool
     patterns
 }
 
+/// Environment variable that relocates ck's per-root index directories out of
+/// the source tree. See [`index_dir`].
+pub const INDEX_DIR_ENV: &str = "CK_INDEX_DIR";
+
+/// File written inside a relocated index directory recording the absolute
+/// search root it was built for, so a basename-hash collision under
+/// [`INDEX_DIR_ENV`] can be detected rather than silently sharing an index.
+const INDEX_ROOT_MARKER: &str = "root_path";
+
+/// The configured relocation base, or `None` when [`INDEX_DIR_ENV`] is unset or
+/// empty (in which case indexes live in-tree at `<root>/.ck`).
+fn relocation_base() -> Option<PathBuf> {
+    match std::env::var(INDEX_DIR_ENV) {
+        Ok(base) if !base.is_empty() => Some(absolute_for_hash(Path::new(&base))),
+        _ => None,
+    }
+}
+
+/// Best-effort absolute form of `path`, stable across calls but not required to
+/// exist on disk.
+///
+/// Prefers [`std::fs::canonicalize`] (resolves symlinks, requires existence),
+/// falling back to [`std::path::absolute`] (lexical, anchored at the current
+/// directory, no filesystem access), and finally to `path` itself. Never
+/// panics.
+fn absolute_for_hash(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path)
+        .or_else(|_| std::path::absolute(path))
+        .unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// Returns the directory that holds ck's index and sidecar files for a search
+/// root.
+///
+/// By default this is `<root>/.ck`, keeping the index alongside the data it
+/// describes. When [`INDEX_DIR_ENV`] is set to a non-empty value, the index is
+/// relocated to `$CK_INDEX_DIR/<basename>-<hash8>`, where `<basename>` is the
+/// final component of `root` and `<hash8>` is the first 8 hex characters of the
+/// blake3 hash of the root's absolute path. This keeps repositories free of
+/// in-tree `.ck` directories while giving each root a stable, collision-
+/// resistant location even when two roots share a basename.
+///
+/// Both the relocation base and the root are absolutized, so the returned path
+/// is absolute and independent of the current directory (a relative
+/// `CK_INDEX_DIR` is anchored at the launch directory). The environment
+/// variable is read on every call, so callers (and tests) may change it at
+/// runtime. An empty value is treated as unset. This function never panics: if
+/// a path cannot be made absolute it degrades gracefully (see
+/// [`absolute_for_hash`]).
+pub fn index_dir(root: &Path) -> PathBuf {
+    match relocation_base() {
+        Some(base) => {
+            let abs = absolute_for_hash(root);
+            let basename = abs
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "root".to_string());
+            let hash = blake3::hash(abs.to_string_lossy().as_bytes());
+            let hash8 = &hash.to_hex()[..8];
+            base.join(format!("{basename}-{hash8}"))
+        }
+        None => root.join(".ck"),
+    }
+}
+
+/// Returns `true` if the index directory for `root` (see [`index_dir`]) exists.
+pub fn index_exists(root: &Path) -> bool {
+    index_dir(root).exists()
+}
+
+/// Record which search root a relocated index directory belongs to.
+///
+/// A no-op unless the index is relocated via [`INDEX_DIR_ENV`] — an in-tree
+/// `.ck` directory lives under its own root and cannot collide. Callers write
+/// the marker when they create or populate an index directory so a later
+/// [`check_index_root_marker`] can detect a basename-hash collision.
+pub fn write_index_root_marker(root: &Path) -> std::io::Result<()> {
+    if relocation_base().is_none() {
+        return Ok(());
+    }
+    let dir = index_dir(root);
+    std::fs::create_dir_all(&dir)?;
+    std::fs::write(
+        dir.join(INDEX_ROOT_MARKER),
+        absolute_for_hash(root).to_string_lossy().as_bytes(),
+    )
+}
+
+/// Verify that an existing relocated index directory belongs to `root`.
+///
+/// A no-op unless the index is relocated via [`INDEX_DIR_ENV`]. Returns an
+/// error when the directory carries a marker for a different root — a basename
+/// hash collision under `CK_INDEX_DIR` — rather than silently serving another
+/// root's index. A missing marker (no directory yet, or an index built before
+/// markers existed) is tolerated.
+pub fn check_index_root_marker(root: &Path) -> Result<()> {
+    if relocation_base().is_none() {
+        return Ok(());
+    }
+    let dir = index_dir(root);
+    match std::fs::read_to_string(dir.join(INDEX_ROOT_MARKER)) {
+        Ok(stored) => {
+            let expected = absolute_for_hash(root);
+            if stored.trim() == expected.to_string_lossy() {
+                Ok(())
+            } else {
+                Err(CkError::Index(format!(
+                    "index directory {} was built for a different search root ({}), not {}; \
+                     this is a CK_INDEX_DIR basename-hash collision — point CK_INDEX_DIR at a \
+                     different location for one of the roots",
+                    dir.display(),
+                    stored.trim(),
+                    expected.display(),
+                )))
+            }
+        }
+        Err(_) => Ok(()),
+    }
+}
+
 pub fn get_sidecar_path(repo_root: &Path, file_path: &Path) -> PathBuf {
     let relative = file_path.strip_prefix(repo_root).unwrap_or(file_path);
-    let mut sidecar = repo_root.join(".ck");
+    let mut sidecar = index_dir(repo_root);
     sidecar.push(relative);
     let ext = relative
         .extension()
@@ -668,7 +788,7 @@ pub mod pdf {
     /// Get path for cached PDF content
     pub fn get_content_cache_path(repo_root: &Path, file_path: &Path) -> PathBuf {
         let relative = file_path.strip_prefix(repo_root).unwrap_or(file_path);
-        let mut cache_path = repo_root.join(".ck").join("content");
+        let mut cache_path = crate::index_dir(repo_root).join("content");
         cache_path.push(relative);
 
         // Add .txt extension to the cached file
@@ -684,6 +804,7 @@ pub mod pdf {
     #[cfg(test)]
     mod tests {
         use super::*;
+        use serial_test::serial;
         use std::path::PathBuf;
 
         #[test]
@@ -697,7 +818,9 @@ pub mod pdf {
         }
 
         #[test]
+        #[serial]
         fn test_get_content_cache_path() {
+            unsafe { std::env::remove_var(crate::INDEX_DIR_ENV) };
             let repo_root = PathBuf::from("/project");
             let file_path = PathBuf::from("/project/docs/manual.pdf");
 
@@ -709,7 +832,9 @@ pub mod pdf {
         }
 
         #[test]
+        #[serial]
         fn test_get_content_cache_path_no_extension() {
+            unsafe { std::env::remove_var(crate::INDEX_DIR_ENV) };
             let repo_root = PathBuf::from("/project");
             let file_path = PathBuf::from("/project/docs/manual");
 
@@ -721,7 +846,9 @@ pub mod pdf {
         }
 
         #[test]
+        #[serial]
         fn test_get_content_cache_path_relative() {
+            unsafe { std::env::remove_var(crate::INDEX_DIR_ENV) };
             let repo_root = PathBuf::from("/project");
             let file_path = PathBuf::from("docs/manual.pdf"); // Relative path
 
@@ -737,6 +864,7 @@ pub mod pdf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use std::fs;
     use tempfile::TempDir;
 
@@ -995,7 +1123,9 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_get_sidecar_path() {
+        unsafe { std::env::remove_var(INDEX_DIR_ENV) };
         let repo_root = PathBuf::from("/home/user/project");
         let file_path = PathBuf::from("/home/user/project/src/main.rs");
 
@@ -1006,7 +1136,9 @@ mod tests {
     }
 
     #[test]
+    #[serial]
     fn test_get_sidecar_path_no_extension() {
+        unsafe { std::env::remove_var(INDEX_DIR_ENV) };
         let repo_root = PathBuf::from("/project");
         let file_path = PathBuf::from("/project/README");
 
@@ -1514,5 +1646,188 @@ mod tests {
         // Patterns should be trimmed
         assert!(!patterns.iter().any(|p| p.starts_with(' ')));
         assert!(!patterns.iter().any(|p| p.ends_with(' ')));
+    }
+
+    // Tests that mutate CK_INDEX_DIR are #[serial]: the variable is
+    // process-global and Rust runs tests in parallel threads by default.
+
+    #[test]
+    #[serial]
+    fn test_index_dir_unset_is_dot_ck() {
+        unsafe { std::env::remove_var(INDEX_DIR_ENV) };
+        let root = Path::new("/some/project");
+        assert_eq!(index_dir(root), root.join(".ck"));
+        assert_eq!(
+            get_sidecar_path(root, &root.join("main.rs")).parent(),
+            Some(root.join(".ck").as_path())
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_index_dir_empty_is_treated_as_unset() {
+        unsafe { std::env::set_var(INDEX_DIR_ENV, "") };
+        let root = Path::new("/some/project");
+        assert_eq!(index_dir(root), root.join(".ck"));
+        unsafe { std::env::remove_var(INDEX_DIR_ENV) };
+    }
+
+    #[test]
+    #[serial]
+    fn test_index_dir_set_uses_basename_and_hash() {
+        let base = TempDir::new().unwrap();
+        unsafe { std::env::set_var(INDEX_DIR_ENV, base.path()) };
+
+        let root = TempDir::new().unwrap();
+        let dir = index_dir(root.path());
+        unsafe { std::env::remove_var(INDEX_DIR_ENV) };
+
+        // Recompute the documented formula against the canonicalized base and
+        // root (index_dir absolutizes both).
+        let base_abs = std::fs::canonicalize(base.path()).unwrap();
+        let abs = std::fs::canonicalize(root.path()).unwrap();
+        let basename = abs.file_name().unwrap().to_string_lossy().into_owned();
+        let hash8 = blake3::hash(abs.to_string_lossy().as_bytes()).to_hex()[..8].to_string();
+        let expected = base_abs.join(format!("{basename}-{hash8}"));
+        assert_eq!(dir, expected);
+
+        // Structural checks: absolute, lives directly under the base, 8-hex suffix.
+        assert!(dir.is_absolute());
+        assert_eq!(dir.parent().unwrap(), base_abs);
+        let name = dir.file_name().unwrap().to_string_lossy().into_owned();
+        let suffix = name.rsplit('-').next().unwrap();
+        assert_eq!(suffix.len(), 8);
+        assert!(suffix.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    #[serial]
+    fn test_index_dir_same_basename_different_roots_differ() {
+        let base = TempDir::new().unwrap();
+        unsafe { std::env::set_var(INDEX_DIR_ENV, base.path()) };
+
+        // Two distinct roots that share the basename "proj" must not collide.
+        let parent_a = TempDir::new().unwrap();
+        let parent_b = TempDir::new().unwrap();
+        let root_a = parent_a.path().join("proj");
+        let root_b = parent_b.path().join("proj");
+        fs::create_dir_all(&root_a).unwrap();
+        fs::create_dir_all(&root_b).unwrap();
+
+        let dir_a = index_dir(&root_a);
+        let dir_b = index_dir(&root_b);
+        unsafe { std::env::remove_var(INDEX_DIR_ENV) };
+
+        assert_ne!(dir_a, dir_b, "same basename must map to distinct dirs");
+        assert!(
+            dir_a
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("proj-")
+        );
+        assert!(
+            dir_b
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with("proj-")
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_index_dir_absolute_base_is_cwd_independent() {
+        // With an absolute CK_INDEX_DIR, a given root maps to the same index dir
+        // regardless of the process's current directory — so the index and its
+        // write lock don't silently fork per cwd.
+        let base = TempDir::new().unwrap();
+        unsafe { std::env::set_var(INDEX_DIR_ENV, base.path()) };
+        let root = TempDir::new().unwrap();
+        let cwd1 = TempDir::new().unwrap();
+        let cwd2 = TempDir::new().unwrap();
+        let original = std::env::current_dir().ok();
+
+        std::env::set_current_dir(cwd1.path()).unwrap();
+        let dir1 = index_dir(root.path());
+        std::env::set_current_dir(cwd2.path()).unwrap();
+        let dir2 = index_dir(root.path());
+        if let Some(orig) = original {
+            let _ = std::env::set_current_dir(orig);
+        }
+        unsafe { std::env::remove_var(INDEX_DIR_ENV) };
+
+        assert_eq!(
+            dir1, dir2,
+            "index_dir must not depend on the current directory"
+        );
+        assert!(dir1.is_absolute());
+    }
+
+    #[test]
+    #[serial]
+    fn test_index_dir_relative_base_is_absolutized() {
+        // A relative CK_INDEX_DIR is anchored at the launch directory and
+        // resolved to an absolute path, rather than a bare relative path that
+        // downstream filesystem and lock operations would resolve against
+        // whatever cwd each happened to run in.
+        let root = TempDir::new().unwrap();
+        unsafe { std::env::set_var(INDEX_DIR_ENV, "rel-index-base") };
+        let dir = index_dir(root.path());
+        unsafe { std::env::remove_var(INDEX_DIR_ENV) };
+
+        assert!(
+            dir.is_absolute(),
+            "relocated index_dir must be absolute even for a relative CK_INDEX_DIR"
+        );
+        assert!(dir.to_string_lossy().contains("rel-index-base"));
+    }
+
+    #[test]
+    #[serial]
+    fn test_index_exists_tracks_index_dir() {
+        unsafe { std::env::remove_var(INDEX_DIR_ENV) };
+        let root = TempDir::new().unwrap();
+        assert!(!index_exists(root.path()));
+        fs::create_dir_all(index_dir(root.path())).unwrap();
+        assert!(index_exists(root.path()));
+    }
+
+    #[test]
+    #[serial]
+    fn test_index_root_marker_noop_when_unset() {
+        unsafe { std::env::remove_var(INDEX_DIR_ENV) };
+        let root = TempDir::new().unwrap();
+        // With no relocation, the marker helpers do nothing and never create a
+        // marker under the in-tree .ck (which can't collide anyway).
+        write_index_root_marker(root.path()).unwrap();
+        assert!(check_index_root_marker(root.path()).is_ok());
+        assert!(!root.path().join(".ck").join("root_path").exists());
+    }
+
+    #[test]
+    #[serial]
+    fn test_check_index_root_marker_detects_collision() {
+        let base = TempDir::new().unwrap();
+        unsafe { std::env::set_var(INDEX_DIR_ENV, base.path()) };
+        let parent = TempDir::new().unwrap();
+        let root = parent.path().join("proj");
+        fs::create_dir_all(&root).unwrap();
+
+        // A markerless dir, then a self-marked dir, both validate.
+        assert!(check_index_root_marker(&root).is_ok());
+        write_index_root_marker(&root).unwrap();
+        assert!(check_index_root_marker(&root).is_ok());
+
+        // A marker naming a different root (a basename-hash collision) is
+        // rejected rather than silently reused.
+        let dir = index_dir(&root);
+        fs::write(dir.join("root_path"), b"/a/completely/different/root").unwrap();
+        let result = check_index_root_marker(&root);
+        unsafe { std::env::remove_var(INDEX_DIR_ENV) };
+        assert!(
+            result.is_err(),
+            "a marker for a different root must be rejected"
+        );
     }
 }

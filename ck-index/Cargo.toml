@@ -38,3 +38,4 @@ fastembed = ["ck-embed/fastembed", "ck-chunk/fastembed"]
 mixedbread = ["ck-embed/mixedbread", "ck-chunk/mixedbread"]
 
 [dev-dependencies]
+serial_test = "2.0"

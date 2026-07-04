@@ -382,8 +382,12 @@ async fn test_mcp_semantic_search_with_missing_files() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_mcp_index_status_reports_real_index_size() {
     use ck_search::IndexStatusRequest;
+    // This test asserts the in-tree `.ck` size, so pin default behavior even if
+    // CK_INDEX_DIR is set in the ambient environment.
+    unsafe { std::env::remove_var("CK_INDEX_DIR") };
 
     let temp_dir = create_test_files().await;
     let server = CkMcpServer::new(temp_dir.path().to_path_buf()).unwrap();

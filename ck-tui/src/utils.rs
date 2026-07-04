@@ -50,7 +50,7 @@ pub fn find_repo_root(path: &Path) -> Option<PathBuf> {
     };
 
     loop {
-        if current.join(".ck").exists() {
+        if ck_core::index_exists(current) {
             return Some(current.to_path_buf());
         }
         match current.parent() {
