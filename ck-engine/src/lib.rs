@@ -898,9 +898,18 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
     let searcher = reader.searcher();
     let query_parser = QueryParser::for_index(&index, vec![content_field]);
 
-    let query = query_parser
-        .parse_query(&options.query)
-        .map_err(|e| CkError::Search(format!("Failed to parse query: {e}")))?;
+    // Parse leniently so any string is a valid query: syntax tantivy can't
+    // interpret (unbalanced quotes, stray field colons, bare boolean operators)
+    // degrades to the terms it can parse instead of erroring. A query that
+    // already parses cleanly yields the same query object with no errors, so
+    // its results and scores are unchanged.
+    let (query, parse_errors) = query_parser.parse_query_lenient(&options.query);
+    for error in &parse_errors {
+        tracing::debug!(
+            "lenient parse of lexical query {:?}: {error:?}",
+            options.query
+        );
+    }
 
     let top_docs = if let Some(top_k) = options.top_k {
         searcher.search(&query, &TopDocs::with_limit(top_k))?
@@ -2262,6 +2271,130 @@ mod tests {
             all_in_scope,
             "Some results leaked out of the requested scope: {:?}",
             results.iter().map(|r| &r.file).collect::<Vec<_>>()
+        );
+    }
+
+    #[test]
+    fn test_lenient_parse_matches_strict_for_valid_query() {
+        // Invariance: a query that already parses cleanly yields the same
+        // documents and scores whether parsed strictly or leniently.
+        let mut schema_builder = Schema::builder();
+        let content_field = schema_builder.add_text_field("content", TEXT | STORED);
+        let schema = schema_builder.build();
+        let index = Index::create_in_ram(schema);
+        {
+            let mut writer = index.writer(50_000_000).unwrap();
+            writer
+                .add_document(doc!(content_field => "zebra alpha"))
+                .unwrap();
+            writer
+                .add_document(doc!(content_field => "zebra zebra beta"))
+                .unwrap();
+            writer
+                .add_document(doc!(content_field => "gamma delta"))
+                .unwrap();
+            writer.commit().unwrap();
+        }
+        let searcher = index.reader().unwrap().searcher();
+        let query_parser = QueryParser::for_index(&index, vec![content_field]);
+
+        let strict = query_parser.parse_query("zebra").unwrap();
+        let (lenient, errors) = query_parser.parse_query_lenient("zebra");
+        assert!(errors.is_empty(), "valid query must parse without errors");
+
+        let strict_hits = searcher.search(&strict, &TopDocs::with_limit(10)).unwrap();
+        let lenient_hits = searcher.search(&lenient, &TopDocs::with_limit(10)).unwrap();
+        assert_eq!(strict_hits.len(), lenient_hits.len());
+        for ((s_score, s_addr), (l_score, l_addr)) in strict_hits.iter().zip(lenient_hits.iter()) {
+            assert_eq!(s_addr, l_addr, "same documents in the same order");
+            assert!((s_score - l_score).abs() < 1e-6, "same scores");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_lexical_search_recovers_from_unbalanced_quote() {
+        // parse_query hard-errors on an unbalanced quote; lenient parsing
+        // recovers the bare term and still matches.
+        let temp_dir = TempDir::new().unwrap();
+        fs::write(
+            temp_dir.path().join("mod.py"),
+            "def gamma():\n    zebra = 3\n",
+        )
+        .unwrap();
+        fs::create_dir_all(temp_dir.path().join(".ck")).unwrap();
+
+        let options = SearchOptions {
+            mode: SearchMode::Lexical,
+            query: "zebra\"".to_string(),
+            path: temp_dir.path().to_path_buf(),
+            recursive: true,
+            ..Default::default()
+        };
+
+        let results = lexical_search(&options)
+            .await
+            .expect("lenient parse must not error on an unbalanced quote");
+        assert!(
+            results
+                .iter()
+                .any(|r| r.file.file_name().unwrap() == "mod.py")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_lexical_search_recovers_term_from_field_colon() {
+        // A clause referencing an unknown field is dropped; the bare term still
+        // matches, where parse_query would have failed the whole query.
+        let temp_dir = TempDir::new().unwrap();
+        fs::write(
+            temp_dir.path().join("mod.py"),
+            "def gamma():\n    zebra = 3\n",
+        )
+        .unwrap();
+        fs::create_dir_all(temp_dir.path().join(".ck")).unwrap();
+
+        let options = SearchOptions {
+            mode: SearchMode::Lexical,
+            query: "zebra foo:baz".to_string(),
+            path: temp_dir.path().to_path_buf(),
+            recursive: true,
+            ..Default::default()
+        };
+
+        let results = lexical_search(&options)
+            .await
+            .expect("lenient parse must not error on a stray field colon");
+        assert!(
+            results
+                .iter()
+                .any(|r| r.file.file_name().unwrap() == "mod.py")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_lexical_search_all_fragments_error_degrades_gracefully() {
+        // Every fragment references an unknown field, so nothing is
+        // interpretable. parse_query would error; lenient parsing yields normal
+        // results (here empty) instead.
+        let temp_dir = TempDir::new().unwrap();
+        fs::write(
+            temp_dir.path().join("mod.py"),
+            "def gamma():\n    zebra = 3\n",
+        )
+        .unwrap();
+        fs::create_dir_all(temp_dir.path().join(".ck")).unwrap();
+
+        let options = SearchOptions {
+            mode: SearchMode::Lexical,
+            query: "title:zebra".to_string(),
+            path: temp_dir.path().to_path_buf(),
+            recursive: true,
+            ..Default::default()
+        };
+
+        assert!(
+            lexical_search(&options).await.is_ok(),
+            "an all-unknown-field query must degrade gracefully, not error"
         );
     }
 }
