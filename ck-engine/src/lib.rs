@@ -189,7 +189,7 @@ fn find_nearest_index_root(path: &Path) -> Option<StdPathBuf> {
         path
     };
     loop {
-        if current.join(".ck").exists() {
+        if ck_core::index_exists(current) {
             return Some(current.to_path_buf());
         }
         match current.parent() {
@@ -232,7 +232,7 @@ pub(crate) fn resolve_model_from_root(
     use ck_models::ModelRegistry;
 
     let registry = ModelRegistry::default();
-    let index_dir = index_root.join(".ck");
+    let index_dir = ck_core::index_dir(index_root);
     let manifest_path = index_dir.join("manifest.json");
 
     if manifest_path.exists() {
@@ -831,10 +831,13 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
         }
     });
 
-    let index_dir = index_root.join(".ck");
+    let index_dir = ck_core::index_dir(&index_root);
     if !index_dir.exists() {
         return Err(CkError::Index("No index found. Run 'ck index' first.".to_string()).into());
     }
+    // Refuse to serve results from an index dir that a different root claimed
+    // via a CK_INDEX_DIR basename-hash collision. No-op in-tree.
+    ck_core::check_index_root_marker(&index_root)?;
 
     let tantivy_index_path = index_dir.join("tantivy_index");
 

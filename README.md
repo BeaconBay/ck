@@ -420,6 +420,23 @@ project/
 
 The `.ck/` directory is a cache — safe to delete and rebuild anytime.
 
+#### Relocating the index (`CK_INDEX_DIR`)
+
+Set the `CK_INDEX_DIR` environment variable to keep indexes out of your source
+tree entirely. Each search root is then indexed under
+`$CK_INDEX_DIR/<basename>-<hash>`, where `<hash>` is derived from the root's
+absolute path so roots that share a name don't collide:
+
+```bash
+export CK_INDEX_DIR="$HOME/.cache/ck"
+ck --index ~/code/project     # index lives in ~/.cache/ck/project-<hash>/
+```
+
+This is handy for keeping repositories free of in-tree `.ck/` directories,
+caching indexes in CI, or sharing one index location across multiple checkouts
+of the same tree. When `CK_INDEX_DIR` is unset, indexes are stored in `.ck/` as
+above.
+
 ## 🧪 Testing
 
 ```bash

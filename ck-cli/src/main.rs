@@ -513,7 +513,7 @@ async fn run_index_workflow(
     let exclude_patterns = build_exclude_patterns(cli);
 
     if clean_first {
-        let index_dir = path.join(".ck");
+        let index_dir = ck_core::index_dir(path);
         if index_dir.exists() {
             let spinner = status.create_spinner("Removing existing index...");
             ck_index::clean_index(path)?;
@@ -978,7 +978,7 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
             .map_err(|e| anyhow::anyhow!(e.to_string()))?;
 
         if !cli.force {
-            let manifest_path = path.join(".ck").join("manifest.json");
+            let manifest_path = ck_core::index_dir(&path).join("manifest.json");
             if manifest_path.exists()
                 && let Ok(data) = std::fs::read(&manifest_path)
                 && let Ok(manifest) = serde_json::from_slice::<ck_index::IndexManifest>(&data)
@@ -1143,7 +1143,7 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
             });
 
             // Add model information if available
-            let manifest_path = status_path.join(".ck").join("manifest.json");
+            let manifest_path = ck_core::index_dir(&status_path).join("manifest.json");
             if let Ok(data) = std::fs::read(&manifest_path)
                 && let Ok(manifest) = serde_json::from_slice::<ck_index::IndexManifest>(&data)
                 && let Some(model_name) = manifest.embedding_model
@@ -1183,7 +1183,7 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
             status.info(&format!("  Total chunks: {}", stats.total_chunks));
             status.info(&format!("  Embedded chunks: {}", stats.embedded_chunks));
 
-            let manifest_path = status_path.join(".ck").join("manifest.json");
+            let manifest_path = ck_core::index_dir(&status_path).join("manifest.json");
             if let Ok(data) = std::fs::read(&manifest_path)
                 && let Ok(manifest) = serde_json::from_slice::<ck_index::IndexManifest>(&data)
                 && let Some(model_name) = manifest.embedding_model

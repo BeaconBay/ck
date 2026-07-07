@@ -1650,7 +1650,7 @@ impl CkMcpServer {
         let _guard = lock.lock().await;
 
         // Check if index exists and get stats
-        let index_path = path_buf.join(".ck");
+        let index_path = ck_core::index_dir(&path_buf);
         let index_exists = index_path.exists();
 
         let mut index_info = json!({
@@ -1703,7 +1703,7 @@ impl CkMcpServer {
                 index_info["index_size_bytes"] = json!(stats.index_size_bytes);
 
                 // Add model information if available
-                let manifest_path = path_buf.join(".ck").join("manifest.json");
+                let manifest_path = ck_core::index_dir(&path_buf).join("manifest.json");
                 if let Ok(data) = std::fs::read(&manifest_path)
                     && let Ok(manifest) = serde_json::from_slice::<ck_index::IndexManifest>(&data)
                     && let Some(model_name) = manifest.embedding_model

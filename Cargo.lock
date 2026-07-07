@@ -427,6 +427,7 @@ dependencies = [
  "regex",
  "serde",
  "serde_json",
+ "serial_test",
  "tempfile",
  "thiserror 1.0.69",
 ]
@@ -491,6 +492,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_json",
+ "serial_test",
  "tempfile",
  "tokio",
  "tracing",

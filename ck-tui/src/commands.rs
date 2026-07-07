@@ -267,7 +267,7 @@ fn load_chunk_spans(repo_root: &Path, file_path: &Path) -> Result<Vec<IndexedChu
         .strip_prefix(repo_root)
         .unwrap_or(file_path)
         .to_path_buf();
-    let index_dir = repo_root.join(".ck");
+    let index_dir = ck_core::index_dir(repo_root);
     let sidecar_path = index_dir.join(format!("{}.ck", standard_path.display()));
 
     if !sidecar_path.exists() {
