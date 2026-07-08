@@ -371,12 +371,6 @@ fn chunk_generic_with_token_config(text: &str, model_name: Option<&str>) -> Resu
 }
 
 pub(crate) fn tree_sitter_language(language: ParseableLanguage) -> Result<tree_sitter::Language> {
-    // tree-sitter-dart v0.0.4 uses an older API that returns Language directly,
-    // while newer bindings (v0.24+) require calling .into() on a factory struct.
-    if language == ParseableLanguage::Dart {
-        return Ok(tree_sitter_dart::language());
-    }
-
     if language == ParseableLanguage::Markdown {
         return Ok(tree_sitter_md::LANGUAGE.into());
     }
@@ -395,7 +389,7 @@ pub(crate) fn tree_sitter_language(language: ParseableLanguage) -> Result<tree_s
         ParseableLanguage::CSharp => tree_sitter_c_sharp::LANGUAGE,
         ParseableLanguage::Zig => tree_sitter_zig::LANGUAGE,
 
-        ParseableLanguage::Dart => unreachable!("Handled above via early return"),
+        ParseableLanguage::Dart => tree_sitter_dart::LANGUAGE,
 
         ParseableLanguage::Elixir => tree_sitter_elixir::LANGUAGE,
 
