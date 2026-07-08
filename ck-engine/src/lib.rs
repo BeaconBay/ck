@@ -8,7 +8,7 @@ use std::fs;
 use std::path::PathBuf as StdPathBuf;
 use std::path::{Path, PathBuf};
 use tantivy::collector::TopDocs;
-use tantivy::query::QueryParser;
+use tantivy::query::{Query, QueryParser};
 use tantivy::schema::{STORED, Schema, TEXT, Value};
 use tantivy::{Index, ReloadPolicy, TantivyDocument, doc};
 use walkdir::WalkDir;
@@ -821,6 +821,100 @@ fn lexical_corpus_fingerprint(files: &[PathBuf]) -> String {
     hasher.finalize().to_hex().to_string()
 }
 
+/// Split a lexical query into comparison terms the same way tantivy's default
+/// tokenizer does: lowercased and split on non-alphanumeric boundaries.
+fn lexical_query_terms(query: &str) -> Vec<String> {
+    query
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|term| !term.is_empty())
+        .map(str::to_lowercase)
+        .collect()
+}
+
+/// Refine the span and preview reported for a lexical hit down to the chunk
+/// that best matches the query.
+///
+/// `terms` are the content-field terms of the parsed tantivy query (already
+/// tokenized and lowercased), not the raw query string — so field prefixes,
+/// quotes, and boolean operators, which tantivy strips before matching, don't
+/// leak into span selection.
+///
+/// Retrieval is document-granular, so this runs only after the top-k documents
+/// are selected and never changes which documents match or their scores. The
+/// file is chunked with the same chunker the semantic path uses; the winning
+/// chunk is the one with the most whole-token matches for `terms`, ties broken
+/// toward the earliest chunk. When `terms` is empty, no chunk contains a term,
+/// or the content cannot be chunked, the whole-file span and a first-lines
+/// preview are returned unchanged.
+fn locate_lexical_span(
+    file_path: &Path,
+    content: &str,
+    terms: &[String],
+    full_section: bool,
+) -> (Span, String) {
+    let whole_file = || {
+        let span = Span {
+            byte_start: 0,
+            byte_end: content.len(),
+            line_start: 1,
+            line_end: content.lines().count(),
+        };
+        let preview = if full_section {
+            content.to_string()
+        } else {
+            content.lines().take(3).collect::<Vec<_>>().join("\n")
+        };
+        (span, preview)
+    };
+
+    if terms.is_empty() {
+        return whole_file();
+    }
+
+    // Detect language for tree-sitter parsing the same way the indexer does.
+    let lang = if ck_core::pdf::is_pdf_file(file_path) {
+        Some(ck_core::Language::Pdf)
+    } else {
+        ck_core::Language::from_path(file_path)
+    };
+
+    let chunks = match ck_chunk::chunk_text(content, lang) {
+        Ok(chunks) => chunks,
+        Err(_) => return whole_file(),
+    };
+
+    // Keep the earliest chunk with the highest query-term count: only a strictly
+    // greater count replaces the incumbent, so ties favor the earlier chunk.
+    // Count whole-token matches, not substrings — the chunk is tokenized the
+    // same way the query is, so a short term like "in" doesn't tally hits inside
+    // larger words ("string", "printing") and let a coincidental chunk win.
+    let mut best: Option<(usize, &ck_chunk::Chunk)> = None;
+    for chunk in &chunks {
+        let hits = lexical_query_terms(&chunk.text)
+            .into_iter()
+            .filter(|token| terms.contains(token))
+            .count();
+        if hits == 0 {
+            continue;
+        }
+        if best.is_none_or(|(best_hits, _)| hits > best_hits) {
+            best = Some((hits, chunk));
+        }
+    }
+
+    match best {
+        Some((_, chunk)) => {
+            let preview = if full_section {
+                content.to_string()
+            } else {
+                chunk.text.clone()
+            };
+            (chunk.span.clone(), preview)
+        }
+        None => whole_file(),
+    }
+}
+
 async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
     // Handle both files and directories and reuse nearest existing .ck index up the tree
     let index_root = find_nearest_index_root(&options.path).unwrap_or_else(|| {
@@ -914,6 +1008,22 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
         );
     }
 
+    // The content-field terms tantivy will actually match on, used only to
+    // refine each hit's reported span (see locate_lexical_span). Taking them
+    // from the parsed query rather than the raw string means field prefixes,
+    // phrases, and operators are already resolved to their leaf terms.
+    let mut span_terms: Vec<String> = Vec::new();
+    query.query_terms(&mut |term, _| {
+        if term.field() == content_field
+            && let Some(text) = term.value().as_str()
+        {
+            let lowered = text.to_lowercase();
+            if !span_terms.contains(&lowered) {
+                span_terms.push(lowered);
+            }
+        }
+    });
+
     let top_docs = if let Some(top_k) = options.top_k {
         searcher.search(&query, &TopDocs::with_limit(top_k))?
     } else {
@@ -937,22 +1047,14 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
         if !path_matches_include(&file_path, &options.include_patterns) {
             continue;
         }
-        let preview = if options.full_section {
-            content_text.to_string()
-        } else {
-            content_text.lines().take(3).collect::<Vec<_>>().join("\n")
-        };
+        let (span, preview) =
+            locate_lexical_span(&file_path, content_text, &span_terms, options.full_section);
 
         raw_results.push((
             _score,
             SearchResult {
                 file: file_path,
-                span: Span {
-                    byte_start: 0,
-                    byte_end: content_text.len(),
-                    line_start: 1,
-                    line_end: content_text.lines().count(),
-                },
+                span,
                 score: _score,
                 preview,
                 lang: ck_core::Language::from_path(&PathBuf::from(path_text)),
@@ -2399,5 +2501,248 @@ mod tests {
             lexical_search(&options).await.is_ok(),
             "an all-unknown-field query must degrade gracefully, not error"
         );
+    }
+
+    #[test]
+    fn test_lexical_query_terms_tokenization() {
+        assert_eq!(lexical_query_terms("Hello, World!"), vec!["hello", "world"]);
+        assert_eq!(
+            lexical_query_terms("snake_case-and.dots"),
+            vec!["snake", "case", "and", "dots"]
+        );
+        assert!(lexical_query_terms("   ").is_empty());
+        assert!(lexical_query_terms("").is_empty());
+    }
+
+    #[test]
+    fn test_locate_lexical_span_late_section() {
+        // The query term lives in the third function, so its chunk span must
+        // start well below line 1 and bracket the term's line.
+        let content = "fn alpha() {\n    let x = 1;\n}\n\nfn beta() {\n    let y = 2;\n}\n\nfn gamma() {\n    let zebra = 3;\n}\n";
+        let term_line = content.lines().position(|l| l.contains("zebra")).unwrap() + 1;
+
+        let (span, preview) = locate_lexical_span(
+            Path::new("sample.rs"),
+            content,
+            &["zebra".to_string()],
+            false,
+        );
+
+        assert!(span.line_start > 1, "span should not start at line 1");
+        assert!(
+            span.line_start <= term_line && span.line_end >= term_line,
+            "span {}-{} should bracket the term line {term_line}",
+            span.line_start,
+            span.line_end
+        );
+        assert!(preview.to_lowercase().contains("zebra"));
+        // The preview is the chunk, not the whole file.
+        assert!(!preview.contains("fn alpha"));
+    }
+
+    #[test]
+    fn test_locate_lexical_span_no_match_falls_back_to_whole_file() {
+        // A term that no chunk contains yields the whole-file span + first-lines
+        // preview rather than dropping provenance entirely.
+        let content = "fn alpha() {\n    let x = 1;\n}\n\nfn beta() {\n    let y = 2;\n}\n";
+        let (span, preview) = locate_lexical_span(
+            Path::new("sample.rs"),
+            content,
+            &["nonexistentterm".to_string()],
+            false,
+        );
+
+        assert_eq!(span.line_start, 1);
+        assert_eq!(span.line_end, content.lines().count());
+        assert_eq!(span.byte_start, 0);
+        assert_eq!(span.byte_end, content.len());
+        assert_eq!(
+            preview,
+            content.lines().take(3).collect::<Vec<_>>().join("\n")
+        );
+    }
+
+    #[test]
+    fn test_locate_lexical_span_empty_terms_falls_back() {
+        // No query terms (e.g. a query that parsed to nothing on the content
+        // field) yields the whole-file span rather than a spurious chunk.
+        let content = "one\ntwo\nthree\n";
+        let (span, _) = locate_lexical_span(Path::new("f.txt"), content, &[], false);
+        assert_eq!(span.line_start, 1);
+        assert_eq!(span.line_end, content.lines().count());
+    }
+
+    #[test]
+    fn test_locate_lexical_span_full_section_keeps_whole_file() {
+        // full_section=true keeps whole-file content as the preview even though
+        // the span narrows to the matching chunk.
+        let content = "fn alpha() {\n    let x = 1;\n}\n\nfn gamma() {\n    let zebra = 3;\n}\n";
+        let (span, preview) = locate_lexical_span(
+            Path::new("sample.rs"),
+            content,
+            &["zebra".to_string()],
+            true,
+        );
+
+        assert!(span.line_start > 1);
+        assert_eq!(preview, content);
+    }
+
+    #[test]
+    fn test_locate_lexical_span_counts_tokens_not_substrings() {
+        // "in" occurs as a substring inside the first function's words
+        // (printing, index, string) but as a real token only in the second.
+        // Substring counting would score the first chunk 3 and pick it; whole-
+        // token counting scores it 0 and correctly selects the second chunk.
+        let content =
+            "fn printing() {\n    let index = string;\n}\n\nfn other() {\n    let x = \"in\";\n}\n";
+        let target_line = content.lines().position(|l| l.contains("\"in\"")).unwrap() + 1;
+
+        let (span, preview) =
+            locate_lexical_span(Path::new("sample.rs"), content, &["in".to_string()], false);
+
+        assert!(
+            span.line_start > 3,
+            "token counting should select the second function, got line_start {}",
+            span.line_start
+        );
+        assert!(span.line_start <= target_line && span.line_end >= target_line);
+        assert!(preview.contains("\"in\""));
+        assert!(!preview.contains("printing"));
+    }
+
+    #[test]
+    fn test_locate_lexical_span_last_chunk_reaches_eof() {
+        // When the winning chunk is the last one in the file, its span reaches
+        // the final line rather than stopping short.
+        let content = "fn early() {\n    let a = 1;\n}\n\nfn late() {\n    let zebra = 2;\n}\n";
+        let (span, _) =
+            locate_lexical_span(Path::new("s.rs"), content, &["zebra".to_string()], false);
+        assert!(span.line_start > 1);
+        assert_eq!(
+            span.line_end,
+            content.lines().count(),
+            "last chunk span should reach end of file"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_lexical_search_span_uses_parsed_query_terms() {
+        // Regression: span selection must use the PARSED query's terms, not a
+        // re-tokenization of the raw string. `content:zebra` matches "zebra" on
+        // the content field, `index OR zebra` drops the operator, and a phrase
+        // keeps only its leaf terms — but the raw string carries "content" and
+        // "or", which flood the phantom-heavy first chunk and would point the
+        // span at the wrong place.
+        let temp_dir = TempDir::new().unwrap();
+        let mut body = String::from("fn phantoms() {\n");
+        for i in 0..30 {
+            body.push_str(&format!("    let content_{i} = {i};\n"));
+        }
+        for i in 0..30 {
+            body.push_str(&format!("    let or_{i} = {i};\n"));
+        }
+        body.push_str("}\n\nfn target() {\n    let index = 1;\n    let zebra = 2;\n    let pair = \"index zebra\";\n}\n");
+        fs::write(temp_dir.path().join("f.rs"), &body).unwrap();
+        fs::create_dir_all(temp_dir.path().join(".ck")).unwrap();
+        let zebra_line = body.lines().position(|l| l.contains("let zebra")).unwrap() + 1;
+
+        for query in ["content:zebra", "\"index zebra\"", "index OR zebra"] {
+            let options = SearchOptions {
+                mode: SearchMode::Lexical,
+                query: query.to_string(),
+                path: temp_dir.path().to_path_buf(),
+                recursive: true,
+                ..Default::default()
+            };
+            let results = lexical_search(&options).await.unwrap();
+            let hit = results
+                .iter()
+                .find(|r| r.file.file_name().unwrap() == "f.rs")
+                .unwrap_or_else(|| panic!("expected a hit for query {query:?}"));
+            assert!(
+                hit.span.line_start <= zebra_line && hit.span.line_end >= zebra_line,
+                "query {query:?}: span {}-{} should bracket the real match at line {zebra_line}",
+                hit.span.line_start,
+                hit.span.line_end
+            );
+            assert!(
+                hit.preview.to_lowercase().contains("zebra"),
+                "query {query:?}: preview should contain the real match, got {:?}",
+                hit.preview
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_lexical_search_reports_chunk_line_span() {
+        let temp_dir = TempDir::new().unwrap();
+        let file = temp_dir.path().join("late.rs");
+        // The match sits in the final function; padding functions push it down.
+        fs::write(
+            &file,
+            "fn alpha() {\n    let a = 1;\n}\n\nfn beta() {\n    let b = 2;\n}\n\nfn gamma() {\n    let zebra = 3;\n}\n",
+        )
+        .unwrap();
+        // The index directory must exist; the tantivy subindex is then built
+        // lazily on first lexical search, mirroring the CLI's `ck index` step.
+        fs::create_dir_all(temp_dir.path().join(".ck")).unwrap();
+
+        let options = SearchOptions {
+            mode: SearchMode::Lexical,
+            query: "zebra".to_string(),
+            path: temp_dir.path().to_path_buf(),
+            recursive: true,
+            ..Default::default()
+        };
+
+        let results = lexical_search(&options).await.unwrap();
+        let hit = results
+            .iter()
+            .find(|r| r.file.file_name().unwrap() == "late.rs")
+            .expect("expected a hit for late.rs");
+
+        assert!(
+            hit.span.line_start > 1,
+            "lexical hit should report a mid-file line, got line_start {}",
+            hit.span.line_start
+        );
+        assert!(hit.preview.to_lowercase().contains("zebra"));
+    }
+
+    #[tokio::test]
+    async fn test_lexical_search_ranking_unchanged() {
+        // Ranking-invariance guard: span/preview refinement must not perturb
+        // which documents match, their order, or their scores.
+        let temp_dir = TempDir::new().unwrap();
+        fs::write(temp_dir.path().join("a.txt"), "zebra zebra zebra").unwrap();
+        fs::write(temp_dir.path().join("b.txt"), "zebra tail").unwrap();
+        fs::write(temp_dir.path().join("c.txt"), "nothing relevant here").unwrap();
+        fs::create_dir_all(temp_dir.path().join(".ck")).unwrap();
+
+        let options = SearchOptions {
+            mode: SearchMode::Lexical,
+            query: "zebra".to_string(),
+            path: temp_dir.path().to_path_buf(),
+            recursive: true,
+            ..Default::default()
+        };
+
+        let results = lexical_search(&options).await.unwrap();
+        let files: Vec<String> = results
+            .iter()
+            .map(|r| r.file.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+
+        // Only the two documents containing the term match, ordered by score.
+        assert_eq!(files, vec!["a.txt".to_string(), "b.txt".to_string()]);
+        for pair in results.windows(2) {
+            assert!(
+                pair[0].score >= pair[1].score,
+                "results must be in descending score order"
+            );
+        }
+        // Top score is normalized to 1.0, exactly as before this patch.
+        assert!((results[0].score - 1.0).abs() < 1e-6);
     }
 }
