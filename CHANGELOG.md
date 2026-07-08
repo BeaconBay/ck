@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **`--hidden` flag** (re-implements #97, original by @peterkc): Include hidden (dot-prefixed) files and directories in both search and indexing. Off by default to preserve current behavior; when set, the file walker no longer skips dot-prefixed entries. Composes with `--no-ignore`/`--no-ckignore` (independent toggles). Threads through `SearchOptions.hidden` and `FileCollectionOptions.show_hidden` to the `ignore` crate's `WalkBuilder.hidden(!show_hidden)` in `ck-index::collect_files`.
+
 ## [0.7.11] - 2026-05-24
 
 ### Added

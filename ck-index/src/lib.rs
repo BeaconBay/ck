@@ -201,7 +201,7 @@ pub fn collect_files(
             .git_ignore(true)
             .git_global(true)
             .git_exclude(true)
-            .hidden(true);
+            .hidden(!options.show_hidden);
 
         // Add .ckignore support (hierarchical, like .gitignore)
         if options.use_ckignore {
@@ -227,7 +227,7 @@ pub fn collect_files(
             .git_ignore(false)
             .git_global(false)
             .git_exclude(false)
-            .hidden(true);
+            .hidden(!options.show_hidden);
 
         // Add .ckignore support even without gitignore
         if options.use_ckignore {
@@ -1934,6 +1934,7 @@ mod tests {
             respect_gitignore: true,
             use_ckignore: true,
             exclude_patterns: vec![],
+            show_hidden: false,
         };
 
         // First index
@@ -1998,6 +1999,7 @@ mod tests {
             respect_gitignore: true,
             use_ckignore: true,
             exclude_patterns: vec![],
+            show_hidden: false,
         };
         let stats = cleanup_index(test_path, &file_options).unwrap();
         assert_eq!(stats.orphaned_entries_removed, 1);
@@ -2193,6 +2195,7 @@ mod tests {
             respect_gitignore: true,
             use_ckignore: false,
             exclude_patterns: vec![],
+            show_hidden: false,
         };
         let files = collect_files(test_path, &options_respect).unwrap();
         assert_eq!(
@@ -2206,6 +2209,7 @@ mod tests {
             respect_gitignore: false,
             use_ckignore: false,
             exclude_patterns: vec![],
+            show_hidden: false,
         };
         let files = collect_files(test_path, &options_no_ignore).unwrap();
         assert_eq!(
@@ -2235,6 +2239,7 @@ mod tests {
             respect_gitignore: false,
             use_ckignore: true,
             exclude_patterns: vec![],
+            show_hidden: false,
         };
 
         let files = collect_files(test_path, &options).unwrap();
@@ -2267,6 +2272,7 @@ mod tests {
             respect_gitignore: false,
             use_ckignore: false,
             exclude_patterns: vec![],
+            show_hidden: false,
         };
 
         let files_all = collect_files(test_path, &options_both_disabled).unwrap();

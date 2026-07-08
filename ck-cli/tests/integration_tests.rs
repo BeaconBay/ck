@@ -1304,3 +1304,112 @@ fn test_lexical_search_reflects_file_changes() {
         "lexical search returned stale content for a modified file; stdout: {stdout}"
     );
 }
+
+/// Helper: create a workspace with one visible file, one hidden dot-file, and a
+/// hidden directory containing a file. All three share the search term "needle".
+fn setup_hidden_workspace() -> TempDir {
+    let temp_dir = TempDir::new().unwrap();
+    fs::write(
+        temp_dir.path().join("visible.txt"),
+        "needle in visible file",
+    )
+    .unwrap();
+    fs::write(
+        temp_dir.path().join(".hidden-file.txt"),
+        "needle in hidden file",
+    )
+    .unwrap();
+    let hidden_dir = temp_dir.path().join(".hidden-dir");
+    fs::create_dir(&hidden_dir).unwrap();
+    fs::write(hidden_dir.join("inside.txt"), "needle inside hidden dir").unwrap();
+    temp_dir
+}
+
+/// Regex search (the on-the-fly search path) must skip dot-prefixed files and
+/// directories by default, and include them only when `--hidden` is passed.
+#[test]
+#[serial]
+fn test_hidden_flag_regex_search() {
+    let temp_dir = setup_hidden_workspace();
+
+    // Default: hidden files/dirs are excluded from the walker.
+    let output = ck_command()
+        .args(["needle", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck search");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("visible.txt"),
+        "visible file should always match; stdout: {stdout}"
+    );
+    assert!(
+        !stdout.contains(".hidden-file.txt"),
+        "hidden file should NOT match without --hidden; stdout: {stdout}"
+    );
+    assert!(
+        !stdout.contains("inside.txt"),
+        "file in hidden dir should NOT match without --hidden; stdout: {stdout}"
+    );
+
+    // With --hidden: everything is walked.
+    let output = ck_command()
+        .args(["--hidden", "needle", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck --hidden search");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("visible.txt"),
+        "visible file should still match with --hidden; stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains(".hidden-file.txt"),
+        "hidden file SHOULD match with --hidden; stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains("inside.txt"),
+        "file in hidden dir SHOULD match with --hidden; stdout: {stdout}"
+    );
+}
+
+/// Lexical search builds/refreshes a Tantivy corpus via `collect_files`, so it
+/// exercises the index-building walker path. `--hidden` must control whether
+/// dot-prefixed files land in that corpus.
+#[test]
+#[serial]
+fn test_hidden_flag_lexical_index() {
+    let temp_dir = setup_hidden_workspace();
+
+    // Default: hidden content is not indexed, so it cannot be found.
+    let output = ck_command()
+        .args(["--lex", "needle", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck --lex");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains("visible.txt"),
+        "lexical index should contain the visible file; stdout: {stdout}"
+    );
+    assert!(
+        !stdout.contains(".hidden-file.txt") && !stdout.contains("inside.txt"),
+        "hidden content should NOT be in the lexical index without --hidden; stdout: {stdout}"
+    );
+
+    // With --hidden: hidden content is indexed and therefore searchable.
+    let output = ck_command()
+        .args(["--hidden", "--lex", "needle", "."])
+        .current_dir(temp_dir.path())
+        .output()
+        .expect("Failed to run ck --hidden --lex");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        stdout.contains(".hidden-file.txt"),
+        "hidden file SHOULD be in the lexical index with --hidden; stdout: {stdout}"
+    );
+    assert!(
+        stdout.contains("inside.txt"),
+        "file in hidden dir SHOULD be in the lexical index with --hidden; stdout: {stdout}"
+    );
+}
