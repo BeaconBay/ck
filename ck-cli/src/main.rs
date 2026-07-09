@@ -248,6 +248,12 @@ struct Cli {
     no_ckignore: bool,
 
     #[arg(
+        long = "hidden",
+        help = "Include hidden (dot-prefixed) files and directories"
+    )]
+    hidden: bool,
+
+    #[arg(
         long = "print-default-ckignore",
         help = "Print the default .ckignore content that ck generates and exit"
     )]
@@ -608,6 +614,7 @@ async fn run_index_workflow(
         respect_gitignore: !cli.no_ignore,
         use_ckignore: !cli.no_ckignore,
         exclude_patterns: exclude_patterns.clone(),
+        show_hidden: cli.hidden,
     };
     let index_future = ck_index::smart_update_index_with_detailed_progress(
         path,
@@ -1063,6 +1070,7 @@ async fn run_cli_mode(cli: Cli) -> Result<()> {
                 respect_gitignore: !cli.no_ignore,
                 use_ckignore: !cli.no_ckignore,
                 exclude_patterns: exclude_patterns.clone(),
+                show_hidden: cli.hidden,
             };
             let cleanup_stats = ck_index::cleanup_index(&clean_path, &file_options)?;
             status.finish_progress(cleanup_spinner, "Cleanup complete");
@@ -1485,6 +1493,7 @@ fn build_options(cli: &Cli, reindex: bool, _repo_root: Option<&Path>) -> SearchO
         respect_gitignore: !cli.no_ignore,
         use_ckignore: !cli.no_ckignore,
         full_section: cli.full_section,
+        hidden: cli.hidden,
         // Enhanced embedding options (search-time only)
         rerank: cli.rerank,
         rerank_model: cli.rerank_model.clone(),

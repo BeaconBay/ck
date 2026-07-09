@@ -465,6 +465,7 @@ fn regex_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
             respect_gitignore: options.respect_gitignore,
             use_ckignore: options.use_ckignore,
             exclude_patterns: options.exclude_patterns.clone(),
+            show_hidden: options.hidden,
         };
         let collected = ck_index::collect_files(&options.path, &file_options)?;
         filter_files_by_include(collected, &options.include_patterns)
@@ -949,6 +950,7 @@ async fn lexical_search(options: &SearchOptions) -> Result<Vec<SearchResult>> {
         respect_gitignore: options.respect_gitignore,
         use_ckignore: options.use_ckignore,
         exclude_patterns: options.exclude_patterns.clone(),
+        show_hidden: options.hidden,
     };
     let corpus = ck_index::collect_files(&index_root, &file_options)?;
     let fingerprint = lexical_corpus_fingerprint(&corpus);

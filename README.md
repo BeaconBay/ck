@@ -148,6 +148,7 @@ Automatically excludes cache directories, build artifacts, and respects `.gitign
 ck "pattern" .                           # Uses .gitignore + .ckignore + defaults
 ck --no-ignore "pattern" .               # Skip .gitignore (still uses .ckignore)
 ck --no-ckignore "pattern" .             # Skip .ckignore (still uses .gitignore)
+ck --hidden "pattern" .                  # Include hidden (dot-prefixed) files/dirs
 ck --exclude "dist" --exclude "logs" .   # Add custom exclusions
 
 # .ckignore file (created automatically on first index):
