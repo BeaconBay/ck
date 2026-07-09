@@ -146,7 +146,7 @@
     "@types/node": "^25.x",
     "@types/vscode": "^1.120.0",
     "typescript": "^6.0.3",
-    "@vscode/vsce": "^2.24.0"
+    "@vscode/vsce": "^3.9.2"
   },
   "dependencies": {
     "jsonrpc-lite": "^2.2.0"
