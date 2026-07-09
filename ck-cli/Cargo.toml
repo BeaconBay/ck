@@ -45,7 +45,7 @@ schemars = "1.2"
 glob = { workspace = true }
 globset = { workspace = true }
 regex = { workspace = true }
-indicatif = "0.17"
+indicatif = "0.18"
 console = "0.15"
 owo-colors = "4.3"
 walkdir = "2.3"
