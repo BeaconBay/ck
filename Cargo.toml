@@ -58,7 +58,7 @@ tree-sitter-c = "0.24"
 tree-sitter-cpp = "0.23"
 tree-sitter-c-sharp = "0.23"
 tree-sitter-zig = "1.1"
-tree-sitter-dart = "0.0.4"
+tree-sitter-dart = "0.2.0"
 tree-sitter-elixir = "0.3"
 tree-sitter-md = "0.5.3"
 fastembed = { version = "5.13", default-features = false, features = ["hf-hub-rustls-tls", "ort-download-binaries"] }
