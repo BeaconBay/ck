@@ -36,8 +36,8 @@ serde_json = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-rmcp = { version = "0.6", features = ["transport-io"] }
-rmcp-macros = "0.6"
+rmcp = { version = "1.7", features = ["transport-io"] }
+rmcp-macros = "1.7"
 tokio-util = { version = "0.7", features = ["rt", "full"] }
 chrono = { version = "0.4", features = ["serde"] }
 thiserror = { workspace = true }
