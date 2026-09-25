@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'docs-site/**'
+      - '.github/workflows/deploy-docs.yml'
   workflow_dispatch:
 
 permissions:
@@ -24,12 +25,12 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 10
+          package_json_file: docs-site/package.json
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: '24'
           cache: pnpm
           cache-dependency-path: docs-site/pnpm-lock.yaml
 

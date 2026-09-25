@@ -132,7 +132,7 @@ jobs:
             # Both fastembed and mixedbread depend on tokenizers which has esaxx-rs (MT) conflicting with ort-sys (MD)
             # See: https://github.com/huggingface/tokenizers/issues/1482
             # Windows users get regex search only (no semantic search)
-            ${{ env.CARGO_CMD }} build --release --target ${{ matrix.target }} --package ck-search --no-default-features
+            ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --no-default-features
           elif [ "${{ matrix.os }}" = "macos-latest" ]; then
             # macOS approach - use system OpenSSL to avoid cross-compilation issues
             if [ "${{ matrix.target }}" = "x86_64-apple-darwin" ]; then
@@ -364,10 +364,15 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Install npm with trusted publishing support
+        # OIDC requires npm >=11.5.1 and Node >=22.14.0.
+        # https://docs.npmjs.com/trusted-publishers/
+        run: npm install --global npm@11.17.0
 
       - name: Sync package.json version from Cargo.toml + tag
         run: |
@@ -408,7 +413,8 @@ jobs:
     name: Finalize GitHub Release
     needs: [build-release, publish-crates, publish-npm]
     runs-on: ubuntu-latest
-    if: always() && needs.build-release.result == 'success'
+    # Keep the release draft if either registry publish fails.
+    if: needs.build-release.result == 'success' && needs.publish-crates.result == 'success' && needs.publish-npm.result == 'success'
     steps:
       - name: Publish release
         env:
