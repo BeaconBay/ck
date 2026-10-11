@@ -15,6 +15,13 @@ npm install -g @beaconbay/ck-search
 
 This installs the NPM package from [@beaconbay/ck-search](https://www.npmjs.com/package/@beaconbay/ck-search).
 
+### Linux ARM64 compatibility
+
+The Linux ARM64 prebuilt binary targets Ubuntu 24.04 or a distribution with
+glibc 2.39 and libstdc++ providing CXXABI_1.3.15 or newer. Ubuntu 22.04's standard libraries are
+too old for the bundled ONNX Runtime. CI verifies indexing and semantic search
+on Ubuntu 24.04 ARM64 before release.
+
 ### Check for updates
 
 ```bash

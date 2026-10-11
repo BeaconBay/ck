@@ -57,9 +57,9 @@ jobs:
             target: x86_64-unknown-linux-gnu
             use-cross: false
           - build: linux-aarch64
-            os: ubuntu-latest
+            os: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
-            use-cross: true
+            use-cross: false
 
           # macOS builds
           - build: macos-x86_64
@@ -93,7 +93,7 @@ jobs:
           targets: ${{ matrix.target }}
       
       - name: Install build dependencies (Ubuntu)
-        if: matrix.os == 'ubuntu-latest' && !matrix.use-cross
+        if: startsWith(matrix.os, 'ubuntu-') && !matrix.use-cross
         run: |
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev perl make
@@ -145,12 +145,7 @@ jobs:
               ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
             fi
           else
-            # Linux approach from 4cf1a9b - keep working approach unchanged
-            if [ "${{ matrix.target }}" = "x86_64-pc-windows-gnu" ]; then
-              ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search
-            else
-              ${{ env.CARGO_CMD }} build --locked --release --target ${{ matrix.target }} --package ck-search --features=openssl/vendored
-            fi
+            bash .github/scripts/build-linux-release.sh "${{ matrix.target }}"
           fi
         shell: bash
       

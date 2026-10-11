@@ -30,7 +30,7 @@ jobs:
     permissions:
       contents: none
     name: CI
-    needs: [test, msrv, lockfile, rustfmt, clippy, docs, vscode, release-checks]
+    needs: [test, msrv, lockfile, rustfmt, clippy, docs, vscode, release-checks, linux-arm-release]
     runs-on: ubuntu-latest
     if: "always()"
     steps:
@@ -110,6 +110,27 @@ jobs:
         node-version: '24'
     - run: node --test .github/tests/test_install_targets.cjs
     - run: python3 .github/tests/test_release_finalization.py -v
+  linux-arm-release:
+    name: Linux ARM64 release smoke test
+    runs-on: ubuntu-24.04-arm
+    steps:
+    - uses: actions/checkout@v7
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-unknown-linux-gnu
+    - uses: Swatinem/rust-cache@v2
+    - name: Install native build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pkg-config libssl-dev perl make
+    - name: Build the release binary
+      run: bash .github/scripts/build-linux-release.sh aarch64-unknown-linux-gnu
+    - name: Exercise the release binary
+      run: |
+        binary="$PWD/target/aarch64-unknown-linux-gnu/release/ck"
+        ldd "$binary"
+        readelf --version-info "$binary" | grep -E "Name: (GLIBC|GLIBCXX|CXXABI)"
+        bash .github/tests/test_release_binary.sh "$binary"
   msrv:
     name: "Check MSRV"
     runs-on: ubuntu-latest
