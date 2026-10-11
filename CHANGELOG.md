@@ -10,7 +10,7 @@ This is the first published 0.8 release. The 0.8.0 build attempt stopped before
 registry publication because the Linux ARM64 cross-build lacked host OpenSSL.
 
 ### Fixed
-- Build Linux ARM64 releases on a native Ubuntu 22.04 ARM runner with OpenSSL development dependencies, and explicitly enable target OpenSSL vendoring. PR CI builds the same release binary and exercises version, regex, indexing, and semantic search before merge.
+- Build Linux ARM64 releases on a native Ubuntu 24.04 ARM runner with OpenSSL development dependencies, and explicitly enable target OpenSSL vendoring. PR CI builds the same release binary and exercises version, regex, indexing, and semantic search before merge.
 
 ### Security
 - Update rustls to 0.23.45 and rustls-webpki to 0.103.15, addressing GHSA-2mjx-qc3c-rqvc (TLS 1.3 encryption-level boundary validation).

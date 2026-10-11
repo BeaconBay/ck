@@ -112,7 +112,7 @@ jobs:
     - run: python3 .github/tests/test_release_finalization.py -v
   linux-arm-release:
     name: Linux ARM64 release smoke test
-    runs-on: ubuntu-22.04-arm
+    runs-on: ubuntu-24.04-arm
     steps:
     - uses: actions/checkout@v7
     - uses: dtolnay/rust-toolchain@stable
@@ -129,6 +129,8 @@ jobs:
       run: |
         binary="$PWD/target/aarch64-unknown-linux-gnu/release/ck"
         "$binary" --version
+        ldd "$binary"
+        readelf --version-info "$binary" | grep -E "Name: (GLIBC|GLIBCXX|CXXABI)"
         fixture=$(mktemp -d)
         trap 'rm -rf "$fixture"' EXIT
         printf 'fn main() { println!("release regression needle"); }\n' > "$fixture/input.rs"
