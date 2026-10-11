@@ -413,11 +413,15 @@ jobs:
     name: Finalize GitHub Release
     needs: [build-release, publish-crates, publish-npm]
     runs-on: ubuntu-latest
-    # Keep the release draft if either registry publish fails.
-    if: needs.build-release.result == 'success' && needs.publish-crates.result == 'success' && needs.publish-npm.result == 'success'
+    # Run the tested guard even when an upstream job fails or is skipped.
+    if: always()
     steps:
+      - uses: actions/checkout@v7
       - name: Publish release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release edit "${{ github.ref_name }}" --draft=false --repo=${{ github.repository }}
+          BUILD_RESULT: ${{ needs.build-release.result }}
+          CRATES_RESULT: ${{ needs.publish-crates.result }}
+          NPM_RESULT: ${{ needs.publish-npm.result }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: bash .github/scripts/finalize-release.sh

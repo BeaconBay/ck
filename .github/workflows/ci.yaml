@@ -30,7 +30,7 @@ jobs:
     permissions:
       contents: none
     name: CI
-    needs: [test, msrv, lockfile, rustfmt, clippy, docs, vscode]
+    needs: [test, msrv, lockfile, rustfmt, clippy, docs, vscode, release-checks]
     runs-on: ubuntu-latest
     if: "always()"
     steps:
@@ -98,7 +98,18 @@ jobs:
     - run: npm ci --ignore-scripts
     # Packaging also compiles and checks API types against engines.vscode.
     - run: npm run package -- --out "$RUNNER_TEMP/ck-search.vsix"
+    - run: python3 ../.github/tests/test_vscode_package.py "$RUNNER_TEMP/ck-search.vsix"
     - run: npm audit
+  release-checks:
+    name: Release workflow regression tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-node@v7
+      with:
+        node-version: '24'
+    - run: node --test .github/tests/test_install_targets.cjs
+    - run: python3 .github/tests/test_release_finalization.py -v
   msrv:
     name: "Check MSRV"
     runs-on: ubuntu-latest
