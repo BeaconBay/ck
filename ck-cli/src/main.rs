@@ -337,7 +337,7 @@ struct Cli {
     #[arg(
         long = "model",
         value_name = "MODEL",
-        help = "Embedding model to use for indexing (bge-small, nomic-v1.5, jina-code, mxbai-xsmall) [default: bge-small]. Only used with --index."
+        help = "Embedding model to use for indexing (bge-small, nomic-v1.5, jina-code, mxbai-xsmall, bge-m3, paraphrase-multilingual, paraphrase-multilingual-base) [default: bge-small]. Only used with --index."
     )]
     model: Option<String>,
 

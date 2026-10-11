@@ -403,6 +403,7 @@ dependencies = [
  "anyhow",
  "ck-core",
  "ck-embed",
+ "ck-models",
  "serde",
  "tracing",
  "tree-sitter",

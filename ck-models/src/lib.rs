@@ -69,6 +69,43 @@ impl Default for ModelRegistry {
             },
         );
 
+        // Multilingual models. These three need no instruction prefix, which
+        // matters because fastembed does not prepend one (see bge-m3 vs e5 below).
+        models.insert(
+            "bge-m3".to_string(),
+            ModelConfig {
+                name: "BAAI/bge-m3".to_string(),
+                provider: "fastembed".to_string(),
+                dimensions: 1024,
+                max_tokens: 8192,
+                description: "Multilingual embedding model (100+ languages, 8k context, 1024 dims)"
+                    .to_string(),
+            },
+        );
+
+        models.insert(
+            "paraphrase-multilingual".to_string(),
+            ModelConfig {
+                name: "Xenova/paraphrase-multilingual-MiniLM-L12-v2".to_string(),
+                provider: "fastembed".to_string(),
+                dimensions: 384,
+                max_tokens: 512,
+                description: "Small multilingual embedding model (50+ languages, 384 dims)"
+                    .to_string(),
+            },
+        );
+
+        models.insert(
+            "paraphrase-multilingual-base".to_string(),
+            ModelConfig {
+                name: "Xenova/paraphrase-multilingual-mpnet-base-v2".to_string(),
+                provider: "fastembed".to_string(),
+                dimensions: 768,
+                max_tokens: 512,
+                description: "Multilingual embedding model (50+ languages, 768 dims)".to_string(),
+            },
+        );
+
         models.insert(
             "mxbai-xsmall".to_string(),
             ModelConfig {
@@ -290,5 +327,86 @@ impl ProjectConfig {
         let data = serde_json::to_string_pretty(self)?;
         std::fs::write(path, data)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MULTILINGUAL: [(&str, &str, usize, usize); 3] = [
+        ("bge-m3", "BAAI/bge-m3", 1024, 8192),
+        (
+            "paraphrase-multilingual",
+            "Xenova/paraphrase-multilingual-MiniLM-L12-v2",
+            384,
+            512,
+        ),
+        (
+            "paraphrase-multilingual-base",
+            "Xenova/paraphrase-multilingual-mpnet-base-v2",
+            768,
+            512,
+        ),
+    ];
+
+    #[test]
+    fn multilingual_aliases_resolve_to_expected_config() {
+        let registry = ModelRegistry::default();
+
+        for (alias, name, dimensions, max_tokens) in MULTILINGUAL {
+            let (resolved_alias, config) = registry
+                .resolve(Some(alias))
+                .unwrap_or_else(|e| panic!("alias '{alias}' should resolve: {e}"));
+
+            assert_eq!(resolved_alias, alias);
+            assert_eq!(config.name, name, "alias '{alias}' maps to the wrong model");
+            assert_eq!(config.dimensions, dimensions, "wrong dims for '{alias}'");
+            assert_eq!(
+                config.max_tokens, max_tokens,
+                "wrong max_tokens for '{alias}'"
+            );
+            assert_eq!(config.provider, "fastembed", "wrong provider for '{alias}'");
+        }
+    }
+
+    #[test]
+    fn multilingual_models_resolve_by_full_name_too() {
+        let registry = ModelRegistry::default();
+
+        for (_, name, _, _) in MULTILINGUAL {
+            let (_, config) = registry
+                .resolve(Some(name))
+                .unwrap_or_else(|e| panic!("model '{name}' should resolve by name: {e}"));
+            assert_eq!(config.name, name);
+        }
+    }
+
+    #[test]
+    fn adding_multilingual_models_leaves_the_default_alone() {
+        let registry = ModelRegistry::default();
+
+        let (alias, config) = registry.resolve(None).expect("default should resolve");
+        assert_eq!(alias, "bge-small");
+        assert_eq!(config.name, "BAAI/bge-small-en-v1.5");
+    }
+
+    #[test]
+    fn every_registered_model_declares_nonzero_limits() {
+        let registry = ModelRegistry::default();
+
+        for alias in registry.aliases() {
+            let (_, config) = registry
+                .resolve(Some(&alias))
+                .expect("a listed alias resolves");
+            assert!(config.dimensions > 0, "'{alias}' declares zero dimensions");
+            assert!(config.max_tokens > 0, "'{alias}' declares zero max_tokens");
+        }
+    }
+
+    #[test]
+    fn unknown_alias_is_an_error() {
+        let registry = ModelRegistry::default();
+        assert!(registry.resolve(Some("no-such-model")).is_err());
     }
 }

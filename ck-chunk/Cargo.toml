@@ -32,6 +32,9 @@ tree-sitter-elixir = { workspace = true }
 tree-sitter-md = { workspace = true }
 tracing = { workspace = true }
 
+[dev-dependencies]
+ck-models = { workspace = true }
+
 [features]
 default = ["fastembed", "mixedbread"]
 fastembed = ["ck-embed/fastembed"]

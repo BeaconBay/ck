@@ -34,6 +34,12 @@ pub fn get_model_chunk_config(model_name: Option<&str>) -> (usize, usize) {
             (400, 80) // 400 tokens target, 80 token overlap (~20%)
         }
 
+        // Multilingual models. The paraphrase pair truncates at 512, so chunks
+        // must stay well under it or the tail of every chunk is silently dropped.
+        "BAAI/bge-m3" => (1024, 200),
+        "Xenova/paraphrase-multilingual-MiniLM-L12-v2"
+        | "Xenova/paraphrase-multilingual-mpnet-base-v2" => (400, 80),
+
         // Default to large model config since nomic-v1.5 is default
         _ => (1024, 200), // Good balance of context vs precision
     }
@@ -4087,5 +4093,76 @@ end
             "Should capture both @behaviour and @behavior spellings, found {}",
             behaviour_chunks.len()
         );
+    }
+}
+
+#[cfg(test)]
+mod model_config_consistency {
+    use super::get_model_chunk_config;
+    use ck_embed::TokenEstimator;
+    use ck_models::ModelRegistry;
+
+    /// Chunks larger than a model's token limit are silently truncated at embed
+    /// time, so every registered model must chunk below its own limit.
+    ///
+    /// Regression guard: the model tables live in three crates (ck-models for the
+    /// registry, ck-chunk for chunk sizing, ck-embed for token limits) and adding
+    /// a model to one without the others leaves the default 8192/1024 in place.
+    #[test]
+    fn every_registered_model_chunks_below_its_token_limit() {
+        let registry = ModelRegistry::default();
+
+        for alias in registry.aliases() {
+            let (_, config) = registry
+                .resolve(Some(&alias))
+                .expect("a listed alias resolves");
+
+            let limit = TokenEstimator::get_model_limit(&config.name);
+            let (target, overlap) = get_model_chunk_config(Some(&config.name));
+
+            assert!(
+                target <= limit,
+                "'{alias}' ({}) chunks at {target} tokens but its embedder truncates at {limit}",
+                config.name
+            );
+            assert!(
+                overlap < target,
+                "'{alias}' overlap {overlap} is not smaller than its target {target}"
+            );
+        }
+    }
+
+    /// Pre-existing disagreement, left alone rather than silently changed here:
+    /// 'minilm' declares max_tokens 256 in the registry (correct for
+    /// all-MiniLM-L6-v2, whose max_seq_length is 256) while the tokenizer table
+    /// reports 512. Excluded so this test guards new additions without altering
+    /// existing behaviour.
+    const KNOWN_REGISTRY_TOKENIZER_MISMATCH: [&str; 1] = ["sentence-transformers/all-MiniLM-L6-v2"];
+
+    /// The registry's declared max_tokens must agree with the tokenizer table,
+    /// otherwise --help and the indexing banner report a limit ck does not apply.
+    #[test]
+    fn registry_max_tokens_matches_the_tokenizer_table() {
+        let registry = ModelRegistry::default();
+
+        for alias in registry.aliases() {
+            let (_, config) = registry
+                .resolve(Some(&alias))
+                .expect("a listed alias resolves");
+
+            if config.provider != "fastembed"
+                || KNOWN_REGISTRY_TOKENIZER_MISMATCH.contains(&config.name.as_str())
+            {
+                continue;
+            }
+
+            assert_eq!(
+                config.max_tokens,
+                TokenEstimator::get_model_limit(&config.name),
+                "'{alias}' ({}) declares a different limit in the registry than in the \
+                 tokenizer table",
+                config.name
+            );
+        }
     }
 }

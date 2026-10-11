@@ -179,6 +179,15 @@ impl FastEmbedder {
             "BAAI/bge-base-en-v1.5" => EmbeddingModel::BGEBaseENV15,
             "BAAI/bge-large-en-v1.5" => EmbeddingModel::BGELargeENV15,
 
+            // Multilingual models
+            "BAAI/bge-m3" => EmbeddingModel::BGEM3,
+            "Xenova/paraphrase-multilingual-MiniLM-L12-v2" => {
+                EmbeddingModel::ParaphraseMLMiniLML12V2
+            }
+            "Xenova/paraphrase-multilingual-mpnet-base-v2" => {
+                EmbeddingModel::ParaphraseMLMpnetBaseV2
+            }
+
             // Default to Nomic v1.5 for better performance
             _ => EmbeddingModel::NomicEmbedTextV15,
         };
@@ -216,6 +225,12 @@ impl FastEmbedder {
             // BGE large can handle more
             EmbeddingModel::BGELargeENV15 => 512, // Conservative for BGE
 
+            // Multilingual
+            EmbeddingModel::BGEM3 => 8192,
+            EmbeddingModel::ParaphraseMLMiniLML12V2 | EmbeddingModel::ParaphraseMLMpnetBaseV2 => {
+                512
+            }
+
             _ => 512, // Safe default
         };
 
@@ -243,6 +258,11 @@ impl FastEmbedder {
 
             // Large models (1024 dimensions)
             EmbeddingModel::BGELargeENV15 => 1024,
+            EmbeddingModel::BGEM3 => 1024,
+
+            // Multilingual
+            EmbeddingModel::ParaphraseMLMiniLML12V2 => 384,
+            EmbeddingModel::ParaphraseMLMpnetBaseV2 => 768,
 
             _ => 384, // Default to 384 for BGE default
         };

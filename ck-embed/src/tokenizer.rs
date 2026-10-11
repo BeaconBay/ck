@@ -53,6 +53,9 @@ impl TokenEstimator {
             "jina-embeddings-v2-base-code" => 8192,
             "BAAI/bge-base-en-v1.5" => 512,
             "BAAI/bge-large-en-v1.5" => 512,
+            "BAAI/bge-m3" => 8192,
+            "Xenova/paraphrase-multilingual-MiniLM-L12-v2" => 512,
+            "Xenova/paraphrase-multilingual-mpnet-base-v2" => 512,
             _ => 8192, // Default to Nomic limit
         }
     }
