@@ -18,7 +18,7 @@ This installs the NPM package from [@beaconbay/ck-search](https://www.npmjs.com/
 ### Linux ARM64 compatibility
 
 The Linux ARM64 prebuilt binary targets Ubuntu 24.04 or a distribution with
-compatible glibc and libstdc++ libraries. Ubuntu 22.04's standard libraries are
+glibc 2.39 and libstdc++ providing CXXABI_1.3.15 or newer. Ubuntu 22.04's standard libraries are
 too old for the bundled ONNX Runtime. CI verifies indexing and semantic search
 on Ubuntu 24.04 ARM64 before release.
 

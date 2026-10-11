@@ -128,17 +128,9 @@ jobs:
     - name: Exercise the release binary
       run: |
         binary="$PWD/target/aarch64-unknown-linux-gnu/release/ck"
-        "$binary" --version
         ldd "$binary"
         readelf --version-info "$binary" | grep -E "Name: (GLIBC|GLIBCXX|CXXABI)"
-        fixture=$(mktemp -d)
-        trap 'rm -rf "$fixture"' EXIT
-        printf 'fn main() { println!("release regression needle"); }\n' > "$fixture/input.rs"
-        "$binary" --regex needle "$fixture/input.rs" > "$fixture/result.txt"
-        grep -q 'release regression needle' "$fixture/result.txt"
-        "$binary" --index "$fixture"
-        "$binary" --sem 'release regression' "$fixture/input.rs" --threshold 0 > "$fixture/semantic.txt"
-        grep -q 'release regression needle' "$fixture/semantic.txt"
+        bash .github/tests/test_release_binary.sh "$binary"
   msrv:
     name: "Check MSRV"
     runs-on: ubuntu-latest

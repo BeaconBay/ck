@@ -14,6 +14,12 @@ This file tracks instances where ck behaves unexpectedly during testing or usage
 
 ## Issues Found
 
+**Command:** `ck --sem 'release regression' input.rs --threshold 0 > semantic.txt`
+**Expected:** Redirected output contains a contiguous plain-text match suitable for text processing.
+**Actual:** Semantic highlighting emits ANSI escapes into redirected output, splitting the matching phrase. The search exits successfully; a plain-text grep assertion fails. Reproduced with the 0.8.0 draft binary, with `CLICOLOR=1` as in CI. JSON output contains the expected file/content and a positive score.
+**Date:** 2026-10-11
+**Status:** Open (#206); release smoke tests use structured JSON assertions. Terminal-color behavior remains a separate fix.
+
 **Command:** `ck ""`
 **Expected:** Error message or no results
 **Actual:** Massive output with every empty line in the codebase being matched
