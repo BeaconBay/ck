@@ -80,9 +80,10 @@ jobs:
         cache: pnpm
         cache-dependency-path: docs-site/pnpm-lock.yaml
     - run: pnpm install --frozen-lockfile
+    - run: pnpm audit
     - run: pnpm build
   vscode:
-    name: Build VS Code extension
+    name: Package VS Code extension
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -95,7 +96,9 @@ jobs:
         cache: npm
         cache-dependency-path: ck-vscode/package-lock.json
     - run: npm ci --ignore-scripts
-    - run: npm run compile
+    # Packaging also compiles and checks API types against engines.vscode.
+    - run: npm run package -- --out "$RUNNER_TEMP/ck-search.vsix"
+    - run: npm audit
   msrv:
     name: "Check MSRV"
     runs-on: ubuntu-latest
