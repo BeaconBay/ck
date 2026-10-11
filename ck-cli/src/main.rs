@@ -429,7 +429,7 @@ fn find_search_root(include_patterns: &[IncludePattern]) -> PathBuf {
     };
 
     for pattern in include_patterns.iter().skip(1) {
-        let mut candidate = if pattern.is_dir {
+        let candidate = if pattern.is_dir {
             pattern.path.clone()
         } else {
             pattern.path.parent().unwrap_or(&pattern.path).to_path_buf()
@@ -438,27 +438,31 @@ fn find_search_root(include_patterns: &[IncludePattern]) -> PathBuf {
         if candidate.starts_with(&root) {
             continue;
         }
-
-        while !root.starts_with(&candidate) && !candidate.starts_with(&root) {
-            if let Some(parent) = root.parent() {
-                root = parent.to_path_buf();
-            } else {
-                break;
-            }
-        }
-
-        if !candidate.starts_with(&root) {
-            while let Some(parent) = candidate.parent() {
-                if parent.starts_with(&root) {
-                    candidate = parent.to_path_buf();
-                    break;
-                }
-                candidate = parent.to_path_buf();
-            }
-        }
-
+        // The candidate is an ancestor of the current root: widen to it. This
+        // previously fell through to a loop that walked the candidate up to
+        // "/" before the root adopted it.
         if root.starts_with(&candidate) {
             root = candidate;
+            continue;
+        }
+
+        // Neither path contains the other: reduce to their longest shared
+        // prefix, rather than walking either path up one parent at a time.
+        let shared: PathBuf = root
+            .components()
+            .zip(candidate.components())
+            .take_while(|(a, b)| a == b)
+            .map(|(a, _)| a)
+            .collect();
+
+        // An empty reduction means the two paths share no component at all:
+        // relative operands under different directories, or differing Windows
+        // drive prefixes. (Absolute Unix paths always share the root
+        // component.) Keep the current root, which covers one operand, rather
+        // than falling through to the cwd fallback below, which would cover
+        // neither.
+        if !shared.as_os_str().is_empty() {
+            root = shared;
         }
     }
 
@@ -1849,6 +1853,162 @@ mod tests {
 
     use crate::path_utils::{self, expand_glob_patterns_with_base};
     use tempfile::tempdir;
+
+    #[test]
+    fn test_find_search_root_does_not_escape_to_filesystem_root() {
+        // `ck <query> docs/ notes.md` -- a directory operand plus a file whose
+        // parent is an ANCESTOR of it. The search root must be their shared
+        // parent, never "/", and must not depend on operand order.
+        let temp_dir = tempdir().unwrap();
+        let base = temp_dir.path().canonicalize().unwrap();
+        let docs = base.join("docs");
+        fs::create_dir_all(&docs).unwrap();
+        let notes = base.join("notes.md");
+        fs::write(&notes, "needle\n").unwrap();
+
+        let dir_first = vec![
+            IncludePattern {
+                path: docs.clone(),
+                is_dir: true,
+            },
+            IncludePattern {
+                path: notes.clone(),
+                is_dir: false,
+            },
+        ];
+        let file_first = vec![
+            IncludePattern {
+                path: notes,
+                is_dir: false,
+            },
+            IncludePattern {
+                path: docs,
+                is_dir: true,
+            },
+        ];
+
+        assert_eq!(find_search_root(&dir_first), base, "dir operand first");
+        assert_eq!(find_search_root(&file_first), base, "file operand first");
+    }
+
+    #[test]
+    fn test_find_search_root_unrelated_subtrees_use_shared_prefix() {
+        // Neither operand contains the other and their shared prefix is deeper
+        // than "/", so this exercises the prefix reduction itself rather than
+        // the containment fast paths.
+        let temp_dir = tempdir().unwrap();
+        let base = temp_dir.path().canonicalize().unwrap();
+        let deep = base.join("x").join("deep");
+        let other = base.join("y");
+        fs::create_dir_all(&deep).unwrap();
+        fs::create_dir_all(&other).unwrap();
+        let other_file = other.join("other.md");
+        fs::write(&other_file, "needle\n").unwrap();
+
+        let patterns = vec![
+            IncludePattern {
+                path: deep,
+                is_dir: true,
+            },
+            IncludePattern {
+                path: other_file,
+                is_dir: false,
+            },
+        ];
+        assert_eq!(find_search_root(&patterns), base);
+    }
+
+    #[test]
+    fn test_find_search_root_three_operands_are_order_independent() {
+        // The reduction is a fold, so the result must not depend on the order
+        // the operands arrive in.
+        let temp_dir = tempdir().unwrap();
+        let base = temp_dir.path().canonicalize().unwrap();
+        let a = base.join("a").join("deep");
+        let b = base.join("b");
+        let c = base.join("c").join("nested");
+        for d in [&a, &b, &c] {
+            fs::create_dir_all(d).unwrap();
+        }
+
+        let mk = |p: &std::path::Path| IncludePattern {
+            path: p.to_path_buf(),
+            is_dir: true,
+        };
+        let orders = [
+            vec![mk(&a), mk(&b), mk(&c)],
+            vec![mk(&c), mk(&a), mk(&b)],
+            vec![mk(&b), mk(&c), mk(&a)],
+        ];
+        for patterns in orders {
+            assert_eq!(find_search_root(&patterns), base);
+        }
+    }
+
+    #[test]
+    fn test_find_search_root_no_shared_component_keeps_first_operand() {
+        // Operands sharing no component at all reduce to nothing. Rather than
+        // falling through to the "." fallback -- which would search neither --
+        // the first operand's root is kept, so at least one is covered.
+        // Reachable on any platform with relative operands; also the differing
+        // Windows drive prefix case.
+        let patterns = vec![
+            IncludePattern {
+                path: PathBuf::from("a/x"),
+                is_dir: true,
+            },
+            IncludePattern {
+                path: PathBuf::from("b/y"),
+                is_dir: true,
+            },
+        ];
+        assert_eq!(find_search_root(&patterns), PathBuf::from("a/x"));
+    }
+
+    #[test]
+    fn test_find_search_root_disjoint_operands_share_only_root() {
+        // These paths are intentionally notional -- find_search_root operates
+        // purely textually, so they need not exist on disk.
+        // Operands under different top-level directories genuinely share only
+        // "/", so that is the correct common parent — this reduction narrows
+        // the root to the shared prefix, it does not bound how wide that
+        // prefix may legitimately be.
+        let patterns = vec![
+            IncludePattern {
+                path: PathBuf::from("/tmp/docs"),
+                is_dir: true,
+            },
+            IncludePattern {
+                path: PathBuf::from("/var/notes.md"),
+                is_dir: false,
+            },
+        ];
+        assert_eq!(find_search_root(&patterns), PathBuf::from("/"));
+    }
+
+    #[test]
+    fn test_find_search_root_reduces_siblings_to_common_ancestor() {
+        // Two sibling directories still reduce to the directory containing
+        // them -- the ordinary common-ancestor case.
+        let temp_dir = tempdir().unwrap();
+        let base = temp_dir.path().canonicalize().unwrap();
+        let a = base.join("a");
+        let b = base.join("b");
+        fs::create_dir_all(&a).unwrap();
+        fs::create_dir_all(&b).unwrap();
+
+        let patterns = vec![
+            IncludePattern {
+                path: a,
+                is_dir: true,
+            },
+            IncludePattern {
+                path: b,
+                is_dir: true,
+            },
+        ];
+        assert_eq!(find_search_root(&patterns), base);
+    }
 
     #[test]
     fn test_expand_glob_patterns_supports_semicolon_lists() {

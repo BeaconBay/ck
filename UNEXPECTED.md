@@ -80,6 +80,12 @@ This file tracks instances where ck behaves unexpectedly during testing or usage
 **Status:** Fixed (fix/command-flag-paths — command-mode flags now resolve their target from the pattern slot via `Cli::command_target_path`; covers `--index`, `--clean`, `--clean-orphans`, `--status*`, `--switch-model`, `--add`)
 **Notes:** Found while writing a concurrent-indexing test: two `ck --index <tempdir>` processes silently indexed the ck repo itself (cwd). Command-mode flags (`--index`, `--clean`, `--add`, …) should treat the first positional arg as their target path.
 
+**Command:** `ck needle docs notes.md` (a directory operand plus a file beside it)
+**Expected:** Search limited to `docs/` and `notes.md`
+**Actual:** The walk was rooted at `/` and traversed the entire filesystem — an apparent hang, or `DETAILED ERROR: Read-only file system (os error 30)` when ck tried to create an index at `/`. Order-dependent: `ck needle notes.md docs` (file operand first) returned instantly. Found after a `ck` process spent 4.5 hours walking a mounted cloud-storage directory, downloading files as it went.
+**Date:** 2026-07-28
+**Status:** Fixed (#184 — `find_search_root` now reduces to the operands' longest common path prefix instead of walking a path up one parent at a time)
+
 ---
 
 ## Instructions

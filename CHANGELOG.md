@@ -45,6 +45,9 @@ registry publication because the Linux ARM64 cross-build lacked host OpenSSL.
 - The search-root traversal bug (#184), TUI `q` input bug (#198), and MCP `.ckignore` initialization issue (#191) remain open.
 - The rmcp 2.1 security migration (#197/#181) remains separate. The currently enabled stdio transport does not include the HTTP/OAuth features affected by the open advisories.
 
+### Fixed
+- **Search root no longer escapes past the operands' shared parent** (#184): `ck <query> docs/ notes.md` — a directory operand plus a file that lives beside it rather than inside it — rooted the search/index walk at the filesystem root and walked everything. In `find_search_root`, when the candidate was an *ancestor* of the current root, a loop walked that candidate up one parent at a time looking for an ancestor contained by the (deeper) root — a condition that never held, so it ran to `/`, which the root then adopted. The reduction now takes the longest common prefix of the paths' components, so the root is the operands' actual shared parent. The old behavior was operand-order dependent and surfaced as an apparent hang, or as `Read-only file system (os error 30)` when creating an index at `/`. Note this does not change the root for operands whose *only* shared component is `/` (e.g. `ck <query> /tmp/a /var/b`), where the shared parent genuinely is the filesystem root.
+
 ## [0.7.11] - 2026-05-24
 
 ### Added
