@@ -1644,7 +1644,7 @@ mod tests {
         assert_eq!(fused.len(), 2);
         let chunk = fused
             .iter()
-            .find(|r| r.file == PathBuf::from("src/a.rs"))
+            .find(|r| r.file == Path::new("src/a.rs"))
             .unwrap();
         // Chunk-level span retained, score = both lists at rank 1
         assert_eq!((chunk.span.line_start, chunk.span.line_end), (10, 50));
@@ -1654,7 +1654,7 @@ mod tests {
         // The fused result must outrank the semantic-only one
         let other = fused
             .iter()
-            .find(|r| r.file == PathBuf::from("src/b.rs"))
+            .find(|r| r.file == Path::new("src/b.rs"))
             .unwrap();
         assert!(chunk.score > other.score);
     }
@@ -1668,7 +1668,7 @@ mod tests {
         assert_eq!(fused.len(), 2);
         let standalone = fused
             .iter()
-            .find(|r| r.file == PathBuf::from("src/z.rs"))
+            .find(|r| r.file == Path::new("src/z.rs"))
             .unwrap();
         assert!((standalone.score - 1.0 / 61.0).abs() < 1e-6);
     }

@@ -7,7 +7,7 @@
   "license": "Apache-2.0 OR MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/beacon-biosignals/ck.git",
+    "url": "https://github.com/BeaconBay/ck.git",
     "directory": "ck-vscode"
   },
   "engines": {
@@ -144,9 +144,9 @@
   },
   "devDependencies": {
     "@types/node": "^25.x",
-    "@types/vscode": "^1.120.0",
+    "@types/vscode": "~1.93.0",
     "typescript": "^6.0.3",
-    "@vscode/vsce": "^2.24.0"
+    "@vscode/vsce": "^4.0.0"
   },
   "dependencies": {
     "jsonrpc-lite": "^2.2.0"

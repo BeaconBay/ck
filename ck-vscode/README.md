@@ -82,11 +82,18 @@ code --install-extension . --force
 
 ## Development
 
+Use Node.js 24, matching CI. Install the committed dependency versions with
+`npm ci --ignore-scripts`.
+
+The extension supports VS Code 1.93 and later. Keep `@types/vscode` on the
+1.93 API line so compilation and packaging check that compatibility; upgrading
+the types requires reviewing the minimum supported editor version together.
+
 ### Building
 
 ```bash
 cd ck-vscode
-npm install
+npm ci --ignore-scripts
 npm run compile
 ```
 

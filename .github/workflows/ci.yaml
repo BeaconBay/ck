@@ -15,6 +15,11 @@ env:
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
   CLICOLOR: 1
+  # Each feature build otherwise leaves large debug/incremental artifacts behind
+  # and can exhaust the hosted Linux runner's disk before the matrix finishes.
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"
@@ -25,7 +30,7 @@ jobs:
     permissions:
       contents: none
     name: CI
-    needs: [test, msrv, lockfile, rustfmt, clippy]
+    needs: [test, msrv, lockfile, rustfmt, clippy, docs, vscode, release-checks]
     runs-on: ubuntu-latest
     if: "always()"
     steps:
@@ -34,7 +39,12 @@ jobs:
         if: "contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')"
   test:
     name: Test
+    env:
+      # ort rc.11 can race while dropping/recreating its global environment.
+      # Serialize model-backed tests until that upstream lifetime issue is fixed.
+      RUST_TEST_THREADS: 1
     strategy:
+      fail-fast: false
       matrix:
         # Windows tests disabled due to esaxx-rs/ort runtime library mismatch (MT vs MD)
         # See: https://github.com/huggingface/tokenizers/issues/1482
@@ -52,7 +62,54 @@ jobs:
     - uses: Swatinem/rust-cache@v2
     - uses: taiki-e/install-action@cargo-hack
     - name: Build and Test
-      run: cargo hack test --each-feature --workspace
+      run: cargo hack test --each-feature --workspace --locked
+  docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs-site
+    steps:
+    - uses: actions/checkout@v7
+    - uses: pnpm/action-setup@v6
+      with:
+        package_json_file: docs-site/package.json
+    - uses: actions/setup-node@v7
+      with:
+        node-version: '24'
+        cache: pnpm
+        cache-dependency-path: docs-site/pnpm-lock.yaml
+    - run: pnpm install --frozen-lockfile
+    - run: pnpm audit
+    - run: pnpm build
+  vscode:
+    name: Package VS Code extension
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ck-vscode
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-node@v7
+      with:
+        node-version: '24'
+        cache: npm
+        cache-dependency-path: ck-vscode/package-lock.json
+    - run: npm ci --ignore-scripts
+    # Packaging also compiles and checks API types against engines.vscode.
+    - run: npm run package -- --out "$RUNNER_TEMP/ck-search.vsix"
+    - run: python3 ../.github/tests/test_vscode_package.py "$RUNNER_TEMP/ck-search.vsix"
+    - run: npm audit
+  release-checks:
+    name: Release workflow regression tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-node@v7
+      with:
+        node-version: '24'
+    - run: node --test .github/tests/test_install_targets.cjs
+    - run: python3 .github/tests/test_release_finalization.py -v
   msrv:
     name: "Check MSRV"
     runs-on: ubuntu-latest

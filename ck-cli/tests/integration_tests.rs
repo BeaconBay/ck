@@ -739,7 +739,13 @@ fn test_add_single_file_to_index() {
         .output()
         .expect("Failed to create index");
 
-    assert!(output.status.success(), "Failed to create initial index");
+    assert!(
+        output.status.success(),
+        "Failed to create initial index: status: {}, stderr: {}, stdout: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
 
     // Create another file after index creation
     let new_file = temp_dir.path().join("new_file.txt");
@@ -794,7 +800,13 @@ fn test_add_file_with_relative_path() {
         .output()
         .expect("Failed to create index");
 
-    assert!(output.status.success());
+    assert!(
+        output.status.success(),
+        "Failed to create initial index: status: {}, stderr: {}, stdout: {}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout)
+    );
 
     // Create a new file to add
     fs::write(

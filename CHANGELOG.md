@@ -4,8 +4,35 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-11
+
 ### Added
 - **`--hidden` flag** (re-implements #97, original by @peterkc): Include hidden (dot-prefixed) files and directories in both search and indexing. Off by default to preserve current behavior; when set, the file walker no longer skips dot-prefixed entries. Composes with `--no-ignore`/`--no-ckignore` (independent toggles). Threads through `SearchOptions.hidden` and `FileCollectionOptions.show_hidden` to the `ignore` crate's `WalkBuilder.hidden(!show_hidden)` in `ck-index::collect_files`.
+- **External index directories** (#165): Set `CK_INDEX_DIR` to keep indexes outside the source tree, isolated by project path.
+- **ARM64 release archives** (#156): Linux and Windows ARM64 binaries join the existing release targets. The npm installer now selects the Linux ARM64 archive, with regression coverage for all six supported platform/architecture combinations.
+- **Lexical result spans** (#167): Lexical matches report chunk-level line ranges.
+
+### Fixed
+- **Lexical index freshness and query handling** (#154, #166): Rebuild stale indexes when the corpus changes, use the shared file walker, and handle natural-language queries containing Tantivy syntax leniently.
+- **Hybrid natural-language searches** (#151): Improve candidate retrieval and combine keyword and semantic hits at chunk level.
+- **CLI paths and pipes** (#148, #152): Command-mode flags honor their explicit target path, and piping output to commands such as `head` no longer panics on a broken pipe.
+- **Index coordination and metrics** (#149, #150): Serialize cross-process index writes and report actual index size separately from indexing/search time.
+- **C/C++ chunking edge cases** (#137): Correct the cases reported in #136.
+- **VS Code packaging** (#203): Compile against the advertised VS Code 1.93 API and package with vsce 4 on Node 24. CI verifies the entrypoint, runtime dependency, webview assets, and minimum editor version.
+
+### Security
+- Update compatible Rust dependencies, including quinn-proto 0.11.18 (#193, #195).
+- Update the documentation dependencies and extension packaging stack; both JavaScript dependency audits pass (#177, #179, #201, #202, #203).
+
+### Technical
+- Stabilize the Rust CI feature matrix by reducing build artifacts and serializing model-backed tests; require documentation, VSIX, audit, and release regression checks (#203).
+- Use Node 24/npm 11.17.0 for trusted publishing and keep GitHub releases in draft when a binary build or registry publish fails. Regression tests cover failed, cancelled, skipped, and missing upstream results (#203).
+- Update rmcp/rmcp-macros to 1.7 (#175), Dart grammar bindings to 0.2 (#174), and retire the unused ck-ann crate (#153).
+
+### Known limitations
+- Windows and Intel macOS release binaries are built without semantic embedding support. Windows semantic flags can still misleadingly return zero scores; #200 tracks explicit failure reporting, native linking, and Windows MCP issues.
+- The search-root traversal bug (#184), TUI `q` input bug (#198), and MCP `.ckignore` initialization issue (#191) remain open.
+- The rmcp 2.1 security migration (#197/#181) remains separate. The currently enabled stdio transport does not include the HTTP/OAuth features affected by the open advisories.
 
 ## [0.7.11] - 2026-05-24
 
