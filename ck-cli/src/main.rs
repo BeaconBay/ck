@@ -10,6 +10,7 @@ use regex::RegexBuilder;
 use std::path::{Path, PathBuf};
 
 mod mcp;
+mod mcp_http;
 mod mcp_server;
 mod path_utils;
 mod progress;
@@ -81,6 +82,7 @@ QUICK START EXAMPLES:
 
   AI agent integration (MCP):
     ck --serve                         # Start MCP server for Claude/Cursor integration
+    ck --serve-http 127.0.0.1:8185     # The same over Streamable HTTP (CK_MCP_API_KEY_FILE: bearer key)
     # Provides tools: semantic_search, regex_search, hybrid_search, index_status, reindex, health_check
     # Connect with Claude Desktop, Cursor, or any MCP-compatible client
 
@@ -371,6 +373,23 @@ struct Cli {
     )]
     serve: bool,
 
+    // MCP server over Streamable HTTP
+    #[arg(
+        long = "serve-http",
+        value_name = "ADDR",
+        help = "Start MCP server mode over Streamable HTTP on ADDR (e.g. 127.0.0.1:8185); CK_MCP_API_KEY_FILE sets a bearer key",
+        conflicts_with_all = [
+            "pattern", "files", "line_numbers", "no_filenames", "with_filenames",
+            "files_with_matches", "files_without_matches", "ignore_case", "word_regexp",
+            "fixed_strings", "recursive", "context", "after_context", "before_context",
+            "semantic", "lexical", "hybrid", "regex", "top_k", "threshold", "show_scores",
+            "json", "json_v1", "jsonl", "no_snippet", "reindex", "exclude", "no_default_excludes",
+            "no_ignore", "full_section", "index", "clean", "clean_orphans", "switch_model",
+            "force", "add", "status", "status_verbose", "inspect", "dump_chunks", "model", "rerank", "rerank_model", "tui", "serve"
+        ]
+    )]
+    serve_http: Option<std::net::SocketAddr>,
+
     // TUI mode
     #[arg(
         long = "tui",
@@ -382,7 +401,7 @@ struct Cli {
             "semantic", "lexical", "hybrid", "regex", "top_k", "threshold", "show_scores",
             "json", "json_v1", "jsonl", "no_snippet", "reindex", "exclude", "no_default_excludes",
             "no_ignore", "full_section", "index", "clean", "clean_orphans", "switch_model",
-            "force", "add", "status", "status_verbose", "inspect", "dump_chunks", "model", "rerank", "rerank_model", "serve"
+            "force", "add", "status", "status_verbose", "inspect", "dump_chunks", "model", "rerank", "rerank_model", "serve", "serve_http"
         ]
     )]
     tui: bool,
@@ -933,6 +952,9 @@ async fn run_main() -> Result<()> {
     if cli.serve {
         return run_mcp_server().await;
     }
+    if let Some(addr) = cli.serve_http {
+        return run_mcp_http_server(addr).await;
+    }
 
     // Handle TUI mode
     if cli.tui {
@@ -962,6 +984,20 @@ async fn run_mcp_server() -> Result<()> {
     let cwd = std::env::current_dir()?;
     let server = mcp_server::CkMcpServer::new(cwd)?;
     server.run().await
+}
+
+async fn run_mcp_http_server(addr: std::net::SocketAddr) -> Result<()> {
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::from_default_env()
+                .add_directive(tracing::Level::INFO.into()),
+        )
+        .init();
+
+    let cwd = std::env::current_dir()?;
+    let server = mcp_server::CkMcpServer::new(cwd)?;
+    mcp_http::run(server, addr).await
 }
 
 async fn run_cli_mode(cli: Cli) -> Result<()> {

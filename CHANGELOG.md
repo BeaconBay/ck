@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **MCP over HTTP** (`--serve-http <addr>`): Serve the MCP tools over the Streamable HTTP transport (rmcp's `transport-streamable-http-server`), stateless with JSON responses, for clients on another host. `CK_MCP_API_KEY_FILE` names a file holding a bearer key that every request must present (constant-time comparison, `401` otherwise). The `--serve` path sandbox and rmcp's loopback `Host` check apply unchanged.
+
 ## [0.8.1] - 2026-10-11
 
 This is the first published 0.8 release. The 0.8.0 build attempt stopped before
