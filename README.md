@@ -64,6 +64,21 @@ claude mcp list  # or use /mcp in Claude Code
 }
 ```
 
+**Remote clients over HTTP:** `--serve-http` serves the same tools over MCP's Streamable HTTP transport, for a client on another machine that reaches ck through a tunnel or reverse proxy instead of spawning it:
+
+```bash
+# Require a bearer key, and allow searches of two more trees besides the working directory
+openssl rand -hex 32 > ~/.config/ck-api-key && chmod 600 ~/.config/ck-api-key
+CK_MCP_API_KEY_FILE=~/.config/ck-api-key \
+CK_MCP_ALLOWED_ROOTS=/srv/repo-a:/srv/repo-b \
+  ck --serve-http 127.0.0.1:8185
+```
+
+- Stateless, with plain JSON responses: each `POST` carries one JSON-RPC request and gets one response, with no session or `initialize` round trip. The model, caches and pagination cursors are shared across requests.
+- With `CK_MCP_API_KEY_FILE` set, every request must send `Authorization: Bearer <key>` or gets `401`. Without it, any process that can reach the port can search, so bind to loopback.
+- Paths are sandboxed exactly as with `--serve`: the working directory plus `CK_MCP_ALLOWED_ROOTS`.
+- Only loopback `Host` headers are accepted (DNS-rebinding protection), so a proxy in front must send `Host: localhost` or `127.0.0.1`.
+
 **Tool Permissions:** When prompted by Claude Code, approve permissions for ck-search tools (semantic_search, regex_search, hybrid_search, etc.)
 
 **Available MCP Tools:**

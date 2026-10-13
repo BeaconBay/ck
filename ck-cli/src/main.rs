@@ -82,6 +82,7 @@ QUICK START EXAMPLES:
 
   AI agent integration (MCP):
     ck --serve                         # Start MCP server for Claude/Cursor integration
+    ck --serve-http 127.0.0.1:8185     # The same over Streamable HTTP (CK_MCP_API_KEY_FILE: bearer key)
     # Provides tools: semantic_search, regex_search, hybrid_search, index_status, reindex, health_check
     # Connect with Claude Desktop, Cursor, or any MCP-compatible client
 

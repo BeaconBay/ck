@@ -58,7 +58,11 @@ pub async fn run(server: CkMcpServer, addr: SocketAddr) -> Result<()> {
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .with_context(|| format!("binding {addr}"))?;
-    info!("ck MCP server listening on http://{addr}");
+    // The bound address, not the requested one, so `127.0.0.1:0` reports its port.
+    info!(
+        "ck MCP server listening on http://{}",
+        listener.local_addr()?
+    );
 
     loop {
         let (stream, peer) = listener.accept().await?;
