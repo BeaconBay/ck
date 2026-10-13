@@ -211,7 +211,13 @@ impl SessionManager {
         if config.include_snippet {
             for result in &mut page_results {
                 if result.preview.len() > config.snippet_length {
-                    result.preview.truncate(config.snippet_length);
+                    // snippet_length is in bytes; back off to a char boundary so a
+                    // multi-byte character straddling the limit can't panic truncate().
+                    let mut cut = config.snippet_length;
+                    while !result.preview.is_char_boundary(cut) {
+                        cut -= 1;
+                    }
+                    result.preview.truncate(cut);
                     result.preview.push_str("...");
                 }
             }
@@ -541,6 +547,26 @@ mod tests {
         assert_eq!(page2.count, 25); // 75 - 50 = 25
         assert!(!page2.has_more);
         assert!(page2.next_cursor.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_snippet_truncation_respects_char_boundaries() {
+        let manager = SessionManager::default();
+        let mut results = create_test_results(1);
+        // "€" is 3 bytes (positions 3..6), so a 4-byte limit falls inside it.
+        results[0].preview = "abc€def".to_string();
+        let config = PaginationConfig {
+            include_snippet: true,
+            snippet_length: 4,
+            ..PaginationConfig::default()
+        };
+
+        let page = manager
+            .get_first_page(create_test_search_options(), results, config)
+            .await
+            .unwrap();
+
+        assert_eq!(page.matches[0].preview, "abc...");
     }
 
     #[tokio::test]
