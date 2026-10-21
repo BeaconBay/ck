@@ -2747,4 +2747,43 @@ mod tests {
         // Top score is normalized to 1.0, exactly as before this patch.
         assert!((results[0].score - 1.0).abs() < 1e-6);
     }
+
+    #[tokio::test]
+    async fn test_lexical_search_rebuilds_empty_stub() {
+        // A lexical search over a directory with no indexable files builds an
+        // empty tantivy index. Once real files appear the corpus fingerprint
+        // changes, so a later search must rebuild and surface them rather than
+        // trusting the empty index. The unique TempDir path keys its own index
+        // (in-tree .ck, or a path-hashed subdir under CK_INDEX_DIR when set), so
+        // the test needs no env manipulation or serialization to stay isolated.
+        let temp_dir = TempDir::new().unwrap();
+        fs::create_dir_all(temp_dir.path().join(".ck")).unwrap();
+
+        let options = SearchOptions {
+            mode: SearchMode::Lexical,
+            query: "zebra".to_string(),
+            path: temp_dir.path().to_path_buf(),
+            recursive: true,
+            ..Default::default()
+        };
+
+        // First search builds an empty index (no files yet).
+        let empty = lexical_search(&options).await.unwrap();
+        assert!(empty.is_empty());
+
+        // A real file appears; the next search must find it.
+        fs::write(
+            temp_dir.path().join("mod.py"),
+            "def gamma():\n    zebra = 3\n    return zebra\n",
+        )
+        .unwrap();
+
+        let results = lexical_search(&options).await.unwrap();
+        assert!(
+            results
+                .iter()
+                .any(|r| r.file.file_name().unwrap() == "mod.py"),
+            "empty tantivy stub was trusted; expected a rebuild to find the new file"
+        );
+    }
 }
